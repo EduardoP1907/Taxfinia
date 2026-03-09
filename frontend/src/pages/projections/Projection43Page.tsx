@@ -9,14 +9,12 @@ import { DashboardLayout } from '../../layouts/DashboardLayout';
 import {
   projectionsService,
   type ProjectionScenarioWithData,
-  type DCFParameters,
   type DCFResults,
 } from '../../services/projections.service';
 import { companyService } from '../../services/company.service';
 import { toast } from 'sonner';
-import { ArrowLeft, Calculator, TrendingUp, DollarSign, Save } from 'lucide-react';
+import { ArrowLeft, Calculator, DollarSign, Save } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
 
 interface Projection43PageProps {
   tabsHeader?: React.ReactNode;
@@ -30,11 +28,11 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [calculating, setCalculating] = useState(false);
+  const [_calculating, _setCalculating] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [company, setCompany] = useState<any>(null);
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
-  const [dcfResults, setDcfResults] = useState<DCFResults | null>(null);
+  const [_dcfResults, setDcfResults] = useState<DCFResults | null>(null);
 
   // DCF Parameters state — stored as plain percentages (e.g. 8 = 8%)
   const [waccPct, setWaccPct] = useState<number>(8);
@@ -131,44 +129,6 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
     }
   };
 
-  const handleCalculateDCF = async () => {
-    try {
-      setCalculating(true);
-
-      // Convertir % → decimales para el backend
-      // El WACC ingresado directamente por el usuario tiene prioridad
-      const params: DCFParameters = {
-        wacc: waccPct / 100,
-        costOfDebt: costOfDebtPct / 100,
-        taxRateForWacc: taxRatePct / 100,
-        terminalGrowthRate: terminalGrowthPct / 100,
-        netDebt: 0,
-      };
-
-      // Primero actualizamos los parámetros
-      const updated = await projectionsService.updateDCFParameters(scenarioId!, params);
-
-      // IMPORTANTE: Necesitamos actualizar manualmente el WACC que el usuario ingresó
-      // ya que el backend lo calcula automáticamente
-      // Por ahora, recalculamos el DCF con el WACC calculado por el backend
-
-      // Calcular DCF
-      const result = await projectionsService.calculateDCFValuation(scenarioId!);
-
-      // Cargar resultados
-      const dcfData = await projectionsService.getDCFResults(scenarioId!);
-      setDcfResults(dcfData);
-      setScenario(result);
-
-      toast.success('Valoración DCF calculada exitosamente');
-    } catch (error: any) {
-      console.error('Error calculating DCF:', error);
-      toast.error(error.response?.data?.error || 'Error al calcular DCF');
-    } finally {
-      setCalculating(false);
-    }
-  };
-
   const handleSaveAll = async () => {
     try {
       setSaving(true);
@@ -205,11 +165,6 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
   const formatPercent = (value: number | null | undefined, decimals = 2) => {
     if (value === null || value === undefined) return '-';
     return `${(value * 100).toFixed(decimals)}%`;
-  };
-
-  const formatDecimal = (value: number | null | undefined, decimals = 4) => {
-    if (value === null || value === undefined) return '-';
-    return value.toFixed(decimals);
   };
 
   if (loading) {

@@ -139,7 +139,7 @@ export const YearSelector: React.FC<YearSelectorProps> = ({
                       size="sm"
                       onClick={handleAddYear}
                       disabled={loading}
-                      loading={loading}
+                      isLoading={loading}
                       className="flex-1"
                     >
                       Añadir

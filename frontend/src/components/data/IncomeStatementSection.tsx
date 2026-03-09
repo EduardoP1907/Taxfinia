@@ -369,7 +369,7 @@ export const IncomeStatementSection: React.FC<IncomeStatementSectionProps> = ({ 
           <RatioCard
             label="Margen EBIT"
             value={calculations.ebitMargin}
-            color="indigo"
+            color="slate"
           />
           <RatioCard
             label="Margen Neto"
@@ -418,7 +418,7 @@ const RatioCard: React.FC<{
   const colorClasses = {
     green: 'bg-green-100 text-green-700',
     blue: 'bg-blue-100 text-blue-700',
-    indigo: 'bg-slate-100 text-amber-700',
+    slate: 'bg-slate-100 text-amber-700',
     amber: 'bg-amber-50 text-amber-700',
   };
 

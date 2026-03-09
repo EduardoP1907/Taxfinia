@@ -136,22 +136,6 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
     return isNaN(num) ? 0 : num;
   };
 
-  const formatCurrency = (value: number | null | undefined) => {
-    if (value === null || value === undefined) return '-';
-    const currency = company?.currency || 'EUR';
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number | null | undefined) => {
-    if (value === null || value === undefined) return '-';
-    return `${(value * 100).toFixed(2)}%`;
-  };
-
   const handleUpdateProjection = async (projectionId: string, field: string, value: any) => {
     try {
       // Actualizar en el backend

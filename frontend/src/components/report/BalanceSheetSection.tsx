@@ -6,7 +6,7 @@ interface Props {
   currency?: string;
 }
 
-export const BalanceSheetSection: React.FC<Props> = ({ years, currency = 'EUR' }) => {
+export const BalanceSheetSection: React.FC<Props> = ({ years }) => {
   const formatCurrency = (value: number | null | undefined): string => {
     if (value === null || value === undefined) return '-';
     return value.toLocaleString('es-ES', {

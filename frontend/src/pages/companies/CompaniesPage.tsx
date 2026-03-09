@@ -33,8 +33,8 @@ export const CompaniesPage: React.FC = () => {
     }
   };
 
-  const handleCreateCompany = async (data: CreateCompanyData) => {
-    await companyService.createCompany(data);
+  const handleCreateCompany = async (data: CreateCompanyData | UpdateCompanyData) => {
+    await companyService.createCompany(data as CreateCompanyData);
     await loadCompanies();
   };
 

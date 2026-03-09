@@ -4,7 +4,7 @@ import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { projectionsService, type ProjectionScenarioWithData, type FinancialProjection } from '../../services/projections.service';
 import { companyService } from '../../services/company.service';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Save, TrendingUp, Settings, Trash2, Calculator } from 'lucide-react';
+import { ArrowLeft, Save, TrendingUp, Settings, Calculator } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
@@ -122,7 +122,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
   const handleApplyGrowthRates = async () => {
     try {
       setSaving(true);
-      await projectionsService.applyGrowthRates(scenarioId!, growthRates);
+      await projectionsService.applyGrowthRates(scenarioId!, [growthRates] as any);
       toast.success('Tasas de crecimiento aplicadas');
       setShowGrowthRatesModal(false);
       loadData();

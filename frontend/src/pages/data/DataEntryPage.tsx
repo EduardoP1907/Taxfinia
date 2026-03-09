@@ -335,7 +335,7 @@ export const DataEntryPage: React.FC = () => {
               <Button
                 onClick={handleNext}
                 disabled={saving}
-                loading={saving}
+                isLoading={saving}
               >
                 Siguiente
                 <ChevronRight className="w-4 h-4 ml-2" />
@@ -344,7 +344,7 @@ export const DataEntryPage: React.FC = () => {
               <Button
                 onClick={handleFinish}
                 disabled={saving}
-                loading={saving}
+                isLoading={saving}
                 className="bg-green-600 hover:bg-green-700"
               >
                 <Check className="w-4 h-4 mr-2" />

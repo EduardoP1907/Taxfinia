@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { FinancialProjection } from '../../services/projections.service';
+import { type FinancialProjection } from '../../services/projections.service';
 
 interface ProjectionTableProps {
   projections: FinancialProjection[];
