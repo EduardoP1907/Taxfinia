@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config/env';
 
 export interface JwtPayload {
+  id: string;
   userId: string;
   email: string;
   role: string;
@@ -9,13 +10,13 @@ export interface JwtPayload {
 
 export const generateAccessToken = (payload: JwtPayload): string => {
   return jwt.sign(payload, config.jwtSecret, {
-    expiresIn: config.jwtExpiresIn,
+    expiresIn: config.jwtExpiresIn as any,
   });
 };
 
 export const generateRefreshToken = (payload: JwtPayload): string => {
   return jwt.sign(payload, config.jwtSecret, {
-    expiresIn: '30d',
+    expiresIn: '30d' as any,
   });
 };
 

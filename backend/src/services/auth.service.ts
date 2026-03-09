@@ -105,12 +105,14 @@ export class AuthService {
 
     // Generar tokens
     const accessToken = generateAccessToken({
+      id: user.id,
       userId: user.id,
       email: user.email,
       role: user.role,
     });
 
     const refreshToken = generateRefreshToken({
+      id: user.id,
       userId: user.id,
       email: user.email,
       role: user.role,
@@ -171,12 +173,14 @@ export class AuthService {
 
     // Generar tokens
     const accessToken = generateAccessToken({
+      id: user.id,
       userId: user.id,
       email: user.email,
       role: user.role,
     });
 
     const refreshToken = generateRefreshToken({
+      id: user.id,
       userId: user.id,
       email: user.email,
       role: user.role,
