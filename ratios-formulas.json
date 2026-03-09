@@ -1,0 +1,347 @@
+{
+  "FINANCIACIÓN": {
+    "row": 6,
+    "formula": "'2.2'!H52",
+    "value": 2024,
+    "cells": {
+      "2020": {
+        "formula": "'2.2'!P52",
+        "value": 2020
+      },
+      "2021": {
+        "formula": "'2.2'!N52",
+        "value": 2021
+      },
+      "2022": {
+        "formula": "'2.2'!L52",
+        "value": 2022
+      },
+      "2023": {
+        "formula": "'2.2'!J52",
+        "value": 2023
+      }
+    }
+  },
+  "Capitalización": {
+    "row": 9,
+    "formula": "CalcBal!K119",
+    "value": 0.8662938275847489,
+    "cells": {
+      "2020": {
+        "formula": "CalcBal!O119",
+        "value": 0.7639824093673996
+      },
+      "2021": {
+        "formula": "CalcBal!N119",
+        "value": 0.7564715232896079
+      },
+      "2022": {
+        "formula": "CalcBal!M119",
+        "value": 0.8737931391168233
+      },
+      "2023": {
+        "formula": "CalcBal!L119",
+        "value": 0.9019044767423675
+      }
+    }
+  },
+  "INVERSIONES": {
+    "row": 25,
+    "formula": "H6",
+    "value": 2024,
+    "cells": {
+      "2020": {
+        "formula": "P6",
+        "value": 2020
+      },
+      "2021": {
+        "formula": "N6",
+        "value": 2021
+      },
+      "2022": {
+        "formula": "L6",
+        "value": 2022
+      },
+      "2023": {
+        "formula": "J6",
+        "value": 2023
+      }
+    }
+  },
+  "Inmovilización recursos a largo plazo": {
+    "row": 28,
+    "formula": "CalcBal!K135",
+    "value": 0.14216921908073235,
+    "cells": {
+      "2020": {
+        "formula": "CalcBal!O135",
+        "value": 0.1468647658550775
+      },
+      "2021": {
+        "formula": "CalcBal!N135",
+        "value": 0.12279155073593859
+      },
+      "2022": {
+        "formula": "CalcBal!M135",
+        "value": 0.10994897817397278
+      },
+      "2023": {
+        "formula": "CalcBal!L135",
+        "value": 0.12037762805064847
+      }
+    }
+  },
+  "Inmovilización recursos a corto plazo": {
+    "row": 33,
+    "formula": "CalcBal!K141",
+    "value": 0.6631880389320076,
+    "cells": {
+      "2020": {
+        "formula": "CalcBal!O141",
+        "value": 0.31661905733825096
+      },
+      "2021": {
+        "formula": "CalcBal!N141",
+        "value": 0.2307269780479716
+      },
+      "2022": {
+        "formula": "CalcBal!M141",
+        "value": 0.255120890225613
+      },
+      "2023": {
+        "formula": "CalcBal!L141",
+        "value": 0.26073599255634333
+      }
+    }
+  },
+  "FINANCIACIÓN INVERSIONES": {
+    "row": 38,
+    "formula": "H6",
+    "value": 2024,
+    "cells": {
+      "2020": {
+        "formula": "P6",
+        "value": 2020
+      },
+      "2021": {
+        "formula": "N6",
+        "value": 2021
+      },
+      "2022": {
+        "formula": "L6",
+        "value": 2022
+      },
+      "2023": {
+        "formula": "J6",
+        "value": 2023
+      }
+    }
+  },
+  "Financiación necesidad F. Maniobra": {
+    "row": 45,
+    "formula": "CalcBal!K151",
+    "value": 1.0918843012762123,
+    "cells": {
+      "2020": {
+        "formula": "CalcBal!O151",
+        "value": 1.9490855942162761
+      },
+      "2021": {
+        "formula": "CalcBal!N151",
+        "value": 2.74644940923171
+      },
+      "2022": {
+        "formula": "CalcBal!M151",
+        "value": 2.9940478816471088
+      },
+      "2023": {
+        "formula": "CalcBal!L151",
+        "value": 2.9973876679937046
+      }
+    }
+  },
+  "LIQUIDEZ": {
+    "row": 49,
+    "formula": "'2.4'!H63",
+    "value": 2024,
+    "cells": {
+      "2020": {
+        "formula": "'2.2'!$P$52",
+        "value": 2020
+      },
+      "2021": {
+        "formula": "'2.4'!N63",
+        "value": 2021
+      },
+      "2022": {
+        "formula": "'2.4'!L63",
+        "value": 2022
+      },
+      "2023": {
+        "formula": "'2.4'!J63",
+        "value": 2023
+      }
+    }
+  },
+  "ROTACIÓN": {
+    "row": 63,
+    "formula": "DATOS!G9",
+    "value": 2024,
+    "cells": {
+      "2020": {
+        "formula": "DATOS!K9",
+        "value": 2020
+      },
+      "2021": {
+        "formula": "DATOS!J9",
+        "value": 2021
+      },
+      "2022": {
+        "formula": "DATOS!I9",
+        "value": 2022
+      },
+      "2023": {
+        "formula": "DATOS!H9",
+        "value": 2023
+      }
+    }
+  },
+  "Rotación de existencias (1) (s/coste)": {
+    "row": 71,
+    "formula": "CalcBal!K163",
+    "value": 16.09745157780196,
+    "cells": {
+      "2020": {
+        "formula": "CalcBal!O163",
+        "value": 30.607320557532223
+      },
+      "2021": {
+        "formula": "CalcBal!N163",
+        "value": 43.581810005575456
+      },
+      "2022": {
+        "formula": "CalcBal!M163",
+        "value": 28.711693161756614
+      },
+      "2023": {
+        "formula": "CalcBal!L163",
+        "value": 22.05716073613825
+      }
+    }
+  },
+  "Rotación de existencias (2) (s/ventas)": {
+    "row": 72,
+    "formula": "CalcBal!K165",
+    "value": 38.6792513601741,
+    "cells": {
+      "2020": {
+        "formula": "CalcBal!O165",
+        "value": 72.55068250468278
+      },
+      "2021": {
+        "formula": "CalcBal!N165",
+        "value": 123.60539955681067
+      },
+      "2022": {
+        "formula": "CalcBal!M165",
+        "value": 68.1670890318978
+      },
+      "2023": {
+        "formula": "CalcBal!L165",
+        "value": 52.91169473077045
+      }
+    }
+  },
+  "SOLVENCIA": {
+    "row": 87,
+    "formula": "'2.4'!H101",
+    "value": 2024,
+    "cells": {
+      "2020": {
+        "formula": "'2.2'!$P$52",
+        "value": 2020
+      },
+      "2021": {
+        "formula": "'2.4'!N101",
+        "value": 2021
+      },
+      "2022": {
+        "formula": "'2.4'!L101",
+        "value": 2022
+      },
+      "2023": {
+        "formula": "'2.4'!J101",
+        "value": 2023
+      }
+    }
+  },
+  "ENDEUDAMIENTO": {
+    "row": 101,
+    "formula": "DATOS!G9",
+    "value": 2024,
+    "cells": {
+      "2020": {
+        "formula": "DATOS!K9",
+        "value": 2020
+      },
+      "2021": {
+        "formula": "DATOS!J9",
+        "value": 2021
+      },
+      "2022": {
+        "formula": "DATOS!I9",
+        "value": 2022
+      },
+      "2023": {
+        "formula": "DATOS!H9",
+        "value": 2023
+      }
+    }
+  },
+  "VALOR ACCIÓN": {
+    "row": 112,
+    "formula": "H101",
+    "value": 2024,
+    "cells": {
+      "2020": {
+        "formula": "P101",
+        "value": 2020
+      },
+      "2021": {
+        "formula": "N101",
+        "value": 2021
+      },
+      "2022": {
+        "formula": "L101",
+        "value": 2022
+      },
+      "2023": {
+        "formula": "J101",
+        "value": 2023
+      }
+    }
+  },
+  "Tasa de crecimiento": {
+    "row": 118,
+    "formula": "CalcBal!K241",
+    "value": "n/d",
+    "cells": {
+      "2020": {
+        "formula": "CalcBal!O241",
+        "value": "n/d"
+      },
+      "2021": {
+        "formula": "CalcBal!N241",
+        "value": "n/d"
+      },
+      "2022": {
+        "formula": "CalcBal!M241",
+        "value": "n/d"
+      },
+      "2023": {
+        "formula": "CalcBal!L241",
+        "value": "n/d"
+      }
+    }
+  }
+}

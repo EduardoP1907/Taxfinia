@@ -1,0 +1,871 @@
+════════════════════════════════════════════════════════════════════════════════
+DATOS PARA COPIAR EN LA APLICACIÓN WEB
+Empresa: LABORATORIO BARNAFI KRAUSE
+════════════════════════════════════════════════════════════════════════════════
+
+
+████████████████████████████████████████████████████████████████████████████████
+█  AÑO 2024                                                                    █
+████████████████████████████████████████████████████████████████████████████████
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. BALANCE DE SITUACIÓN - ACTIVO NO CORRIENTE                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Inmovilizado Material (Tangible Assets):
+   Celda: G11
+   Valor: 1997353000
+
+📌 Inmovilizado Inmaterial (Intangible Assets):
+   Celda: G12
+   Valor: 0
+
+📌 Inversiones Financieras LP:
+   Celda: G13
+   Valor: 27000
+
+📌 Otro Realizable LP:
+   Celda: G14
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. BALANCE DE SITUACIÓN - ACTIVO CORRIENTE                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Existencias (Inventory):
+   Celda: G16
+   Valor: 459500000
+
+📌 Clientes (Accounts Receivable):
+   Celda: G18
+   Valor: 4539872000
+
+📌 Otros Deudores (Other Receivables):
+   Celda: G19
+   Valor: 4956136000
+
+📌 Hacienda Deudora (Tax Receivables):
+   Celda: G20
+   Valor: 1240309000
+
+📌 Disponible (Cash & Equivalents):
+   Celda: G22
+   Valor: 14049314000
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. BALANCE DE SITUACIÓN - PATRIMONIO NETO                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Capital Social (Share Capital):
+   Celda: G25
+   Valor: 0
+
+📌 Reservas (Reserves):
+   Celda: G26
+   Valor: 0
+
+📌 Resultados Ejercicios Anteriores (Retained Earnings):
+   Celda: G27
+   Valor: 0
+
+📌 Acciones Propias (Treasury Stock):
+   Celda: G28
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. BALANCE DE SITUACIÓN - PASIVO NO CORRIENTE (LP)                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Provisiones LP:
+   Celda: G31
+   Valor: 0
+
+📌 Deudas con Entidades de Crédito LP:
+   Celda: G32
+   Valor: 117891000
+
+📌 Otras Deudas LP:
+   Celda: G34
+   Valor: 5308000
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 5. BALANCE DE SITUACIÓN - PASIVO CORRIENTE (CP)                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Provisiones CP:
+   Celda: G37
+   Valor: 0
+
+📌 Deudas con Entidades de Crédito CP:
+   Celda: G38
+   Valor: 0
+
+📌 Proveedores (Accounts Payable):
+   Celda: G39
+   Valor: 0
+
+📌 Hacienda Acreedora (Tax Liabilities):
+   Celda: G40
+   Valor: 0
+
+📌 Otras Deudas CP:
+   Celda: G41
+   Valor: 14049314000
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 6. CUENTA DE PÉRDIDAS Y GANANCIAS                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Ingresos por Ventas (Revenue):
+   Celda: G45
+   Valor: 2024
+
+📌 Otros Ingresos de Explotación:
+   Celda: G46
+   Valor: 17773116000
+
+📌 Coste de las Ventas (Cost of Sales):
+   Celda: G48
+   Valor: -7396779000
+
+📌 Gastos de Personal - Ventas:
+   Celda: G49
+   Valor: -7396779000
+
+📌 Gastos de Administración:
+   Celda: G51
+   Valor: -5556118000
+
+📌 Gastos de Personal - Administración:
+   Celda: G52
+   Valor: -5556118000
+
+📌 Depreciaciones (Depreciation):
+   Celda: G54
+   Valor: -435485000
+
+📌 Ingresos Excepcionales:
+   Celda: G57
+   Valor: -1094400000
+
+📌 Gastos Excepcionales:
+   Celda: G58
+   Valor: -1094400000
+
+📌 Ingresos Financieros:
+   Celda: G61
+   Valor: 521127000
+
+📌 Gastos Financieros:
+   Celda: G62
+   Valor: 3811461000
+
+📌 Impuesto sobre Sociedades (Income Tax):
+   Celda: G65
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 7. DATOS ADICIONALES                                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Número de Empleados Promedio:
+   Celda: G70
+   Valor: 0
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+████████████████████████████████████████████████████████████████████████████████
+█  AÑO 2023                                                                    █
+████████████████████████████████████████████████████████████████████████████████
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. BALANCE DE SITUACIÓN - ACTIVO NO CORRIENTE                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Inmovilizado Material (Tangible Assets):
+   Celda: H11
+   Valor: 2004455158
+
+📌 Inmovilizado Inmaterial (Intangible Assets):
+   Celda: H12
+   Valor: 0
+
+📌 Inversiones Financieras LP:
+   Celda: H13
+   Valor: 19252
+
+📌 Otro Realizable LP:
+   Celda: H14
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. BALANCE DE SITUACIÓN - ACTIVO CORRIENTE                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Existencias (Inventory):
+   Celda: H16
+   Valor: 320502188
+
+📌 Clientes (Accounts Receivable):
+   Celda: H18
+   Valor: 3880120135
+
+📌 Otros Deudores (Other Receivables):
+   Celda: H19
+   Valor: 379276350
+
+📌 Hacienda Deudora (Tax Receivables):
+   Celda: H20
+   Valor: 1395203201
+
+📌 Disponible (Cash & Equivalents):
+   Celda: H22
+   Valor: 16651552638.64
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. BALANCE DE SITUACIÓN - PATRIMONIO NETO                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Capital Social (Share Capital):
+   Celda: H25
+   Valor: 0
+
+📌 Reservas (Reserves):
+   Celda: H26
+   Valor: 0
+
+📌 Resultados Ejercicios Anteriores (Retained Earnings):
+   Celda: H27
+   Valor: 0
+
+📌 Acciones Propias (Treasury Stock):
+   Celda: H28
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. BALANCE DE SITUACIÓN - PASIVO NO CORRIENTE (LP)                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Provisiones LP:
+   Celda: H31
+   Valor: 0
+
+📌 Deudas con Entidades de Crédito LP:
+   Celda: H32
+   Valor: 59170222.160001755
+
+📌 Otras Deudas LP:
+   Celda: H34
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 5. BALANCE DE SITUACIÓN - PASIVO CORRIENTE (CP)                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Provisiones CP:
+   Celda: H37
+   Valor: 0
+
+📌 Deudas con Entidades de Crédito CP:
+   Celda: H38
+   Valor: 0
+
+📌 Proveedores (Accounts Payable):
+   Celda: H39
+   Valor: 0
+
+📌 Hacienda Acreedora (Tax Liabilities):
+   Celda: H40
+   Valor: 0
+
+📌 Otras Deudas CP:
+   Celda: H41
+   Valor: 16651552638.850002
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 6. CUENTA DE PÉRDIDAS Y GANANCIAS                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Ingresos por Ventas (Revenue):
+   Celda: H45
+   Valor: 2023
+
+📌 Otros Ingresos de Explotación:
+   Celda: H46
+   Valor: 16958313932
+
+📌 Coste de las Ventas (Cost of Sales):
+   Celda: H48
+   Valor: -7069368277
+
+📌 Gastos de Personal - Ventas:
+   Celda: H49
+   Valor: -7069368277
+
+📌 Gastos de Administración:
+   Celda: H51
+   Valor: -5322356145
+
+📌 Gastos de Personal - Administración:
+   Celda: H52
+   Valor: -5322356145
+
+📌 Depreciaciones (Depreciation):
+   Celda: H54
+   Valor: -365779451
+
+📌 Ingresos Excepcionales:
+   Celda: H57
+   Valor: -445430538
+
+📌 Gastos Excepcionales:
+   Celda: H58
+   Valor: -445430538
+
+📌 Ingresos Financieros:
+   Celda: H61
+   Valor: 560313876
+
+📌 Gastos Financieros:
+   Celda: H62
+   Valor: 4315693397
+
+📌 Impuesto sobre Sociedades (Income Tax):
+   Celda: H65
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 7. DATOS ADICIONALES                                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Número de Empleados Promedio:
+   Celda: H70
+   Valor: 0
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+████████████████████████████████████████████████████████████████████████████████
+█  AÑO 2022                                                                    █
+████████████████████████████████████████████████████████████████████████████████
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. BALANCE DE SITUACIÓN - ACTIVO NO CORRIENTE                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Inmovilizado Material (Tangible Assets):
+   Celda: I11
+   Valor: 1684783431
+
+📌 Inmovilizado Inmaterial (Intangible Assets):
+   Celda: I12
+   Valor: 0
+
+📌 Inversiones Financieras LP:
+   Celda: I13
+   Valor: 11394
+
+📌 Otro Realizable LP:
+   Celda: I14
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. BALANCE DE SITUACIÓN - ACTIVO CORRIENTE                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Existencias (Inventory):
+   Celda: I16
+   Valor: 288508991
+
+📌 Clientes (Accounts Receivable):
+   Celda: I18
+   Valor: 3079069663
+
+📌 Otros Deudores (Other Receivables):
+   Celda: I19
+   Valor: 346033494
+
+📌 Hacienda Deudora (Tax Receivables):
+   Celda: I20
+   Valor: 2129634714
+
+📌 Disponible (Cash & Equivalents):
+   Celda: I22
+   Valor: 15323424128
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. BALANCE DE SITUACIÓN - PATRIMONIO NETO                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Capital Social (Share Capital):
+   Celda: I25
+   Valor: 0
+
+📌 Reservas (Reserves):
+   Celda: I26
+   Valor: 0
+
+📌 Resultados Ejercicios Anteriores (Retained Earnings):
+   Celda: I27
+   Valor: 0
+
+📌 Acciones Propias (Treasury Stock):
+   Celda: I28
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. BALANCE DE SITUACIÓN - PASIVO NO CORRIENTE (LP)                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Provisiones LP:
+   Celda: I31
+   Valor: 0
+
+📌 Deudas con Entidades de Crédito LP:
+   Celda: I32
+   Valor: 76923131.16000175
+
+📌 Otras Deudas LP:
+   Celda: I34
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 5. BALANCE DE SITUACIÓN - PASIVO CORRIENTE (CP)                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Provisiones CP:
+   Celda: I37
+   Valor: 0
+
+📌 Deudas con Entidades de Crédito CP:
+   Celda: I38
+   Valor: 0
+
+📌 Proveedores (Accounts Payable):
+   Celda: I39
+   Valor: 0
+
+📌 Hacienda Acreedora (Tax Liabilities):
+   Celda: I40
+   Valor: 0
+
+📌 Otras Deudas CP:
+   Celda: I41
+   Valor: 15323424127.869999
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 6. CUENTA DE PÉRDIDAS Y GANANCIAS                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Ingresos por Ventas (Revenue):
+   Celda: I45
+   Valor: 2022
+
+📌 Otros Ingresos de Explotación:
+   Celda: I46
+   Valor: 19666818076
+
+📌 Coste de las Ventas (Cost of Sales):
+   Celda: I48
+   Valor: -8283581624
+
+📌 Gastos de Personal - Ventas:
+   Celda: I49
+   Valor: -8283581624
+
+📌 Gastos de Administración:
+   Celda: I51
+   Valor: -5075170325
+
+📌 Gastos de Personal - Administración:
+   Celda: I52
+   Valor: -5075170325
+
+📌 Depreciaciones (Depreciation):
+   Celda: I54
+   Valor: -342744201
+
+📌 Ingresos Excepcionales:
+   Celda: I57
+   Valor: -963234977
+
+📌 Gastos Excepcionales:
+   Celda: I58
+   Valor: -962075372
+
+📌 Ingresos Financieros:
+   Celda: I61
+   Valor: 352501508
+
+📌 Gastos Financieros:
+   Celda: I62
+   Valor: 5355748062
+
+📌 Impuesto sobre Sociedades (Income Tax):
+   Celda: I65
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 7. DATOS ADICIONALES                                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Número de Empleados Promedio:
+   Celda: I70
+   Valor: 0
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+████████████████████████████████████████████████████████████████████████████████
+█  AÑO 2021                                                                    █
+████████████████████████████████████████████████████████████████████████████████
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. BALANCE DE SITUACIÓN - ACTIVO NO CORRIENTE                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Inmovilizado Material (Tangible Assets):
+   Celda: J11
+   Valor: 1724560725
+
+📌 Inmovilizado Inmaterial (Intangible Assets):
+   Celda: J12
+   Valor: 0
+
+📌 Inversiones Financieras LP:
+   Celda: J13
+   Valor: 657760
+
+📌 Otro Realizable LP:
+   Celda: J14
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. BALANCE DE SITUACIÓN - ACTIVO CORRIENTE                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Existencias (Inventory):
+   Celda: J16
+   Valor: 201321634
+
+📌 Clientes (Accounts Receivable):
+   Celda: J18
+   Valor: 4196770900
+
+📌 Otros Deudores (Other Receivables):
+   Celda: J19
+   Valor: 226427163
+
+📌 Hacienda Deudora (Tax Receivables):
+   Celda: J20
+   Valor: 2038758617
+
+📌 Disponible (Cash & Equivalents):
+   Celda: J22
+   Valor: 14049977174
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. BALANCE DE SITUACIÓN - PATRIMONIO NETO                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Capital Social (Share Capital):
+   Celda: J25
+   Valor: 0
+
+📌 Reservas (Reserves):
+   Celda: J26
+   Valor: 0
+
+📌 Resultados Ejercicios Anteriores (Retained Earnings):
+   Celda: J27
+   Valor: 0
+
+📌 Acciones Propias (Treasury Stock):
+   Celda: J28
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. BALANCE DE SITUACIÓN - PASIVO NO CORRIENTE (LP)                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Provisiones LP:
+   Celda: J31
+   Valor: 0
+
+📌 Deudas con Entidades de Crédito LP:
+   Celda: J32
+   Valor: 61178517
+
+📌 Otras Deudas LP:
+   Celda: J34
+   Valor: 25591527
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 5. BALANCE DE SITUACIÓN - PASIVO CORRIENTE (CP)                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Provisiones CP:
+   Celda: J37
+   Valor: 0
+
+📌 Deudas con Entidades de Crédito CP:
+   Celda: J38
+   Valor: 0
+
+📌 Proveedores (Accounts Payable):
+   Celda: J39
+   Valor: 0
+
+📌 Hacienda Acreedora (Tax Liabilities):
+   Celda: J40
+   Valor: 0
+
+📌 Otras Deudas CP:
+   Celda: J41
+   Valor: 14049977174
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 6. CUENTA DE PÉRDIDAS Y GANANCIAS                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Ingresos por Ventas (Revenue):
+   Celda: J45
+   Valor: 2021
+
+📌 Otros Ingresos de Explotación:
+   Celda: J46
+   Valor: 24884441010
+
+📌 Coste de las Ventas (Cost of Sales):
+   Celda: J48
+   Valor: -8773961203
+
+📌 Gastos de Personal - Ventas:
+   Celda: J49
+   Valor: -8773961203
+
+📌 Gastos de Administración:
+   Celda: J51
+   Valor: -4923114092
+
+📌 Gastos de Personal - Administración:
+   Celda: J52
+   Valor: -4923114092
+
+📌 Depreciaciones (Depreciation):
+   Celda: J54
+   Valor: -266045663
+
+📌 Ingresos Excepcionales:
+   Celda: J57
+   Valor: -164217922
+
+📌 Gastos Excepcionales:
+   Celda: J58
+   Valor: -164217922
+
+📌 Ingresos Financieros:
+   Celda: J61
+   Valor: -6033755
+
+📌 Gastos Financieros:
+   Celda: J62
+   Valor: 10751068375
+
+📌 Impuesto sobre Sociedades (Income Tax):
+   Celda: J65
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 7. DATOS ADICIONALES                                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Número de Empleados Promedio:
+   Celda: J70
+   Valor: 0
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+████████████████████████████████████████████████████████████████████████████████
+█  AÑO 2020                                                                    █
+████████████████████████████████████████████████████████████████████████████████
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. BALANCE DE SITUACIÓN - ACTIVO NO CORRIENTE                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Inmovilizado Material (Tangible Assets):
+   Celda: K11
+   Valor: 1446908839
+
+📌 Inmovilizado Inmaterial (Intangible Assets):
+   Celda: K12
+   Valor: 0
+
+📌 Inversiones Financieras LP:
+   Celda: K13
+   Valor: 2552659
+
+📌 Otro Realizable LP:
+   Celda: K14
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. BALANCE DE SITUACIÓN - ACTIVO CORRIENTE                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Existencias (Inventory):
+   Celda: K16
+   Valor: 207278065
+
+📌 Clientes (Accounts Receivable):
+   Celda: K18
+   Valor: 4282993455
+
+📌 Otros Deudores (Other Receivables):
+   Celda: K19
+   Valor: 15872319
+
+📌 Hacienda Deudora (Tax Receivables):
+   Celda: K20
+   Valor: 948027139
+
+📌 Disponible (Cash & Equivalents):
+   Celda: K22
+   Valor: 9869361719
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. BALANCE DE SITUACIÓN - PATRIMONIO NETO                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Capital Social (Share Capital):
+   Celda: K25
+   Valor: 0
+
+📌 Reservas (Reserves):
+   Celda: K26
+   Valor: 0
+
+📌 Resultados Ejercicios Anteriores (Retained Earnings):
+   Celda: K27
+   Valor: 0
+
+📌 Acciones Propias (Treasury Stock):
+   Celda: K28
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. BALANCE DE SITUACIÓN - PASIVO NO CORRIENTE (LP)                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Provisiones LP:
+   Celda: K31
+   Valor: 0
+
+📌 Deudas con Entidades de Crédito LP:
+   Celda: K32
+   Valor: 650349271
+
+📌 Otras Deudas LP:
+   Celda: K34
+   Valor: 37196622
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 5. BALANCE DE SITUACIÓN - PASIVO CORRIENTE (CP)                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Provisiones CP:
+   Celda: K37
+   Valor: 0
+
+📌 Deudas con Entidades de Crédito CP:
+   Celda: K38
+   Valor: 0
+
+📌 Proveedores (Accounts Payable):
+   Celda: K39
+   Valor: 0
+
+📌 Hacienda Acreedora (Tax Liabilities):
+   Celda: K40
+   Valor: 0
+
+📌 Otras Deudas CP:
+   Celda: K41
+   Valor: 9869361719
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 6. CUENTA DE PÉRDIDAS Y GANANCIAS                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Ingresos por Ventas (Revenue):
+   Celda: K45
+   Valor: 2020
+
+📌 Otros Ingresos de Explotación:
+   Celda: K46
+   Valor: 15038165084
+
+📌 Coste de las Ventas (Cost of Sales):
+   Celda: K48
+   Valor: -6344226180
+
+📌 Gastos de Personal - Ventas:
+   Celda: K49
+   Valor: -6344226180
+
+📌 Gastos de Administración:
+   Celda: K51
+   Valor: -3681384524
+
+📌 Gastos de Personal - Administración:
+   Celda: K52
+   Valor: -3681384524
+
+📌 Depreciaciones (Depreciation):
+   Celda: K54
+   Valor: -180602022
+
+📌 Ingresos Excepcionales:
+   Celda: K57
+   Valor: -63769930
+
+📌 Gastos Excepcionales:
+   Celda: K58
+   Valor: -63769930
+
+📌 Ingresos Financieros:
+   Celda: K61
+   Valor: 42678205
+
+📌 Gastos Financieros:
+   Celda: K62
+   Valor: 4810860633
+
+📌 Impuesto sobre Sociedades (Income Tax):
+   Celda: K65
+   Valor: 0
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 7. DATOS ADICIONALES                                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📌 Número de Empleados Promedio:
+   Celda: K70
+   Valor: 0
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+✅ INSTRUCCIONES:
+1. Abre http://localhost:5173 en tu navegador
+2. Inicia sesión o regístrate
+3. Crea una nueva empresa: "LABORATORIO BARNAFI KRAUSE"
+4. Ve a "Ingresar Datos" y selecciona el año 2024
+5. Copia los valores de arriba en cada campo correspondiente
+6. Guarda los datos
+7. Ve a "Informe" para ver los ratios calculados
+8. Compara con los ratios del Excel (hoja 2.4)
+
