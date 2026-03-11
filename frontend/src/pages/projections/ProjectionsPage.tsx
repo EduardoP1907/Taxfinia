@@ -4,7 +4,7 @@ import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { projectionsService, type ProjectionScenarioWithData, type FinancialProjection } from '../../services/projections.service';
 import { companyService } from '../../services/company.service';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, TrendingUp, Settings, Calculator } from 'lucide-react';
+import { ArrowLeft, Save, TrendingUp, Settings, Calculator, CheckCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
@@ -28,6 +28,8 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showGrowthRatesModal, setShowGrowthRatesModal] = useState(false);
   const [newYearsCount, setNewYearsCount] = useState(10);
+  const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, any>>>({});
+  const hasUnsavedChanges = Object.keys(pendingChanges).length > 0;
 
   // Growth rates state
   const [growthRates, setGrowthRates] = useState({
@@ -83,12 +85,26 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
       const companyData = await companyService.getCompany(companyId!);
       setCompany(companyData);
 
-      if (scenarioId) {
-        // Cargar escenario existente
-        const scenarioData = await projectionsService.getScenario(scenarioId);
+      const sid = scenarioId;
+      if (sid) {
+        // Cargar escenario existente por ID
+        const scenarioData = await projectionsService.getScenario(sid);
         setScenario(scenarioData);
         setProjections(scenarioData.projections);
         setNewYearsCount(scenarioData.projectionYears);
+      } else {
+        // Auto-cargar el escenario más reciente de la empresa
+        const scenarios = await projectionsService.getCompanyScenarios(companyId!);
+        if (scenarios.length > 0) {
+          const latest = scenarios[0];
+          setScenario(latest);
+          setProjections(latest.projections || []);
+          setNewYearsCount(latest.projectionYears);
+          // Actualizar URL con el scenarioId para que persista en navegación
+          const newParams = new URLSearchParams(searchParams);
+          newParams.set('scenarioId', latest.id);
+          navigate(`/proyecciones?${newParams.toString()}`, { replace: true });
+        }
       }
     } catch (error: any) {
       console.error('Error loading data:', error);
@@ -99,23 +115,34 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
   };
 
 
-  const handleUpdateProjection = async (projectionId: string, field: string, value: any) => {
+  const handleUpdateProjection = (projectionId: string, field: string, value: any) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
+    setProjections((prev) =>
+      prev.map((p) => (p.id === projectionId ? { ...p, [field]: numValue } : p))
+    );
+    setPendingChanges((prev) => ({
+      ...prev,
+      [projectionId]: { ...(prev[projectionId] || {}), [field]: numValue },
+    }));
+  };
+
+  const handleSaveAll = async () => {
+    if (!scenarioId || Object.keys(pendingChanges).length === 0) return;
     try {
-      // Actualizar localmente primero (optimistic update)
-      setProjections((prev) =>
-        prev.map((p) =>
-          p.id === projectionId ? { ...p, [field]: parseFloat(value) || 0 } : p
+      setSaving(true);
+      await Promise.all(
+        Object.entries(pendingChanges).map(([projId, changes]) =>
+          projectionsService.updateProjection(projId, changes)
         )
       );
-
-      // Actualizar en el servidor
-      await projectionsService.updateProjection(projectionId, {
-        [field]: parseFloat(value) || 0,
-      });
-    } catch (error: any) {
-      toast.error('Error al actualizar proyección');
-      // Recargar datos en caso de error
-      loadData();
+      setPendingChanges({});
+      const refreshed = await projectionsService.getScenario(scenarioId!);
+      setProjections(refreshed.projections || []);
+      toast.success('Proyección guardada correctamente');
+    } catch {
+      toast.error('Error al guardar la proyección');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -309,7 +336,27 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {hasUnsavedChanges && (
+              <span className="text-xs text-amber-600 font-medium">
+                Cambios sin guardar
+              </span>
+            )}
+            <Button
+              onClick={handleSaveAll}
+              disabled={saving || !hasUnsavedChanges}
+              size="sm"
+              className={hasUnsavedChanges ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+            >
+              {saving ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+              ) : hasUnsavedChanges ? (
+                <Save className="w-4 h-4 mr-2" />
+              ) : (
+                <CheckCircle className="w-4 h-4 mr-2" />
+              )}
+              {saving ? 'Guardando...' : 'Guardar'}
+            </Button>
             <Button
               onClick={() => setShowGrowthRatesModal(true)}
               variant="outline"

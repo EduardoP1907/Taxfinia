@@ -6,6 +6,8 @@
 import { Request, Response } from 'express';
 import { ProjectionsService } from '../services/projections.service';
 import { bigIntToJSON } from '../utils/bigint';
+import { estimateWACC } from '../services/ai-analysis.service';
+import prisma from '../config/database';
 
 const projectionsService = new ProjectionsService();
 
@@ -278,5 +280,56 @@ export const getDCFResults = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[PROJECTIONS] Error getting DCF results:', error);
     res.status(404).json({ error: error.message || 'Resultados DCF no encontrados' });
+  }
+};
+
+/**
+ * Estimar WACC con IA basado en el sector y país de la empresa
+ * POST /api/projections/:scenarioId/estimate-wacc
+ *
+ * Consulta a Claude para obtener un WACC de mercado ajustado al rubro y país,
+ * lo guarda en el escenario y lo devuelve al cliente.
+ */
+export const estimateWACCWithAI = async (req: Request, res: Response) => {
+  try {
+    const { scenarioId } = req.params;
+
+    // Obtener el escenario y su empresa asociada
+    const scenario = await prisma.projectionScenario.findUnique({
+      where: { id: scenarioId },
+      include: { company: true },
+    });
+
+    if (!scenario) {
+      return res.status(404).json({ error: 'Escenario no encontrado' });
+    }
+
+    const { industry, country, currency, businessActivity } = scenario.company as any;
+
+    if (!industry && !country) {
+      return res.status(400).json({
+        error: 'La empresa debe tener al menos Sector/Industria o País configurado para estimar el WACC con IA.',
+      });
+    }
+
+    console.log(`[WACC-AI] Estimando WACC para sector="${industry}" país="${country}"`);
+
+    const estimate = await estimateWACC(industry, country, currency, businessActivity);
+
+    // Guardar automáticamente el WACC estimado en el escenario
+    await prisma.projectionScenario.update({
+      where: { id: scenarioId },
+      data: {
+        wacc: estimate.wacc,
+        terminalGrowthRate: estimate.terminalGrowthRate,
+      },
+    });
+
+    console.log(`[WACC-AI] WACC estimado: ${(estimate.wacc * 100).toFixed(2)}% — guardado en escenario`);
+
+    res.json({ ...estimate, savedToScenario: true });
+  } catch (error: any) {
+    console.error('[PROJECTIONS] Error estimating WACC with AI:', error);
+    res.status(500).json({ error: error.message || 'Error al estimar WACC con IA' });
   }
 };

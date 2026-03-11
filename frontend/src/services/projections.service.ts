@@ -304,4 +304,22 @@ export const projectionsService = {
     const response = await api.get(`/projections/${scenarioId}/dcf-results`);
     return response.data;
   },
+
+  /**
+   * Estimar WACC con IA basado en el sector y país de la empresa
+   * El backend consulta a Claude, guarda el WACC en el escenario y lo retorna
+   */
+  async estimateWACCWithAI(scenarioId: string): Promise<{
+    wacc: number;
+    costOfEquity: number;
+    costOfDebt: number;
+    debtPercentage: number;
+    taxRate: number;
+    terminalGrowthRate: number;
+    explanation: string;
+    savedToScenario: boolean;
+  }> {
+    const response = await api.post(`/projections/${scenarioId}/estimate-wacc`);
+    return response.data;
+  },
 };

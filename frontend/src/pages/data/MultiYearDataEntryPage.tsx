@@ -95,17 +95,17 @@ export const MultiYearDataEntryPage: React.FC = () => {
       // Obtener años fiscales existentes
       const fiscalYears = await financialService.getFiscalYears(companyId);
 
-      // Si no hay años, crear uno por defecto
+      // Si no hay años, crear uno usando el año base de la empresa
       if (fiscalYears.length === 0) {
-        const currentYear = new Date().getFullYear();
+        const defaultYear = companyData.baseYear || new Date().getFullYear();
         const newYear = await financialService.createFiscalYear(companyId, {
-          year: currentYear,
+          year: defaultYear,
         });
         fiscalYears.push(newYear);
       }
 
-      // Ordenar años de más antiguo a más reciente
-      fiscalYears.sort((a, b) => a.year - b.year);
+      // Ordenar años de más reciente a más antiguo (columna izquierda = año más reciente)
+      fiscalYears.sort((a, b) => b.year - a.year);
 
       // Cargar datos de cada año
       const dataPromises = fiscalYears.map(async (fy) => {
@@ -195,9 +195,9 @@ export const MultiYearDataEntryPage: React.FC = () => {
         additional: {},
       };
 
-      // Agregar y ordenar los años
-      const updatedYearDataList = [...yearDataList, newYearData].sort((a, b) => a.year - b.year);
-      const updatedAvailableYears = [...availableYears, newYear].sort((a, b) => a - b);
+      // Agregar y ordenar los años (más reciente primero)
+      const updatedYearDataList = [...yearDataList, newYearData].sort((a, b) => b.year - a.year);
+      const updatedAvailableYears = [...availableYears, newYear].sort((a, b) => b - a);
 
       setYearDataList(updatedYearDataList);
       setAvailableYears(updatedAvailableYears);
@@ -546,7 +546,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
                 <Plus className="w-6 h-6 text-amber-600" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
-                Agregar Año Fiscal
+                Agregar Año Comercial
               </h3>
 
               {availableYears.length > 0 ? (
@@ -574,13 +574,13 @@ export const MultiYearDataEntryPage: React.FC = () => {
                 </div>
               ) : (
                 <p className="text-sm text-gray-600 text-center mb-4">
-                  Ingrese el año fiscal inicial (máximo 5 años)
+                  Ingrese el año comercial inicial (máximo 5 años)
                 </p>
               )}
 
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Año fiscal
+                  Año comercial
                 </label>
                 <input
                   type="number"
@@ -673,13 +673,12 @@ const BalanceSheetTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onRem
   const balanceFields = [
     // ACTIVO
     { section: 'ACTIVO', isBold: true, bgClass: 'bg-gray-200' },
-    { section: 'A) ACTIVO NO CORRIENTE', isBold: true, bgClass: 'bg-blue-100' },
-    { label: 'Inmovilizado material', field: 'tangibleAssets', indent: true },
-    { label: 'Inmovilizado inmaterial', field: 'intangibleAssets', indent: true },
+    { section: 'A) ACTIVO FIJO', isBold: true, bgClass: 'bg-blue-100' },
+    { label: 'Activo Fijo - Depreciación Acumulada', field: 'tangibleAssets', indent: true },
+    { label: 'Otros Activos', field: 'intangibleAssets', indent: true },
     { label: 'Inversiones financieras LP', field: 'financialInvestmentsLp', indent: true },
-    { label: 'Otro realizable a largo plazo', field: 'otherNoncurrentAssets', indent: true },
 
-    { section: 'B) ACTIVO CORRIENTE', isBold: true, bgClass: 'bg-green-100' },
+    { section: 'B) ACTIVO CIRCULANTE', isBold: true, bgClass: 'bg-green-100' },
     { label: 'Existencias', field: 'inventory', indent: true },
     { subsection: 'Realizable', indent: true },
     { label: 'Clientes - Realizable CP', field: 'accountsReceivable', indent: true, doubleIndent: true },
@@ -693,12 +692,12 @@ const BalanceSheetTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onRem
     { section: 'PATRIMONIO NETO Y PASIVO', isBold: true, bgClass: 'bg-gray-200', isPassive: true },
     { label: 'A) PATRIMONIO NETO', field: 'shareCapital', isBold: true, bgClass: 'bg-blue-100', isPassive: true },
 
-    { section: 'B) PASIVO NO CORRIENTE', isBold: true, bgClass: 'bg-orange-100', isPassive: true },
+    { section: 'B) PASIVO NO CIRCULANTE', isBold: true, bgClass: 'bg-orange-100', isPassive: true },
     { label: 'Provisiones LP', field: 'provisionsLp', indent: true },
     { label: 'Deudas Largo Plazo', field: 'bankDebtLp', indent: true },
     { label: 'Otras Largo Plazo', field: 'otherLiabilitiesLp', indent: true },
 
-    { section: 'C) PASIVO CORRIENTE', isBold: true, bgClass: 'bg-red-100', isPassive: true },
+    { section: 'C) PASIVO CIRCULANTE', isBold: true, bgClass: 'bg-red-100', isPassive: true },
     { label: 'Provisiones CP', field: 'provisionsSp', indent: true },
     { label: 'Deudas Corto Plazo', field: 'bankDebtSp', indent: true },
     { label: 'Proveedores Corto Plazo', field: 'accountsPayable', indent: true },
@@ -706,33 +705,37 @@ const BalanceSheetTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onRem
     { label: 'Otras a Pagar Corto Plazo', field: 'otherLiabilitiesSp', indent: true },
 
     { section: 'TOTAL PATRIMONIO NETO Y PASIVO (A+B+C)', isBold: true, bgClass: 'bg-blue-200', isPassive: true, isCalculated: true },
+
+    { section: 'CUADRATURA', isBold: true, bgClass: '', isCuadratura: true },
   ];
 
-  // Función auxiliar para calcular totales
-  function calculateTotal(yearData: YearData, row: any): string {
-    const balance = yearData.balance;
-
-    // Total Activo (A+B)
-    if (row.section === 'TOTAL ACTIVO (A+B)') {
-      const activoNC = Number(balance.tangibleAssets || 0) + Number(balance.intangibleAssets || 0) +
-                       Number(balance.financialInvestmentsLp || 0) + Number(balance.otherNoncurrentAssets || 0);
-      const activoC = Number(balance.inventory || 0) + Number(balance.accountsReceivable || 0) +
+  // Calcula el Total Activo para un año
+  function calcTotalActivo(balance: CreateBalanceSheetData): number {
+    const activoNC = Number(balance.tangibleAssets || 0) + Number(balance.intangibleAssets || 0) +
+                     Number(balance.financialInvestmentsLp || 0) + Number(balance.otherNoncurrentAssets || 0);
+    const activoC  = Number(balance.inventory || 0) + Number(balance.accountsReceivable || 0) +
                      Number(balance.otherReceivables || 0) + Number(balance.taxReceivables || 0) +
                      Number(balance.cashEquivalents || 0);
-      return formatNumber(activoNC + activoC);
-    }
+    return activoNC + activoC;
+  }
 
-    // Total Patrimonio Neto y Pasivo (A+B+C)
-    if (row.section === 'TOTAL PATRIMONIO NETO Y PASIVO (A+B+C)') {
-      const patrimonioNeto = Number(balance.shareCapital || 0);
-      const pasivoNC = Number(balance.provisionsLp || 0) + Number(balance.bankDebtLp || 0) +
-                      Number(balance.otherLiabilitiesLp || 0);
-      const pasivoC = Number(balance.provisionsSp || 0) + Number(balance.bankDebtSp || 0) +
+  // Calcula el Total Patrimonio Neto + Pasivo para un año
+  function calcTotalPasivoPatrimonio(balance: CreateBalanceSheetData): number {
+    const patrimonioNeto = Number(balance.shareCapital || 0) + Number(balance.reserves || 0) +
+                           Number(balance.retainedEarnings || 0) - Number(balance.treasuryStock || 0);
+    const pasivoNC = Number(balance.provisionsLp || 0) + Number(balance.bankDebtLp || 0) +
+                     Number(balance.otherLiabilitiesLp || 0);
+    const pasivoC  = Number(balance.provisionsSp || 0) + Number(balance.bankDebtSp || 0) +
                      Number(balance.accountsPayable || 0) + Number(balance.taxLiabilities || 0) +
                      Number(balance.otherLiabilitiesSp || 0);
-      return formatNumber(patrimonioNeto + pasivoNC + pasivoC);
-    }
+    return patrimonioNeto + pasivoNC + pasivoC;
+  }
 
+  // Función auxiliar para calcular totales en la tabla
+  function calculateTotal(yearData: YearData, row: any): string {
+    const balance = yearData.balance;
+    if (row.section === 'TOTAL ACTIVO (A+B)') return formatNumber(calcTotalActivo(balance));
+    if (row.section === 'TOTAL PATRIMONIO NETO Y PASIVO (A+B+C)') return formatNumber(calcTotalPasivoPatrimonio(balance));
     return '';
   }
 
@@ -763,8 +766,50 @@ const BalanceSheetTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onRem
       </thead>
       <tbody className="bg-white divide-y divide-gray-200">
         {balanceFields.map((row, index) => {
-          // Calcular indentación
           const indentClass = row.doubleIndent ? 'pl-12' : row.indent ? 'pl-8' : '';
+
+          // ── Fila especial: CUADRATURA ──
+          if (row.isCuadratura) {
+            const allBalanced = yearDataList.every((yd) => {
+              const diff = calcTotalActivo(yd.balance) - calcTotalPasivoPatrimonio(yd.balance);
+              return Math.abs(diff) < 1;
+            });
+            return (
+              <tr key={index} className={allBalanced ? 'bg-green-100' : 'bg-red-100'}>
+                <td className={`px-4 py-3 text-sm font-bold sticky left-0 z-10 ${allBalanced ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {allBalanced ? '✓ CUADRATURA' : '⚠ CUADRATURA'}
+                  <span className="block text-xs font-normal mt-0.5">
+                    {allBalanced ? 'Total Activo = Pasivo + Patrimonio Neto' : 'Total Activo ≠ Pasivo + Patrimonio Neto'}
+                  </span>
+                </td>
+                {yearDataList.map((yearData) => {
+                  const totalActivo = calcTotalActivo(yearData.balance);
+                  const totalPasivo = calcTotalPasivoPatrimonio(yearData.balance);
+                  const diff = totalActivo - totalPasivo;
+                  const balanced = Math.abs(diff) < 1;
+                  return (
+                    <td
+                      key={yearData.year}
+                      className={`px-4 py-3 text-center font-bold text-sm ${balanced ? 'text-green-700' : 'text-red-700'}`}
+                    >
+                      {balanced ? (
+                        <span className="inline-flex items-center gap-1">
+                          <span>✓ Cuadrado</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex flex-col items-center gap-0.5">
+                          <span>✗ Descuadrado</span>
+                          <span className="text-xs font-normal">
+                            Diferencia: {formatNumber(Math.abs(diff))}
+                          </span>
+                        </span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          }
 
           return (
             <tr key={index} className={row.bgClass || (index % 2 === 0 ? 'bg-white' : 'bg-gray-50')}>
@@ -772,14 +817,12 @@ const BalanceSheetTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onRem
                 {row.section || row.subsection || row.label}
               </td>
               {row.section || row.subsection || row.isCalculated ? (
-                // Fila de sección, subsección o calculada (sin inputs)
                 yearDataList.map((yearData) => (
                   <td key={yearData.year} className="px-4 py-2 text-right font-semibold">
                     {row.isCalculated ? calculateTotal(yearData, row) : ''}
                   </td>
                 ))
               ) : (
-                // Fila de campo (con inputs)
                 yearDataList.map((yearData) => (
                   <td key={yearData.year} className="px-4 py-2">
                     <input

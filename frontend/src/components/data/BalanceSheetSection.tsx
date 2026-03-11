@@ -79,20 +79,20 @@ export const BalanceSheetSection: React.FC<BalanceSheetSectionProps> = ({ data, 
       <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 rounded-lg">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">ACTIVO</h2>
 
-        {/* ACTIVO NO CORRIENTE */}
+        {/* ACTIVO FIJO */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-amber-200">
-            A) ACTIVO NO CORRIENTE
+            A) ACTIVO FIJO
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-lg">
             <FormField
-              label="Inmovilizado material"
+              label="Activo Fijo - Depreciación Acumulada"
               value={data.tangibleAssets?.toString() || ''}
               onChange={(value) => onChange('tangibleAssets', value)}
               placeholder="0.00"
             />
             <FormField
-              label="Inmovilizado inmaterial"
+              label="Otros Activos"
               value={data.intangibleAssets?.toString() || ''}
               onChange={(value) => onChange('intangibleAssets', value)}
               placeholder="0.00"
@@ -103,16 +103,10 @@ export const BalanceSheetSection: React.FC<BalanceSheetSectionProps> = ({ data, 
               onChange={(value) => onChange('financialInvestmentsLp', value)}
               placeholder="0.00"
             />
-            <FormField
-              label="Otros activos no corrientes"
-              value={data.otherNoncurrentAssets?.toString() || ''}
-              onChange={(value) => onChange('otherNoncurrentAssets', value)}
-              placeholder="0.00"
-            />
           </div>
           <div className="mt-2 p-3 bg-slate-100 rounded-lg">
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-gray-700">Total Activo No Corriente:</span>
+              <span className="font-semibold text-gray-700">Total Activo Fijo:</span>
               <span className="text-lg font-bold text-amber-700">
                 {calculations.totalNoncurrentAssets.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currencySymbol}
               </span>
@@ -120,10 +114,10 @@ export const BalanceSheetSection: React.FC<BalanceSheetSectionProps> = ({ data, 
           </div>
         </div>
 
-        {/* ACTIVO CORRIENTE */}
+        {/* ACTIVO CIRCULANTE */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-amber-200">
-            B) ACTIVO CORRIENTE
+            B) ACTIVO CIRCULANTE
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-lg">
             <FormField
@@ -159,7 +153,7 @@ export const BalanceSheetSection: React.FC<BalanceSheetSectionProps> = ({ data, 
           </div>
           <div className="mt-2 p-3 bg-slate-100 rounded-lg">
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-gray-700">Total Activo Corriente:</span>
+              <span className="font-semibold text-gray-700">Total Activo Circulante:</span>
               <span className="text-lg font-bold text-amber-700">
                 {calculations.totalCurrentAssets.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currencySymbol}
               </span>
@@ -223,10 +217,10 @@ export const BalanceSheetSection: React.FC<BalanceSheetSectionProps> = ({ data, 
           </div>
         </div>
 
-        {/* PASIVO NO CORRIENTE */}
+        {/* PASIVO NO CIRCULANTE */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-emerald-200">
-            B) PASIVO NO CORRIENTE
+            B) PASIVO NO CIRCULANTE
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-lg">
             <FormField
@@ -250,7 +244,7 @@ export const BalanceSheetSection: React.FC<BalanceSheetSectionProps> = ({ data, 
           </div>
           <div className="mt-2 p-3 bg-emerald-100 rounded-lg">
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-gray-700">Total Pasivo No Corriente:</span>
+              <span className="font-semibold text-gray-700">Total Pasivo No Circulante:</span>
               <span className="text-lg font-bold text-emerald-700">
                 {calculations.totalNoncurrentLiabilities.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currencySymbol}
               </span>
@@ -258,10 +252,10 @@ export const BalanceSheetSection: React.FC<BalanceSheetSectionProps> = ({ data, 
           </div>
         </div>
 
-        {/* PASIVO CORRIENTE */}
+        {/* PASIVO CIRCULANTE */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-emerald-200">
-            C) PASIVO CORRIENTE
+            C) PASIVO CIRCULANTE
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-lg">
             <FormField
@@ -297,7 +291,7 @@ export const BalanceSheetSection: React.FC<BalanceSheetSectionProps> = ({ data, 
           </div>
           <div className="mt-2 p-3 bg-emerald-100 rounded-lg">
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-gray-700">Total Pasivo Corriente:</span>
+              <span className="font-semibold text-gray-700">Total Pasivo Circulante:</span>
               <span className="text-lg font-bold text-emerald-700">
                 {calculations.totalCurrentLiabilities.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currencySymbol}
               </span>

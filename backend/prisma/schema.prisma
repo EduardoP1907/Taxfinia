@@ -1,10 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
-
 
 datasource db {
   provider = "postgresql"
@@ -12,25 +8,21 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  firstName String?  @map("first_name")
-  lastName  String?  @map("last_name")
-  role      Role     @default(ANALYST)
-
-  isVerified Boolean @default(false) @map("is_verified")
-  isActive   Boolean @default(true) @map("is_active")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  lastLogin DateTime? @map("last_login")
-
-  // Relaciones
-  otpCodes  OtpCode[]
-  companies Company[]
-  sessions  Session[]
-  reports   Report[]
+  id         String    @id @default(uuid())
+  email      String    @unique
+  password   String
+  firstName  String?   @map("first_name")
+  lastName   String?   @map("last_name")
+  role       Role      @default(ANALYST)
+  isVerified Boolean   @default(false) @map("is_verified")
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  lastLogin  DateTime? @map("last_login")
+  companies  Company[]
+  otpCodes   OtpCode[]
+  reports    Report[]
+  sessions   Session[]
 
   @@map("users")
 }
@@ -42,8 +34,7 @@ model OtpCode {
   expiresAt DateTime @map("expires_at")
   used      Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("otp_codes")
@@ -55,58 +46,53 @@ model Session {
   refreshToken String   @unique @map("refresh_token")
   expiresAt    DateTime @map("expires_at")
   createdAt    DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("sessions")
 }
 
 model Company {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  name        String
-  taxId       String?  @map("tax_id")
-  industry    String?
-  country     String   @default("ES")
-  description String?
-  website     String?
-  employees   Int?
-  foundedYear Int?     @map("founded_year")
-  isPublic         Boolean  @default(false) @map("is_public")
-  baseYear         Int?     @map("base_year")
-  currency         String   @default("EUR")
-  businessActivity String?  @map("business_activity")
-
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
-
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fiscalYears  FiscalYear[]
-  projections  ProjectionScenario[]
-  reports      Report[]
+  id               String               @id @default(uuid())
+  userId           String               @map("user_id")
+  name             String
+  taxId            String?              @map("tax_id")
+  industry         String?
+  country          String               @default("ES")
+  description      String?
+  website          String?
+  employees        Int?
+  foundedYear      Int?                 @map("founded_year")
+  isPublic         Boolean              @default(false) @map("is_public")
+  currency         String               @default("EUR")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  deletedAt        DateTime?            @map("deleted_at")
+  baseYear         Int?                 @map("base_year")
+  businessActivity String?              @map("business_activity")
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fiscalYears      FiscalYear[]
+  projections      ProjectionScenario[]
+  reports          Report[]
 
   @@index([userId])
   @@map("companies")
 }
 
 model FiscalYear {
-  id        String   @id @default(uuid())
-  companyId String   @map("company_id")
-  year      Int
-  startDate DateTime? @map("start_date")
-  endDate   DateTime? @map("end_date")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  balanceSheet     BalanceSheet?
-  incomeStatement  IncomeStatement?
-  cashFlow         CashFlow?
+  id               String            @id @default(uuid())
+  companyId        String            @map("company_id")
+  year             Int
+  startDate        DateTime?         @map("start_date")
+  endDate          DateTime?         @map("end_date")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
   additionalData   AdditionalData?
+  balanceSheet     BalanceSheet?
   calculatedRatios CalculatedRatios?
+  cashFlow         CashFlow?
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  incomeStatement  IncomeStatement?
 
   @@unique([companyId, year])
   @@index([companyId])
@@ -114,395 +100,238 @@ model FiscalYear {
 }
 
 model BalanceSheet {
-  id           String @id @default(uuid())
-  fiscalYearId String @unique @map("fiscal_year_id")
-
-  // ACTIVO NO CORRIENTE
-  tangibleAssets         Decimal @default(0) @map("tangible_assets") @db.Decimal(15, 2)
-  intangibleAssets       Decimal @default(0) @map("intangible_assets") @db.Decimal(15, 2)
-  financialInvestmentsLp Decimal @default(0) @map("financial_investments_lp") @db.Decimal(15, 2)
-  otherNoncurrentAssets  Decimal @default(0) @map("other_noncurrent_assets") @db.Decimal(15, 2)
-
-  // ACTIVO CORRIENTE
-  inventory          Decimal @default(0) @db.Decimal(15, 2)
-  accountsReceivable Decimal @default(0) @map("accounts_receivable") @db.Decimal(15, 2)
-  otherReceivables   Decimal @default(0) @map("other_receivables") @db.Decimal(15, 2)
-  taxReceivables     Decimal @default(0) @map("tax_receivables") @db.Decimal(15, 2)
-  cashEquivalents    Decimal @default(0) @map("cash_equivalents") @db.Decimal(15, 2)
-
-  // PATRIMONIO NETO
-  shareCapital     Decimal @default(0) @map("share_capital") @db.Decimal(15, 2)
-  reserves         Decimal @default(0) @db.Decimal(15, 2)
-  retainedEarnings Decimal @default(0) @map("retained_earnings") @db.Decimal(15, 2)
-  treasuryStock    Decimal @default(0) @map("treasury_stock") @db.Decimal(15, 2)
-
-  // PASIVO NO CORRIENTE
-  provisionsLp      Decimal @default(0) @map("provisions_lp") @db.Decimal(15, 2)
-  bankDebtLp        Decimal @default(0) @map("bank_debt_lp") @db.Decimal(15, 2)
-  otherLiabilitiesLp Decimal @default(0) @map("other_liabilities_lp") @db.Decimal(15, 2)
-
-  // PASIVO CORRIENTE
-  provisionsSp       Decimal @default(0) @map("provisions_sp") @db.Decimal(15, 2)
-  bankDebtSp         Decimal @default(0) @map("bank_debt_sp") @db.Decimal(15, 2)
-  accountsPayable    Decimal @default(0) @map("accounts_payable") @db.Decimal(15, 2)
-  taxLiabilities     Decimal @default(0) @map("tax_liabilities") @db.Decimal(15, 2)
-  otherLiabilitiesSp Decimal @default(0) @map("other_liabilities_sp") @db.Decimal(15, 2)
-
-  notes     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  id                     String     @id @default(uuid())
+  fiscalYearId           String     @unique @map("fiscal_year_id")
+  tangibleAssets         Decimal    @default(0) @map("tangible_assets") @db.Decimal(15, 2)
+  intangibleAssets       Decimal    @default(0) @map("intangible_assets") @db.Decimal(15, 2)
+  financialInvestmentsLp Decimal    @default(0) @map("financial_investments_lp") @db.Decimal(15, 2)
+  otherNoncurrentAssets  Decimal    @default(0) @map("other_noncurrent_assets") @db.Decimal(15, 2)
+  inventory              Decimal    @default(0) @db.Decimal(15, 2)
+  accountsReceivable     Decimal    @default(0) @map("accounts_receivable") @db.Decimal(15, 2)
+  otherReceivables       Decimal    @default(0) @map("other_receivables") @db.Decimal(15, 2)
+  taxReceivables         Decimal    @default(0) @map("tax_receivables") @db.Decimal(15, 2)
+  cashEquivalents        Decimal    @default(0) @map("cash_equivalents") @db.Decimal(15, 2)
+  shareCapital           Decimal    @default(0) @map("share_capital") @db.Decimal(15, 2)
+  reserves               Decimal    @default(0) @db.Decimal(15, 2)
+  retainedEarnings       Decimal    @default(0) @map("retained_earnings") @db.Decimal(15, 2)
+  treasuryStock          Decimal    @default(0) @map("treasury_stock") @db.Decimal(15, 2)
+  provisionsLp           Decimal    @default(0) @map("provisions_lp") @db.Decimal(15, 2)
+  bankDebtLp             Decimal    @default(0) @map("bank_debt_lp") @db.Decimal(15, 2)
+  otherLiabilitiesLp     Decimal    @default(0) @map("other_liabilities_lp") @db.Decimal(15, 2)
+  provisionsSp           Decimal    @default(0) @map("provisions_sp") @db.Decimal(15, 2)
+  bankDebtSp             Decimal    @default(0) @map("bank_debt_sp") @db.Decimal(15, 2)
+  accountsPayable        Decimal    @default(0) @map("accounts_payable") @db.Decimal(15, 2)
+  taxLiabilities         Decimal    @default(0) @map("tax_liabilities") @db.Decimal(15, 2)
+  otherLiabilitiesSp     Decimal    @default(0) @map("other_liabilities_sp") @db.Decimal(15, 2)
+  notes                  String?
+  createdAt              DateTime   @default(now()) @map("created_at")
+  updatedAt              DateTime   @updatedAt @map("updated_at")
+  fiscalYear             FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
 
   @@map("balance_sheets")
 }
 
 model IncomeStatement {
-  id           String @id @default(uuid())
-  fiscalYearId String @unique @map("fiscal_year_id")
-
-  // INGRESOS
-  revenue               Decimal @default(0) @db.Decimal(15, 2)
-  otherOperatingIncome  Decimal @default(0) @map("other_operating_income") @db.Decimal(15, 2)
-
-  // COSTES
-  costOfSales      Decimal @default(0) @map("cost_of_sales") @db.Decimal(15, 2)
-  staffCostsSales  Decimal @default(0) @map("staff_costs_sales") @db.Decimal(15, 2)
-
-  // GASTOS
-  adminExpenses    Decimal @default(0) @map("admin_expenses") @db.Decimal(15, 2)
-  staffCostsAdmin  Decimal @default(0) @map("staff_costs_admin") @db.Decimal(15, 2)
-  depreciation     Decimal @default(0) @db.Decimal(15, 2)
-
-  // RESULTADO EXCEPCIONAL
-  exceptionalIncome   Decimal @default(0) @map("exceptional_income") @db.Decimal(15, 2)
-  exceptionalExpenses Decimal @default(0) @map("exceptional_expenses") @db.Decimal(15, 2)
-
-  // RESULTADO FINANCIERO
-  financialIncome   Decimal @default(0) @map("financial_income") @db.Decimal(15, 2)
-  financialExpenses Decimal @default(0) @map("financial_expenses") @db.Decimal(15, 2)
-
-  // IMPUESTOS
-  incomeTax Decimal @default(0) @map("income_tax") @db.Decimal(15, 2)
-
-  notes     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  id                   String     @id @default(uuid())
+  fiscalYearId         String     @unique @map("fiscal_year_id")
+  revenue              Decimal    @default(0) @db.Decimal(15, 2)
+  otherOperatingIncome Decimal    @default(0) @map("other_operating_income") @db.Decimal(15, 2)
+  costOfSales          Decimal    @default(0) @map("cost_of_sales") @db.Decimal(15, 2)
+  staffCostsSales      Decimal    @default(0) @map("staff_costs_sales") @db.Decimal(15, 2)
+  adminExpenses        Decimal    @default(0) @map("admin_expenses") @db.Decimal(15, 2)
+  staffCostsAdmin      Decimal    @default(0) @map("staff_costs_admin") @db.Decimal(15, 2)
+  depreciation         Decimal    @default(0) @db.Decimal(15, 2)
+  exceptionalIncome    Decimal    @default(0) @map("exceptional_income") @db.Decimal(15, 2)
+  exceptionalExpenses  Decimal    @default(0) @map("exceptional_expenses") @db.Decimal(15, 2)
+  financialIncome      Decimal    @default(0) @map("financial_income") @db.Decimal(15, 2)
+  financialExpenses    Decimal    @default(0) @map("financial_expenses") @db.Decimal(15, 2)
+  incomeTax            Decimal    @default(0) @map("income_tax") @db.Decimal(15, 2)
+  notes                String?
+  createdAt            DateTime   @default(now()) @map("created_at")
+  updatedAt            DateTime   @updatedAt @map("updated_at")
+  fiscalYear           FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
 
   @@map("income_statements")
 }
 
 model CashFlow {
-  id           String @id @default(uuid())
-  fiscalYearId String @unique @map("fiscal_year_id")
-
-  // OPERACIONES
-  operatingCashFlow  Decimal @default(0) @map("operating_cash_flow") @db.Decimal(15, 2)
-  cfEbtAdjustments   Decimal @default(0) @map("cf_ebt_adjustments") @db.Decimal(15, 2)
-  cfWorkingCapital   Decimal @default(0) @map("cf_working_capital") @db.Decimal(15, 2)
-
-  // INVERSIÓN
-  cfInvestments  Decimal @default(0) @map("cf_investments") @db.Decimal(15, 2)
-  cfDivestments  Decimal @default(0) @map("cf_divestments") @db.Decimal(15, 2)
-
-  // FINANCIACIÓN
-  cfDebtObtained  Decimal @default(0) @map("cf_debt_obtained") @db.Decimal(15, 2)
-  cfDebtRepaid    Decimal @default(0) @map("cf_debt_repaid") @db.Decimal(15, 2)
-  cfDividendsPaid Decimal @default(0) @map("cf_dividends_paid") @db.Decimal(15, 2)
-
-  notes     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  id                String     @id @default(uuid())
+  fiscalYearId      String     @unique @map("fiscal_year_id")
+  operatingCashFlow Decimal    @default(0) @map("operating_cash_flow") @db.Decimal(15, 2)
+  cfEbtAdjustments  Decimal    @default(0) @map("cf_ebt_adjustments") @db.Decimal(15, 2)
+  cfWorkingCapital  Decimal    @default(0) @map("cf_working_capital") @db.Decimal(15, 2)
+  cfInvestments     Decimal    @default(0) @map("cf_investments") @db.Decimal(15, 2)
+  cfDivestments     Decimal    @default(0) @map("cf_divestments") @db.Decimal(15, 2)
+  cfDebtObtained    Decimal    @default(0) @map("cf_debt_obtained") @db.Decimal(15, 2)
+  cfDebtRepaid      Decimal    @default(0) @map("cf_debt_repaid") @db.Decimal(15, 2)
+  cfDividendsPaid   Decimal    @default(0) @map("cf_dividends_paid") @db.Decimal(15, 2)
+  notes             String?
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  fiscalYear        FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
 
   @@map("cash_flows")
 }
 
 model AdditionalData {
-  id           String @id @default(uuid())
-  fiscalYearId String @unique @map("fiscal_year_id")
-
-  // ACCIONES Y MERCADO
-  sharesOutstanding  BigInt?  @map("shares_outstanding")
-  sharePrice         Decimal? @map("share_price") @db.Decimal(10, 4)
-  dividendsPerShare  Decimal? @map("dividends_per_share") @db.Decimal(10, 4)
-
-  // PERSONAL
-  averageEmployees Int? @map("average_employees")
-
-  // VALORACIÓN
-  marketCap       Decimal? @map("market_cap") @db.Decimal(15, 2)
-  enterpriseValue Decimal? @map("enterprise_value") @db.Decimal(15, 2)
-
-  // INVENTARIO Y COMPRAS
-  averageInventory        Decimal? @map("average_inventory") @db.Decimal(15, 2)
-  materialCost            Decimal? @map("material_cost") @db.Decimal(15, 2)
-  purchases               Decimal? @map("purchases") @db.Decimal(15, 2)
-
-  // IMPUESTOS (IVA)
-  averageVatSales         Decimal? @map("average_vat_sales") @db.Decimal(5, 2)
-  averageVatPurchases     Decimal? @map("average_vat_purchases") @db.Decimal(5, 2)
-
-  // FINANCIACIÓN
-  loanAmortization        Decimal? @map("loan_amortization") @db.Decimal(15, 2)
-
-  notes     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  id                  String     @id @default(uuid())
+  fiscalYearId        String     @unique @map("fiscal_year_id")
+  sharesOutstanding   BigInt?    @map("shares_outstanding")
+  sharePrice          Decimal?   @map("share_price") @db.Decimal(10, 4)
+  dividendsPerShare   Decimal?   @map("dividends_per_share") @db.Decimal(10, 4)
+  averageEmployees    Int?       @map("average_employees")
+  marketCap           Decimal?   @map("market_cap") @db.Decimal(15, 2)
+  enterpriseValue     Decimal?   @map("enterprise_value") @db.Decimal(15, 2)
+  notes               String?
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+  averageInventory    Decimal?   @map("average_inventory") @db.Decimal(15, 2)
+  averageVatPurchases Decimal?   @map("average_vat_purchases") @db.Decimal(5, 2)
+  averageVatSales     Decimal?   @map("average_vat_sales") @db.Decimal(5, 2)
+  loanAmortization    Decimal?   @map("loan_amortization") @db.Decimal(15, 2)
+  materialCost        Decimal?   @map("material_cost") @db.Decimal(15, 2)
+  purchases           Decimal?   @map("purchases") @db.Decimal(15, 2)
+  fiscalYear          FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
 
   @@map("additional_data")
 }
 
 model CalculatedRatios {
-  id           String @id @default(uuid())
-  fiscalYearId String @unique @map("fiscal_year_id")
-
-  // RATIOS DE LIQUIDEZ
-  currentRatio Decimal? @map("current_ratio") @db.Decimal(10, 4)
-  quickRatio   Decimal? @map("quick_ratio") @db.Decimal(10, 4)
-  cashRatio    Decimal? @map("cash_ratio") @db.Decimal(10, 4)
-
-  // RATIOS DE ENDEUDAMIENTO
-  debtToEquity Decimal? @map("debt_to_equity") @db.Decimal(10, 4)
-  debtToAssets Decimal? @map("debt_to_assets") @db.Decimal(10, 4)
-  debtToEbitda Decimal? @map("debt_to_ebitda") @db.Decimal(10, 4)
-
-  // RATIOS DE RENTABILIDAD
-  roe Decimal? @db.Decimal(10, 4) // Return on Equity
-  roa Decimal? @db.Decimal(10, 4) // Return on Assets
-  roi Decimal? @db.Decimal(10, 4) // Return on Investment
-  ros Decimal? @db.Decimal(10, 4) // Return on Sales
-
-  // MÁRGENES
-  grossMargin  Decimal? @map("gross_margin") @db.Decimal(10, 4)
-  ebitdaMargin Decimal? @map("ebitda_margin") @db.Decimal(10, 4)
-  ebitMargin   Decimal? @map("ebit_margin") @db.Decimal(10, 4)
-  netMargin    Decimal? @map("net_margin") @db.Decimal(10, 4)
-
-  // RATIOS DE ACTIVIDAD
-  assetTurnover           Decimal? @map("asset_turnover") @db.Decimal(10, 4)
-  inventoryTurnover       Decimal? @map("inventory_turnover") @db.Decimal(10, 4)
-  daysSalesOutstanding    Decimal? @map("days_sales_outstanding") @db.Decimal(10, 2)
-  daysPayableOutstanding  Decimal? @map("days_payable_outstanding") @db.Decimal(10, 2)
-  daysInventoryOutstanding Decimal? @map("days_inventory_outstanding") @db.Decimal(10, 2)
-
-  // RATIOS DE RIESGO
-  altmanZScore Decimal? @map("altman_z_score") @db.Decimal(10, 4)
-
-  // METADATA
-  calculatedAt DateTime @default(now()) @map("calculated_at")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  id                       String     @id @default(uuid())
+  fiscalYearId             String     @unique @map("fiscal_year_id")
+  currentRatio             Decimal?   @map("current_ratio") @db.Decimal(10, 4)
+  quickRatio               Decimal?   @map("quick_ratio") @db.Decimal(10, 4)
+  cashRatio                Decimal?   @map("cash_ratio") @db.Decimal(10, 4)
+  debtToEquity             Decimal?   @map("debt_to_equity") @db.Decimal(10, 4)
+  debtToAssets             Decimal?   @map("debt_to_assets") @db.Decimal(10, 4)
+  debtToEbitda             Decimal?   @map("debt_to_ebitda") @db.Decimal(10, 4)
+  roe                      Decimal?   @db.Decimal(10, 4)
+  roa                      Decimal?   @db.Decimal(10, 4)
+  roi                      Decimal?   @db.Decimal(10, 4)
+  ros                      Decimal?   @db.Decimal(10, 4)
+  grossMargin              Decimal?   @map("gross_margin") @db.Decimal(10, 4)
+  ebitdaMargin             Decimal?   @map("ebitda_margin") @db.Decimal(10, 4)
+  ebitMargin               Decimal?   @map("ebit_margin") @db.Decimal(10, 4)
+  netMargin                Decimal?   @map("net_margin") @db.Decimal(10, 4)
+  assetTurnover            Decimal?   @map("asset_turnover") @db.Decimal(10, 4)
+  inventoryTurnover        Decimal?   @map("inventory_turnover") @db.Decimal(10, 4)
+  daysSalesOutstanding     Decimal?   @map("days_sales_outstanding") @db.Decimal(10, 2)
+  daysPayableOutstanding   Decimal?   @map("days_payable_outstanding") @db.Decimal(10, 2)
+  daysInventoryOutstanding Decimal?   @map("days_inventory_outstanding") @db.Decimal(10, 2)
+  altmanZScore             Decimal?   @map("altman_z_score") @db.Decimal(10, 4)
+  calculatedAt             DateTime   @default(now()) @map("calculated_at")
+  createdAt                DateTime   @default(now()) @map("created_at")
+  updatedAt                DateTime   @updatedAt @map("updated_at")
+  fiscalYear               FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
 
   @@map("calculated_ratios")
 }
 
-// PROYECCIONES FINANCIERAS (Página 4.2 del Excel - Proyección Modelo)
 model ProjectionScenario {
-  id          String   @id @default(uuid())
-  companyId   String   @map("company_id")
-  name        String   @default("Proyección Base")
-  description String?
-
-  // Configuración
-  baseYear        Int      @map("base_year")        // Año actual/base
-  projectionYears Int      @map("projection_years") // Cantidad de años futuros (típicamente 10)
-
-  // ==================== PARÁMETROS DCF (Hoja 4.3) ====================
-  // Parámetros para calcular WACC
-  riskFreeRate       Decimal? @map("risk_free_rate") @db.Decimal(8, 4)       // Rf (ej: 0.0250 = 2.5%)
-  beta               Decimal? @db.Decimal(8, 4)                               // β de la empresa
-  marketRiskPremium  Decimal? @map("market_risk_premium") @db.Decimal(8, 4)  // Rm - Rf (ej: 0.06 = 6%)
-  costOfEquity       Decimal? @map("cost_of_equity") @db.Decimal(8, 4)       // Ke calculado (CAPM)
-  costOfDebt         Decimal? @map("cost_of_debt") @db.Decimal(8, 4)         // Kd
-  taxRateForWacc     Decimal? @map("tax_rate_for_wacc") @db.Decimal(8, 4)    // Tasa impositiva para WACC
-  wacc               Decimal? @db.Decimal(8, 4)                               // WACC calculado
-
-  // Parámetros de valoración
-  terminalGrowthRate Decimal? @map("terminal_growth_rate") @db.Decimal(8, 4) // g perpetuo (ej: 0.02 = 2%)
-  netDebt            Decimal? @map("net_debt") @db.Decimal(15, 2)            // Deuda neta = Deuda - Caja
-
-  // Resultados de valoración DCF
-  sumPvOfFCFs        Decimal? @map("sum_pv_of_fcfs") @db.Decimal(15, 2)      // Suma de VP de FCFs
-  terminalValue      Decimal? @map("terminal_value") @db.Decimal(15, 2)      // Valor Terminal
-  pvOfTerminalValue  Decimal? @map("pv_of_terminal_value") @db.Decimal(15, 2) // VP del Valor Terminal
-  enterpriseValue    Decimal? @map("enterprise_value") @db.Decimal(15, 2)    // Enterprise Value (EV)
-  equityValue        Decimal? @map("equity_value") @db.Decimal(15, 2)        // Equity Value
-  valuePerShare      Decimal? @map("value_per_share") @db.Decimal(15, 2)     // Valor por acción
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  projections FinancialProjection[]
+  id                 String                @id @default(uuid())
+  companyId          String                @map("company_id")
+  name               String                @default("Proyección Base")
+  description        String?
+  baseYear           Int                   @map("base_year")
+  projectionYears    Int                   @map("projection_years")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+  beta               Decimal?              @db.Decimal(8, 4)
+  costOfDebt         Decimal?              @map("cost_of_debt") @db.Decimal(8, 4)
+  costOfEquity       Decimal?              @map("cost_of_equity") @db.Decimal(8, 4)
+  enterpriseValue    Decimal?              @map("enterprise_value") @db.Decimal(15, 2)
+  equityValue        Decimal?              @map("equity_value") @db.Decimal(15, 2)
+  marketRiskPremium  Decimal?              @map("market_risk_premium") @db.Decimal(8, 4)
+  netDebt            Decimal?              @map("net_debt") @db.Decimal(15, 2)
+  pvOfTerminalValue  Decimal?              @map("pv_of_terminal_value") @db.Decimal(15, 2)
+  riskFreeRate       Decimal?              @map("risk_free_rate") @db.Decimal(8, 4)
+  sumPvOfFCFs        Decimal?              @map("sum_pv_of_fcfs") @db.Decimal(15, 2)
+  taxRateForWacc     Decimal?              @map("tax_rate_for_wacc") @db.Decimal(8, 4)
+  terminalGrowthRate Decimal?              @map("terminal_growth_rate") @db.Decimal(8, 4)
+  terminalValue      Decimal?              @map("terminal_value") @db.Decimal(15, 2)
+  valuePerShare      Decimal?              @map("value_per_share") @db.Decimal(15, 2)
+  wacc               Decimal?              @db.Decimal(8, 4)
+  projections        FinancialProjection[]
+  company            Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@map("projection_scenarios")
 }
 
 model FinancialProjection {
-  id         String @id @default(uuid())
-  scenarioId String @map("scenario_id")
-  year       Int    // Año proyectado
-
-  // ==================== BALANCE SHEET (Hoja 4.1) ====================
-  totalAssets           Decimal @default(0) @map("total_assets") @db.Decimal(15, 2) // TOTAL ACTIVO
-  totalAssetsGrowthRate Decimal? @map("total_assets_growth_rate") @db.Decimal(8, 4)
-
-  equity                Decimal @default(0) @db.Decimal(15, 2) // PATRIMONIO NETO
-  equityGrowthRate      Decimal? @map("equity_growth_rate") @db.Decimal(8, 4)
-
-  totalLiabilities      Decimal @default(0) @map("total_liabilities") @db.Decimal(15, 2) // TOTAL PASIVO
-  totalLiabilitiesGrowthRate Decimal? @map("total_liabilities_growth_rate") @db.Decimal(8, 4)
-
-  // ==================== INCOME STATEMENT (Hoja 4.1) ====================
-  // Ingresos por VENTAS
-  revenue               Decimal @default(0) @db.Decimal(15, 2)
-  revenueGrowthRate     Decimal? @map("revenue_growth_rate") @db.Decimal(8, 4)
-
-  // Coste de las ventas
-  costOfSales           Decimal @default(0) @map("cost_of_sales") @db.Decimal(15, 2)
-  costOfSalesGrowthRate Decimal? @map("cost_of_sales_growth_rate") @db.Decimal(8, 4)
-
-  // Otros gastos explotación
-  otherOperatingExpenses         Decimal @default(0) @map("other_operating_expenses") @db.Decimal(15, 2)
-  otherOperatingExpensesGrowthRate Decimal? @map("other_operating_expenses_growth_rate") @db.Decimal(8, 4)
-
-  // Depreciaciones - Amortización
-  depreciation               Decimal @default(0) @db.Decimal(15, 2)
-  depreciationGrowthRate     Decimal? @map("depreciation_growth_rate") @db.Decimal(8, 4)
-
-  // Excepcionales Netos (+ -)
-  exceptionalNet             Decimal @default(0) @map("exceptional_net") @db.Decimal(15, 2)
-  exceptionalNetGrowthRate   Decimal? @map("exceptional_net_growth_rate") @db.Decimal(8, 4)
-
-  // ==================== FINANCIAL RESULTS ====================
-  // Ingresos financieros
-  financialIncome           Decimal @default(0) @map("financial_income") @db.Decimal(15, 2)
-  financialIncomeGrowthRate Decimal? @map("financial_income_growth_rate") @db.Decimal(8, 4)
-
-  // Gastos financieros
-  financialExpenses           Decimal @default(0) @map("financial_expenses") @db.Decimal(15, 2)
-  financialExpensesGrowthRate Decimal? @map("financial_expenses_growth_rate") @db.Decimal(8, 4)
-
-  // Financieros Netos (+ -) - CALCULADO
-  financialNet Decimal? @map("financial_net") @db.Decimal(15, 2)
-  financialNetRate Decimal? @map("financial_net_rate") @db.Decimal(8, 4) // % que ingresa usuario para proyectar Financieros Netos
-
-  // Coste financiero (%)
-  financialCostRate Decimal? @map("financial_cost_rate") @db.Decimal(8, 4)
-
-  // ==================== TAX ====================
-  incomeTax     Decimal @default(0) @map("income_tax") @db.Decimal(15, 2)
-  incomeTaxRate Decimal? @map("income_tax_rate") @db.Decimal(8, 4) // % sobre EBT
-
-  // ==================== CALCULATED METRICS (Hoja 4.1) ====================
-  // EBITDA
-  ebitda Decimal? @db.Decimal(15, 2)
-
-  // Resultado Explotación (EBITDA - Depreciation, SIN excepcionales)
-  operatingResult Decimal? @map("operating_result") @db.Decimal(15, 2)
-
-  // B.A.I.I. - EBIT (Resultado Explotación + Excepcionales)
-  ebit Decimal? @db.Decimal(15, 2)
-
-  // NOPAT - B. Operativo Neto
-  nopat Decimal? @db.Decimal(15, 2)
-
-  // B.A.I. - Beneficio bruto (EBT - Earnings Before Tax)
-  ebt Decimal? @db.Decimal(15, 2)
-
-  // Beneficio Neto (Net Income)
-  netIncome Decimal? @map("net_income") @db.Decimal(15, 2)
-
-  // ROA - Rentabilidad Económica
-  roa Decimal? @db.Decimal(10, 4)
-
-  // Riesgo Operativo
-  operationalRisk Decimal? @map("operational_risk") @db.Decimal(10, 4)
-
-  // ROE - Rentabilidad Financiera
-  roe Decimal? @db.Decimal(10, 4)
-
-  // Apalancamiento Financiero
-  financialLeverage Decimal? @map("financial_leverage") @db.Decimal(10, 4)
-
-  // Riesgo Financiero
-  financialRisk Decimal? @map("financial_risk") @db.Decimal(10, 4)
-
-  // ==================== VARIACIONES (%) - Para ratios ====================
-  // Variación ventas % desde año base
-  revenueVariation Decimal? @map("revenue_variation") @db.Decimal(10, 4)
-
-  // Variación Resultado Explotación % desde año base
-  operatingResultVariation Decimal? @map("operating_result_variation") @db.Decimal(10, 4)
-
-  // Variación BAI % desde año base
-  ebtVariation Decimal? @map("ebt_variation") @db.Decimal(10, 4)
-
-  // ==================== CASH FLOW ====================
-  // Flujo de caja bruto
-  grossCashFlow Decimal? @map("gross_cash_flow") @db.Decimal(15, 2)
-
-  // Inversión en activo circulante (Working Capital Investment)
-  workingCapitalInvestment Decimal @default(0) @map("working_capital_investment") @db.Decimal(15, 2)
-
-  // Inversión en activo fijo (Fixed Assets Investment)
-  fixedAssetsInvestment Decimal @default(0) @map("fixed_assets_investment") @db.Decimal(15, 2)
-
-  // Free Cash Flow (s/a) - CALCULADO
-  freeCashFlow Decimal? @map("free_cash_flow") @db.Decimal(15, 2)
-
-  // ==================== DCF VALUATION (Hoja 4.3) ====================
-  // Factor de descuento: 1 / (1 + WACC)^año
-  discountFactor Decimal? @map("discount_factor") @db.Decimal(10, 6)
-
-  // Valor Presente del FCF: FCF / (1 + WACC)^año
-  pvOfFCF Decimal? @map("pv_of_fcf") @db.Decimal(15, 2)
-
-  // ==================== METADATA ====================
-  notes     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  scenario ProjectionScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  id                               String             @id @default(uuid())
+  scenarioId                       String             @map("scenario_id")
+  year                             Int
+  revenue                          Decimal            @default(0) @db.Decimal(15, 2)
+  revenueGrowthRate                Decimal?           @map("revenue_growth_rate") @db.Decimal(8, 4)
+  costOfSales                      Decimal            @default(0) @map("cost_of_sales") @db.Decimal(15, 2)
+  costOfSalesGrowthRate            Decimal?           @map("cost_of_sales_growth_rate") @db.Decimal(8, 4)
+  otherOperatingExpenses           Decimal            @default(0) @map("other_operating_expenses") @db.Decimal(15, 2)
+  otherOperatingExpensesGrowthRate Decimal?           @map("other_operating_expenses_growth_rate") @db.Decimal(8, 4)
+  depreciation                     Decimal            @default(0) @db.Decimal(15, 2)
+  depreciationGrowthRate           Decimal?           @map("depreciation_growth_rate") @db.Decimal(8, 4)
+  exceptionalNet                   Decimal            @default(0) @map("exceptional_net") @db.Decimal(15, 2)
+  exceptionalNetGrowthRate         Decimal?           @map("exceptional_net_growth_rate") @db.Decimal(8, 4)
+  ebit                             Decimal?           @db.Decimal(15, 2)
+  nopat                            Decimal?           @db.Decimal(15, 2)
+  grossCashFlow                    Decimal?           @map("gross_cash_flow") @db.Decimal(15, 2)
+  workingCapitalInvestment         Decimal            @default(0) @map("working_capital_investment") @db.Decimal(15, 2)
+  fixedAssetsInvestment            Decimal            @default(0) @map("fixed_assets_investment") @db.Decimal(15, 2)
+  freeCashFlow                     Decimal?           @map("free_cash_flow") @db.Decimal(15, 2)
+  notes                            String?
+  createdAt                        DateTime           @default(now()) @map("created_at")
+  updatedAt                        DateTime           @updatedAt @map("updated_at")
+  ebitda                           Decimal?           @db.Decimal(15, 2)
+  ebt                              Decimal?           @db.Decimal(15, 2)
+  equity                           Decimal            @default(0) @db.Decimal(15, 2)
+  equityGrowthRate                 Decimal?           @map("equity_growth_rate") @db.Decimal(8, 4)
+  financialCostRate                Decimal?           @map("financial_cost_rate") @db.Decimal(8, 4)
+  financialExpenses                Decimal            @default(0) @map("financial_expenses") @db.Decimal(15, 2)
+  financialExpensesGrowthRate      Decimal?           @map("financial_expenses_growth_rate") @db.Decimal(8, 4)
+  financialIncome                  Decimal            @default(0) @map("financial_income") @db.Decimal(15, 2)
+  financialIncomeGrowthRate        Decimal?           @map("financial_income_growth_rate") @db.Decimal(8, 4)
+  financialLeverage                Decimal?           @map("financial_leverage") @db.Decimal(10, 4)
+  financialNet                     Decimal?           @map("financial_net") @db.Decimal(15, 2)
+  financialRisk                    Decimal?           @map("financial_risk") @db.Decimal(10, 4)
+  incomeTax                        Decimal            @default(0) @map("income_tax") @db.Decimal(15, 2)
+  incomeTaxRate                    Decimal?           @map("income_tax_rate") @db.Decimal(8, 4)
+  netIncome                        Decimal?           @map("net_income") @db.Decimal(15, 2)
+  operationalRisk                  Decimal?           @map("operational_risk") @db.Decimal(10, 4)
+  roa                              Decimal?           @db.Decimal(10, 4)
+  roe                              Decimal?           @db.Decimal(10, 4)
+  totalAssets                      Decimal            @default(0) @map("total_assets") @db.Decimal(15, 2)
+  totalAssetsGrowthRate            Decimal?           @map("total_assets_growth_rate") @db.Decimal(8, 4)
+  totalLiabilities                 Decimal            @default(0) @map("total_liabilities") @db.Decimal(15, 2)
+  totalLiabilitiesGrowthRate       Decimal?           @map("total_liabilities_growth_rate") @db.Decimal(8, 4)
+  ebtVariation                     Decimal?           @map("ebt_variation") @db.Decimal(10, 4)
+  financialNetRate                 Decimal?           @map("financial_net_rate") @db.Decimal(8, 4)
+  operatingResult                  Decimal?           @map("operating_result") @db.Decimal(15, 2)
+  operatingResultVariation         Decimal?           @map("operating_result_variation") @db.Decimal(10, 4)
+  revenueVariation                 Decimal?           @map("revenue_variation") @db.Decimal(10, 4)
+  discountFactor                   Decimal?           @map("discount_factor") @db.Decimal(10, 6)
+  pvOfFCF                          Decimal?           @map("pv_of_fcf") @db.Decimal(15, 2)
+  scenario                         ProjectionScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
 
   @@unique([scenarioId, year])
   @@index([scenarioId])
   @@map("financial_projections")
 }
 
-// INFORMES GENERADOS CON IA
 model Report {
-  id        String       @id @default(uuid())
-  companyId String       @map("company_id")
-  userId    String       @map("user_id")
-  year      Int          // Año base del informe
-  status    ReportStatus @default(PENDING)
-
-  // Contenido generado por IA (JSON con los textos de cada sección)
-  aiAnalysis Json? @map("ai_analysis")
-
-  // Rutas a los archivos generados
-  pdfPath  String? @map("pdf_path")
-  docxPath String? @map("docx_path")
-
-  // Error si falló
-  errorMessage String? @map("error_message")
-
-  generatedAt DateTime? @map("generated_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String       @id @default(uuid())
+  companyId    String       @map("company_id")
+  userId       String       @map("user_id")
+  year         Int
+  status       ReportStatus @default(PENDING)
+  aiAnalysis   Json?        @map("ai_analysis")
+  pdfPath      String?      @map("pdf_path")
+  docxPath     String?      @map("docx_path")
+  errorMessage String?      @map("error_message")
+  generatedAt  DateTime?    @map("generated_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([userId])

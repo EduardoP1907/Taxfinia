@@ -13,7 +13,8 @@ export const RatiosSection: React.FC<Props> = ({ years }) => {
 
   const formatPercentage = (value: number | null | undefined): string => {
     if (value === null || value === undefined) return '-';
-    return (value * 100).toFixed(2) + '%';
+    // Backend already returns these ratios multiplied by 100 (e.g. 15.5 = 15.5%)
+    return value.toFixed(2) + '%';
   };
 
   const formatDays = (value: number | null | undefined): string => {
@@ -101,15 +102,11 @@ export const RatiosSection: React.FC<Props> = ({ years }) => {
     // Parsear el óptimo
     if (optimalText.includes('>')) {
       const threshold = parseFloat(optimalText.replace(/[^0-9.]/g, ''));
-      if (optimalText.includes('%')) {
-        return value >= threshold / 100 ? 'text-green-600' : 'text-red-600';
-      }
+      // Values are already in percentage units (e.g. 15.5 = 15.5%), compare directly
       return value >= threshold ? 'text-green-600' : 'text-red-600';
     } else if (optimalText.includes('<')) {
       const threshold = parseFloat(optimalText.replace(/[^0-9.]/g, ''));
-      if (optimalText.includes('%')) {
-        return value <= threshold / 100 ? 'text-green-600' : 'text-red-600';
-      } else if (optimalText.includes('días')) {
+      if (optimalText.includes('días')) {
         return value <= threshold ? 'text-green-600' : 'text-red-600';
       }
       return value <= threshold ? 'text-green-600' : 'text-red-600';

@@ -35,6 +35,9 @@ router.put('/:scenarioId/config', projectionsController.updateScenarioConfig);
 
 // ==================== RUTAS DCF (Hoja 4.3) ====================
 
+// Estimar WACC con IA (basado en sector y país de la empresa)
+router.post('/:scenarioId/estimate-wacc', projectionsController.estimateWACCWithAI);
+
 // Actualizar parámetros DCF (WACC, tasa de crecimiento terminal, etc.)
 router.put('/:scenarioId/dcf-parameters', projectionsController.updateDCFParameters);
 

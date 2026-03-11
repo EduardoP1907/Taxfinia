@@ -282,14 +282,14 @@ ${multiYearTable}
 
 === BALANCE ${latest} (DETALLE) ===
 - Total Activo: ${formatAmount(bal.totalAssets, cur)}
-  - Activo No Corriente: ${formatAmount(bal.nonCurrentAssets, cur)} (${pct(bal.totalAssets > 0 ? bal.nonCurrentAssets / bal.totalAssets * 100 : 0)} del total)
-  - Activo Corriente: ${formatAmount(bal.currentAssets, cur)} (${pct(bal.totalAssets > 0 ? bal.currentAssets / bal.totalAssets * 100 : 0)} del total)
+  - Activo Fijo: ${formatAmount(bal.nonCurrentAssets, cur)} (${pct(bal.totalAssets > 0 ? bal.nonCurrentAssets / bal.totalAssets * 100 : 0)} del total)
+  - Activo Circulante: ${formatAmount(bal.currentAssets, cur)} (${pct(bal.totalAssets > 0 ? bal.currentAssets / bal.totalAssets * 100 : 0)} del total)
     - Existencias: ${formatAmount(bal.inventory, cur)}
     - Cuentas por Cobrar: ${formatAmount(bal.accountsReceivable, cur)}
     - Tesorería/Disponible: ${formatAmount(bal.cash, cur)}
 - Patrimonio Neto: ${formatAmount(bal.equity, cur)} (${pct(bal.totalAssets > 0 ? bal.equity / bal.totalAssets * 100 : 0)} del total)
-- Pasivo No Corriente: ${formatAmount(bal.nonCurrentLiabilities, cur)}
-- Pasivo Corriente: ${formatAmount(bal.currentLiabilities, cur)}
+- Pasivo No Circulante: ${formatAmount(bal.nonCurrentLiabilities, cur)}
+- Pasivo Circulante: ${formatAmount(bal.currentLiabilities, cur)}
 - Fondo de Maniobra: ${formatAmount(bal.workingCapital, cur)}
 
 === RATIOS FINANCIEROS ${latest} ===
@@ -386,6 +386,82 @@ const analysisTools: Anthropic.Tool[] = [
     },
   },
 ];
+
+// ─── WACC estimation ──────────────────────────────────────────────────────────
+
+export interface WACCEstimateResult {
+  wacc: number;           // decimal (e.g. 0.085 = 8.5%)
+  costOfEquity: number;   // decimal
+  costOfDebt: number;     // decimal
+  debtPercentage: number; // decimal (e.g. 0.30 = 30%)
+  taxRate: number;        // decimal
+  terminalGrowthRate: number; // decimal
+  explanation: string;
+}
+
+const waccTools: Anthropic.Tool[] = [
+  {
+    name: 'estimate_wacc',
+    description: 'Estima el WACC de mercado para una empresa según su sector y país.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        wacc:               { type: 'number', description: 'WACC en decimal (ej: 0.085 para 8.5%)' },
+        costOfEquity:       { type: 'number', description: 'Ke en decimal' },
+        costOfDebt:         { type: 'number', description: 'Kd (antes de impuestos) en decimal' },
+        debtPercentage:     { type: 'number', description: 'Proporción de deuda sobre capital total (D/V) en decimal' },
+        taxRate:            { type: 'number', description: 'Tasa impositiva corporativa efectiva en decimal' },
+        terminalGrowthRate: { type: 'number', description: 'Tasa de crecimiento perpetuo (g) en decimal' },
+        explanation:        { type: 'string', description: 'Justificación en español del WACC estimado (3-5 oraciones): tasa libre de riesgo usada, prima de riesgo de mercado del país, beta sectorial, coste de deuda de mercado y razonamiento de la estructura de capital.' },
+      },
+      required: ['wacc', 'costOfEquity', 'costOfDebt', 'debtPercentage', 'taxRate', 'terminalGrowthRate', 'explanation'],
+    },
+  },
+];
+
+export async function estimateWACC(
+  industry: string,
+  country: string,
+  currency: string,
+  businessActivity?: string,
+): Promise<WACCEstimateResult> {
+  const prompt = `Eres un experto en finanzas corporativas y valoración de empresas.
+Necesito que estimes el WACC (Coste Promedio Ponderado de Capital) de mercado para una empresa con las siguientes características:
+
+- Sector / Industria: ${industry || 'No especificado'}
+- Actividad comercial: ${businessActivity || 'No especificado'}
+- País de origen: ${country || 'No especificado'}
+- Moneda: ${currency || 'No especificado'}
+
+Para calcular el WACC debes considerar datos actuales de mercado:
+1. Tasa libre de riesgo del país (bono soberano a 10 años o equivalente)
+2. Prima de riesgo de mercado del país (ERP - Equity Risk Premium de Damodaran u otras fuentes)
+3. Beta desapalancada del sector (fuente: Damodaran u otras)
+4. Coste de deuda típico del sector en ese país
+5. Estructura de capital típica del sector (D/V y E/V)
+6. Tasa impositiva corporativa efectiva del país
+7. Tasa de crecimiento perpetuo (g) razonable para el sector y país
+
+Usa tu conocimiento actualizado de parámetros de mercado para ${country || 'el país'} y el sector ${industry || 'indicado'}.
+
+Responde usando la herramienta estimate_wacc con valores numéricos precisos y en decimal.`;
+
+  const message = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 2000,
+    tools: waccTools,
+    tool_choice: { type: 'any' },
+    system: 'Eres un experto en finanzas corporativas con conocimiento actualizado de tasas de mercado globales. Usa la herramienta estimate_wacc para entregar tu estimación. Todos los valores numéricos deben estar en formato decimal.',
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const toolBlock = message.content.find(b => b.type === 'tool_use');
+  if (!toolBlock || toolBlock.type !== 'tool_use') {
+    throw new Error('La IA no pudo estimar el WACC. Intenta nuevamente.');
+  }
+
+  return toolBlock.input as WACCEstimateResult;
+}
 
 // ─── Main export function ──────────────────────────────────────────────────────
 

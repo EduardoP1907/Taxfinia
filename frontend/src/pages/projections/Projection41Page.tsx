@@ -9,7 +9,7 @@ import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { projectionsService, type ProjectionScenarioWithData } from '../../services/projections.service';
 import { companyService } from '../../services/company.service';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Calculator, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Plus, Calculator, TrendingUp, Save } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { GrowthRatesModal } from '../../components/projections/GrowthRatesModal';
@@ -19,7 +19,7 @@ interface Projection41PageProps {
 }
 
 export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }) => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const companyId = searchParams.get('companyId');
   const scenarioId = searchParams.get('scenarioId');
@@ -31,6 +31,9 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
   const [projections, setProjections] = useState<any[]>([]);
   const [showGrowthRatesModal, setShowGrowthRatesModal] = useState(false);
+  // Cambios pendientes de guardar: { projectionId: { field: value } }
+  const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, any>>>({});
+  const hasUnsavedChanges = Object.keys(pendingChanges).length > 0;
 
   useEffect(() => {
     console.log('[EFFECT] companyId:', companyId, 'scenarioId:', scenarioId);
@@ -64,13 +67,21 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
       setCompany(companyData);
 
       if (scenarioId) {
-        console.log('[LOAD DATA] Loading scenario:', scenarioId);
         const scenarioData = await projectionsService.getScenario(scenarioId);
-        console.log('[LOAD DATA] Scenario loaded:', scenarioData);
         setScenario(scenarioData);
         setProjections(scenarioData.projections || []);
+      } else {
+        // Auto-cargar escenario más reciente de la empresa
+        const scenarios = await projectionsService.getCompanyScenarios(companyId!);
+        if (scenarios.length > 0) {
+          const latest = scenarios[0];
+          setScenario(latest);
+          setProjections(latest.projections || []);
+          const newParams = new URLSearchParams(searchParams);
+          newParams.set('scenarioId', latest.id);
+          setSearchParams(newParams);
+        }
       }
-      console.log('[LOAD DATA] Success!');
     } catch (error: any) {
       console.error('[LOAD DATA] Error loading data:', error);
       console.error('[LOAD DATA] Error details:', error.response?.data);
@@ -136,54 +147,36 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
     return isNaN(num) ? 0 : num;
   };
 
-  const handleUpdateProjection = async (projectionId: string, field: string, value: any) => {
+  // Actualiza solo el estado local y acumula los cambios pendientes
+  const handleUpdateProjection = (projectionId: string, field: string, value: any) => {
+    setProjections((prev) =>
+      prev.map((proj) => (proj.id === projectionId ? { ...proj, [field]: value } : proj))
+    );
+    setPendingChanges((prev) => ({
+      ...prev,
+      [projectionId]: { ...(prev[projectionId] || {}), [field]: value },
+    }));
+  };
+
+  // Guarda todos los cambios pendientes al backend de una sola vez
+  const handleSaveAll = async () => {
+    if (!scenarioId || Object.keys(pendingChanges).length === 0) return;
     try {
-      // Actualizar en el backend
-      const updated = await projectionsService.updateProjection(projectionId, { [field]: value });
-
-      // Detectar si es un campo de tasa de crecimiento
-      const isGrowthRateField = field.endsWith('GrowthRate');
-
-      // Campos de valor que pueden generar tasas de crecimiento automáticas
-      const valueFieldsThatTriggerProjection = [
-        'revenue',
-        'costOfSales',
-        'otherOperatingExpenses',
-        'depreciation',
-        'exceptionalNet',
-        'financialIncome',
-        'financialExpenses',
-        'totalAssets',
-        'equity',
-        'totalLiabilities'
-      ];
-
-      // Si se actualizó una tasa de crecimiento O un valor que genera tasa automática,
-      // recargar todo el escenario porque afecta a años futuros
-      if (isGrowthRateField || valueFieldsThatTriggerProjection.includes(field)) {
-        console.log(`🔄 Campo ${field} actualizado, recargando escenario completo...`);
-        const refreshedScenario = await projectionsService.getScenario(scenarioId!);
-        setProjections(refreshedScenario.projections || []);
-
-        // Mostrar mensaje apropiado
-        if (isGrowthRateField) {
-          toast.success('Tasa de crecimiento aplicada a años futuros');
-        } else {
-          toast.success('Valor actualizado y tasa de crecimiento calculada automáticamente');
-        }
-      } else {
-        // Actualizar solo la proyección actual
-        setProjections((prev) =>
-          prev.map((proj) =>
-            proj.id === projectionId ? { ...proj, ...updated } : proj
-          )
-        );
-      }
+      setSaving(true);
+      await Promise.all(
+        Object.entries(pendingChanges).map(([projId, changes]) =>
+          projectionsService.updateProjection(projId, changes)
+        )
+      );
+      setPendingChanges({});
+      // Recargar para obtener valores recalculados por el backend
+      const refreshed = await projectionsService.getScenario(scenarioId!);
+      setProjections(refreshed.projections || []);
+      toast.success('Proyección guardada correctamente');
     } catch (error: any) {
-      console.error('Error updating projection:', error);
-      toast.error('Error al actualizar proyección');
-      // Recargar datos en caso de error
-      loadData();
+      toast.error('Error al guardar la proyección');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -344,14 +337,30 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
               </p>
             </div>
           </div>
-          <Button
-            onClick={() => setShowGrowthRatesModal(true)}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <TrendingUp className="w-4 h-4" />
-            Configurar Tasas de Crecimiento
-          </Button>
+          <div className="flex items-center gap-2">
+            {hasUnsavedChanges && (
+              <span className="text-xs text-amber-600 font-medium bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                ● Cambios sin guardar
+              </span>
+            )}
+            <Button
+              onClick={() => setShowGrowthRatesModal(true)}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Configurar Tasas
+            </Button>
+            <Button
+              onClick={handleSaveAll}
+              disabled={saving || !hasUnsavedChanges}
+              isLoading={saving}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
         </div>
 
         {/* Info Card */}

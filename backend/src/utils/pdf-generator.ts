@@ -250,15 +250,15 @@ function addBalancePage(doc: PDFKit.PDFDocument, data: PDFReportData, pageNum: n
   y += 20;
 
   const rows = [
-    { label: 'ACTIVO NO CORRIENTE', key: 'nonCurrentAssets', bold: true, section: 'assets' },
-    { label: 'ACTIVO CORRIENTE', key: 'currentAssets', bold: true, section: 'assets' },
+    { label: 'ACTIVO FIJO', key: 'nonCurrentAssets', bold: true, section: 'assets' },
+    { label: 'ACTIVO CIRCULANTE', key: 'currentAssets', bold: true, section: 'assets' },
     { label: '  Existencias', key: 'inventory', bold: false, section: 'assets' },
     { label: '  Cuentas por Cobrar', key: 'accountsReceivable', bold: false, section: 'assets' },
     { label: '  Tesorería / Disponible', key: 'cash', bold: false, section: 'assets' },
     { label: 'TOTAL ACTIVO', key: 'totalAssets', bold: true, section: 'total' },
     { label: 'PATRIMONIO NETO', key: 'equity', bold: true, section: 'equity' },
-    { label: 'PASIVO NO CORRIENTE', key: 'nonCurrentLiabilities', bold: true, section: 'liabilities' },
-    { label: 'PASIVO CORRIENTE', key: 'currentLiabilities', bold: true, section: 'liabilities' },
+    { label: 'PASIVO NO CIRCULANTE', key: 'nonCurrentLiabilities', bold: true, section: 'liabilities' },
+    { label: 'PASIVO CIRCULANTE', key: 'currentLiabilities', bold: true, section: 'liabilities' },
     { label: 'TOTAL PASIVO + PATRIMONIO', key: 'totalAssets', bold: true, section: 'total' },
     { label: 'Fondo de Maniobra', key: 'workingCapital', bold: false, section: 'derived' },
   ];
@@ -357,11 +357,11 @@ function addRatiosPage(doc: PDFKit.PDFDocument, data: PDFReportData, pageNum: nu
   y += 14;
 
   const profRows = [
-    { label: 'ROE (Rentabilidad Financiera)', key: 'roe', fmt: (v: number) => fmtPct(v * 100) },
-    { label: 'ROA (Rentabilidad Económica)', key: 'roa', fmt: (v: number) => fmtPct(v * 100) },
-    { label: 'Margen Bruto', key: 'grossMargin', fmt: (v: number) => fmtPct(v * 100) },
-    { label: 'Margen EBITDA', key: 'ebitdaMargin', fmt: (v: number) => fmtPct(v * 100) },
-    { label: 'Margen Neto', key: 'netMargin', fmt: (v: number) => fmtPct(v * 100) },
+    { label: 'ROE (Rentabilidad Financiera)', key: 'roe', fmt: (v: number) => fmtPct(v) },
+    { label: 'ROA (Rentabilidad Económica)', key: 'roa', fmt: (v: number) => fmtPct(v) },
+    { label: 'Margen Bruto', key: 'grossMargin', fmt: (v: number) => fmtPct(v) },
+    { label: 'Margen EBITDA', key: 'ebitdaMargin', fmt: (v: number) => fmtPct(v) },
+    { label: 'Margen Neto', key: 'netMargin', fmt: (v: number) => fmtPct(v) },
   ];
 
   profRows.forEach((row, idx) => {
@@ -491,10 +491,10 @@ export async function generateAnalyticalPDF(data: PDFReportData, outputPath: str
 
     const TOTAL_PAGES = 4; // cover + income + balance + ratios
 
-    addCoverPage(doc, data, TOTAL_PAGES);
-    addIncomeStatementPage(doc, data, 2, TOTAL_PAGES);
-    addBalancePage(doc, data, 3, TOTAL_PAGES);
-    addRatiosPage(doc, data, 4, TOTAL_PAGES);
+    try { addCoverPage(doc, data, TOTAL_PAGES); } catch (e) { console.error('[PDF] Cover page error:', e); }
+    try { addIncomeStatementPage(doc, data, 2, TOTAL_PAGES); } catch (e) { console.error('[PDF] Income statement page error:', e); }
+    try { addBalancePage(doc, data, 3, TOTAL_PAGES); } catch (e) { console.error('[PDF] Balance page error:', e); }
+    try { addRatiosPage(doc, data, 4, TOTAL_PAGES); } catch (e) { console.error('[PDF] Ratios page error:', e); }
 
     doc.end();
 

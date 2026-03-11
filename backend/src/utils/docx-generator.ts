@@ -95,7 +95,12 @@ function subSectionHeading(number: string, title: string): Paragraph {
 
 // ─── Multi-paragraph text ───────────────────────────────────────────────────
 function bodyText(text: string): Paragraph[] {
-  return text
+  // Normalize literal \n escape sequences that AI may produce as text (e.g. ".\n\n .")
+  const normalized = text
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+  return normalized
     .split('\n')
     .filter(line => line.trim().length > 0)
     .map(line =>
@@ -104,7 +109,7 @@ function bodyText(text: string): Paragraph[] {
         spacing: { after: 100, before: 0 },
         children: [
           new TextRun({
-            text: line.trim(),
+            text: line.trim().replace(/[\n\r]/g, ' '),
             size: 20,
             color: '374151',
             font: 'Calibri',

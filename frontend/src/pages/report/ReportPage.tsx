@@ -107,7 +107,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900">Informe Profesional con IA</h3>
-            <p className="text-xs text-amber-600">PDF analítico + Word narrativo generados por Claude AI</p>
+            <p className="text-xs text-amber-600">Reporte PDF con tablas + Análisis Word redactado por IA</p>
           </div>
         </div>
         <Button
@@ -134,15 +134,15 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
         <div className="bg-white rounded-lg p-3 border border-amber-100 flex items-start gap-2">
           <FileDown className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-gray-800">PDF Analítico</p>
-            <p className="text-xs text-gray-500">Tablas de ratios, balance y resultados para {selectedYear}. Mismo formato que TAXFINBK.</p>
+            <p className="text-sm font-semibold text-gray-800">Reporte PDF con Tablas</p>
+            <p className="text-xs text-gray-500">Tablas de ratios, balance y resultados para {selectedYear}. Descarga en formato PDF.</p>
           </div>
         </div>
         <div className="bg-white rounded-lg p-3 border border-amber-100 flex items-start gap-2">
           <FileSpreadsheet className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-gray-800">Word Narrativo</p>
-            <p className="text-xs text-gray-500">Análisis profesional redactado por IA con interpretaciones y valoración DCF.</p>
+            <p className="text-sm font-semibold text-gray-800">Análisis Redactado en Word</p>
+            <p className="text-xs text-gray-500">Análisis profesional redactado por IA con interpretaciones financieras y valoración DCF. Descarga en formato Word.</p>
           </div>
         </div>
       </div>
@@ -203,7 +203,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
                       onClick={() => handleDownload(report.id, 'pdf')}
                       disabled={downloading[`${report.id}-pdf`]}
                       className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
-                      title="Descargar PDF Analítico"
+                      title="Descargar Reporte PDF con Tablas"
                     >
                       {downloading[`${report.id}-pdf`]
                         ? <RefreshCw className="w-3 h-3 animate-spin" />
@@ -214,7 +214,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
                       onClick={() => handleDownload(report.id, 'docx')}
                       disabled={downloading[`${report.id}-docx`]}
                       className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
-                      title="Descargar Word Narrativo"
+                      title="Descargar Análisis Redactado en Word"
                     >
                       {downloading[`${report.id}-docx`]
                         ? <RefreshCw className="w-3 h-3 animate-spin" />
@@ -502,7 +502,7 @@ export const ReportPage: React.FC = () => {
             <div>
               <h4 className="text-sm font-semibold text-slate-900 mb-1">Nota Importante</h4>
               <p className="text-sm text-slate-800">
-                El informe generado con IA incluye análisis narrativo profesional (Word) y reporte analítico con tablas y ratios (PDF).
+                El informe generado con IA incluye un <strong>Análisis Redactado en Word</strong> (interpretaciones narrativas y valoración DCF) y un <strong>Reporte PDF con Tablas</strong> (ratios, balance y resultados en formato estructurado).
                 Los análisis son generados por Claude AI de Anthropic basándose en los datos financieros ingresados.
                 Los resultados deben ser interpretados por profesionales cualificados.
               </p>
