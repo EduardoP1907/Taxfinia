@@ -372,12 +372,12 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
             <h3 className="text-lg font-semibold text-white">PROYECCIONES DE FLUJO DE CAJA</h3>
           </div>
           <div className="p-6 overflow-x-auto">
-            {scenario?.projections?.length > 0 ? (
+            {(scenario?.projections?.length ?? 0) > 0 ? (
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-gray-900">Concepto</th>
-                    {scenario.projections.slice(1, 11).map((proj) => (
+                    {scenario!.projections.slice(1, 11).map((proj) => (
                       <th key={proj.id} className="px-4 py-3 text-center font-medium text-gray-900">{proj.year}</th>
                     ))}
                   </tr>
@@ -385,13 +385,13 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
                 <tbody className="divide-y">
                   <tr>
                     <td className="px-4 py-2 font-medium">Flujo de Caja Libre Proyección</td>
-                    {scenario.projections.slice(1, 11).map((proj) => (
+                    {scenario!.projections.slice(1, 11).map((proj) => (
                       <td key={proj.id} className="px-4 py-2 text-center">{formatCurrency(proj.freeCashFlow)}</td>
                     ))}
                   </tr>
                   <tr className="bg-green-50">
                     <td className="px-4 py-2 font-semibold">Flujo de Caja Libre FINAL</td>
-                    {scenario.projections.slice(1, 11).map((proj) => (
+                    {scenario!.projections.slice(1, 11).map((proj) => (
                       <td key={proj.id} className="px-4 py-2 text-center font-semibold text-green-700">
                         {formatCurrency(proj.freeCashFlow || 0)}
                       </td>
