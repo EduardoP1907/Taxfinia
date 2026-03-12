@@ -25,7 +25,6 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [companies, setCompanies] = useState<any[]>([]);
   const [company, setCompany] = useState<any>(null);
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
 
@@ -44,22 +43,8 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
   useEffect(() => {
     if (companyId) {
       loadData();
-    } else {
-      loadCompanies();
     }
   }, [companyId]);
-
-  const loadCompanies = async () => {
-    try {
-      setLoading(true);
-      const data = await companyService.getCompanies();
-      setCompanies(data);
-    } catch {
-      toast.error('Error al cargar empresas');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadData = async () => {
     try {
@@ -196,44 +181,6 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
     );
   }
 
-  // ── Sin empresa seleccionada ──
-  if (!companyId) {
-    return (
-      <DashboardLayout>
-        {tabsHeader}
-        <div className="max-w-2xl mx-auto mt-10">
-          <div className="bg-white rounded-xl shadow-md p-8">
-            <div className="text-center mb-6">
-              <div className="p-3 bg-amber-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                <Settings className="w-8 h-8 text-amber-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Hoja 4.0 — Configurar Tasas</h2>
-              <p className="text-gray-600">Selecciona la empresa para configurar las tasas de crecimiento</p>
-            </div>
-            <div className="space-y-3">
-              {companies.length === 0 ? (
-                <p className="text-center text-gray-500 py-4">No hay empresas creadas.</p>
-              ) : (
-                companies.map((comp) => (
-                  <button
-                    key={comp.id}
-                    onClick={() => navigate(`/proyecciones?companyId=${comp.id}&view=4.0`)}
-                    className="w-full p-4 border border-gray-200 rounded-lg hover:border-amber-300 hover:bg-amber-50 transition-colors text-left flex items-center justify-between"
-                  >
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{comp.name}</h3>
-                      <p className="text-sm text-gray-500">{comp.taxId || 'Sin RUT'}</p>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-amber-500" />
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
 
   return (
     <DashboardLayout>

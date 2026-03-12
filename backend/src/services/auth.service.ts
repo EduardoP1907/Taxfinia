@@ -265,6 +265,86 @@ export class AuthService {
   }
 
   /**
+   * Solicitar recuperación de contraseña
+   */
+  async forgotPassword(email: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    // Siempre responder con el mismo mensaje para no revelar si el email existe
+    if (!user || !user.isVerified || !user.isActive) {
+      return { message: 'Si el email existe, recibirás un código de recuperación.' };
+    }
+
+    // Invalidar OTPs de recuperación anteriores
+    await prisma.otpCode.updateMany({
+      where: { userId: user.id, type: 'PASSWORD_RESET', used: false },
+      data: { used: true },
+    });
+
+    const otpCode = generateOtp(6);
+    const expiresAt = new Date(Date.now() + config.otp.expirationMinutes * 60 * 1000);
+
+    await prisma.otpCode.create({
+      data: {
+        userId: user.id,
+        code: otpCode,
+        type: 'PASSWORD_RESET',
+        expiresAt,
+      },
+    });
+
+    await sendPasswordResetEmail(email, otpCode);
+
+    return { message: 'Si el email existe, recibirás un código de recuperación.' };
+  }
+
+  /**
+   * Restablecer contraseña con código OTP
+   */
+  async resetPassword(email: string, code: string, newPassword: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      throw new Error('Código inválido o expirado');
+    }
+
+    const otpRecord = await prisma.otpCode.findFirst({
+      where: {
+        userId: user.id,
+        code,
+        type: 'PASSWORD_RESET',
+        used: false,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otpRecord) {
+      throw new Error('Código inválido o expirado');
+    }
+
+    if (isOtpExpired(otpRecord.expiresAt)) {
+      throw new Error('El código ha expirado');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.$transaction([
+      prisma.otpCode.update({
+        where: { id: otpRecord.id },
+        data: { used: true },
+      }),
+      prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword },
+      }),
+      // Invalidar todas las sesiones activas
+      prisma.session.deleteMany({ where: { userId: user.id } }),
+    ]);
+
+    return { message: 'Contraseña actualizada correctamente. Inicia sesión.' };
+  }
+
+  /**
    * Logout (invalidar refresh token)
    */
   async logout(refreshToken: string) {

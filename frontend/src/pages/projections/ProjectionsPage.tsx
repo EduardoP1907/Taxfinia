@@ -21,7 +21,6 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [companies, setCompanies] = useState<any[]>([]);
   const [company, setCompany] = useState<any>(null);
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
   const [projections, setProjections] = useState<FinancialProjection[]>([]);
@@ -59,23 +58,8 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
   useEffect(() => {
     if (companyId) {
       loadData();
-    } else {
-      loadCompanies();
     }
   }, [companyId, scenarioId]);
-
-  const loadCompanies = async () => {
-    try {
-      setLoading(true);
-      const data = await companyService.getCompanies();
-      setCompanies(data);
-    } catch (error: any) {
-      console.error('Error loading companies:', error);
-      toast.error('Error al cargar empresas');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadData = async () => {
     try {
@@ -127,7 +111,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
   };
 
   const handleSaveAll = async () => {
-    if (!scenarioId || Object.keys(pendingChanges).length === 0) return;
+    if (!scenarioId) return;
     try {
       setSaving(true);
       await Promise.all(
@@ -197,69 +181,6 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
     );
   }
 
-  // Selección de empresa
-  if (!companyId) {
-    return (
-      <DashboardLayout>
-        {tabsHeader}
-        <div className="max-w-2xl mx-auto mt-16">
-          <div className="bg-white rounded-lg shadow-md p-8">
-            <div className="text-center mb-6">
-              <TrendingUp className="w-16 h-16 mx-auto text-amber-600 mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Proyecciones Financieras
-              </h2>
-              <p className="text-gray-600">
-                Selecciona una empresa para crear o ver sus proyecciones
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {companies.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No tienes empresas creadas</p>
-                  <Button
-                    onClick={() => navigate('/empresas')}
-                    className="mt-4"
-                  >
-                    Crear primera empresa
-                  </Button>
-                </div>
-              ) : (
-                companies.map((comp) => (
-                  <button
-                    key={comp.id}
-                    onClick={() => navigate(`/proyecciones?companyId=${comp.id}`)}
-                    className="w-full p-4 border border-gray-200 rounded-lg hover:border-amber-300 hover:bg-amber-50 transition-colors text-left"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{comp.name}</h3>
-                        <p className="text-sm text-gray-600">{comp.taxId || 'Sin RUT'}</p>
-                      </div>
-                      <div className="text-amber-600">
-                        <ArrowLeft className="w-5 h-5 rotate-180" />
-                      </div>
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-
-            <div className="mt-6 text-center">
-              <Button
-                onClick={() => navigate('/dashboard')}
-                variant="outline"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Volver al Dashboard
-              </Button>
-            </div>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
 
   if (!scenarioId) {
     return (
@@ -344,16 +265,14 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
             )}
             <Button
               onClick={handleSaveAll}
-              disabled={saving || !hasUnsavedChanges}
+              disabled={saving}
               size="sm"
-              className={hasUnsavedChanges ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+              className="bg-green-600 hover:bg-green-700 text-white"
             >
               {saving ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-              ) : hasUnsavedChanges ? (
-                <Save className="w-4 h-4 mr-2" />
               ) : (
-                <CheckCircle className="w-4 h-4 mr-2" />
+                <Save className="w-4 h-4 mr-2" />
               )}
               {saving ? 'Guardando...' : 'Guardar'}
             </Button>
@@ -702,11 +621,16 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   <td className="px-4 py-3 text-gray-900 sticky left-0 bg-blue-100">
                     FCF - Flujo de caja libre
                   </td>
-                  {projections.map((proj) => (
-                    <td key={proj.id} className="px-4 py-3 text-right text-gray-900">
-                      {formatCurrency(proj.freeCashFlow)}
-                    </td>
-                  ))}
+                  {projections.map((proj) => {
+                    const fcf = (proj.grossCashFlow ?? 0)
+                      - (proj.workingCapitalInvestment ?? 0)
+                      - (proj.fixedAssetsInvestment ?? 0);
+                    return (
+                      <td key={proj.id} className="px-4 py-3 text-right text-gray-900">
+                        {formatCurrency(fcf)}
+                      </td>
+                    );
+                  })}
                 </tr>
               </tbody>
             </table>

@@ -8,6 +8,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { projectionsService, type ProjectionScenarioWithData } from '../../services/projections.service';
 import { companyService } from '../../services/company.service';
+import { useCompanyStore } from '../../store/companyStore';
 import { toast } from 'sonner';
 import { ArrowLeft, Plus, Calculator, TrendingUp, Save } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -23,11 +24,11 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
   const navigate = useNavigate();
   const companyId = searchParams.get('companyId');
   const scenarioId = searchParams.get('scenarioId');
+  const setSelectedCompanyInStore = useCompanyStore((state) => state.setSelectedCompany);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [companies, setCompanies] = useState<any[]>([]);
-  const [company, setCompany] = useState<any>(null);
+const [company, setCompany] = useState<any>(null);
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
   const [projections, setProjections] = useState<any[]>([]);
   const [showGrowthRatesModal, setShowGrowthRatesModal] = useState(false);
@@ -39,23 +40,8 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
     console.log('[EFFECT] companyId:', companyId, 'scenarioId:', scenarioId);
     if (companyId) {
       loadData();
-    } else {
-      loadCompanies();
     }
   }, [companyId, scenarioId]);
-
-  const loadCompanies = async () => {
-    try {
-      setLoading(true);
-      const data = await companyService.getCompanies();
-      setCompanies(data);
-    } catch (error: any) {
-      console.error('Error loading companies:', error);
-      toast.error('Error al cargar empresas');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadData = async () => {
     try {
@@ -65,6 +51,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
       const companyData = await companyService.getCompany(companyId!);
       console.log('[LOAD DATA] Company loaded:', companyData);
       setCompany(companyData);
+      setSelectedCompanyInStore(companyData);
 
       if (scenarioId) {
         const scenarioData = await projectionsService.getScenario(scenarioId);
@@ -160,7 +147,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
 
   // Guarda todos los cambios pendientes al backend de una sola vez
   const handleSaveAll = async () => {
-    if (!scenarioId || Object.keys(pendingChanges).length === 0) return;
+    if (!scenarioId) return;
     try {
       setSaving(true);
       await Promise.all(
@@ -217,61 +204,6 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
     );
   }
 
-  // Company selection
-  if (!companyId) {
-    return (
-      <DashboardLayout>
-        {tabsHeader}
-        <div className="max-w-2xl mx-auto mt-16">
-          <div className="bg-white rounded-lg shadow-md p-8">
-            <div className="text-center mb-6">
-              <Calculator className="w-16 h-16 mx-auto text-blue-600 mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Proyecciones Hoja 4.1
-              </h2>
-              <p className="text-gray-600">
-                Selecciona una empresa para crear proyecciones
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {companies.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No tienes empresas creadas</p>
-                  <Button onClick={() => navigate('/empresas')} className="mt-4">
-                    Crear primera empresa
-                  </Button>
-                </div>
-              ) : (
-                companies.map((comp) => (
-                  <button
-                    key={comp.id}
-                    onClick={() => navigate(`/proyecciones-41?companyId=${comp.id}`)}
-                    className="w-full p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors text-left"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{comp.name}</h3>
-                        <p className="text-sm text-gray-600">{comp.taxId || 'Sin RUT'}</p>
-                      </div>
-                      <ArrowLeft className="w-5 h-5 rotate-180 text-blue-600" />
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-
-            <div className="mt-6 text-center">
-              <Button onClick={() => navigate('/dashboard')} variant="outline">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Volver al Dashboard
-              </Button>
-            </div>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
 
   // Create scenario view
   if (!scenarioId) {
@@ -353,7 +285,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
             </Button>
             <Button
               onClick={handleSaveAll}
-              disabled={saving || !hasUnsavedChanges}
+              disabled={saving}
               isLoading={saving}
               className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
             >
@@ -673,7 +605,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
 
                     <tr className="bg-orange-50">
                       <td colSpan={projections.length + 1} className="px-4 py-2 font-bold">
-                        VARIACIONES (Tasas de Crecimiento %)
+                        VARIACIONES (Tasas de Crecimiento %) (Editables por año)
                       </td>
                     </tr>
                     <tr className="bg-orange-50">

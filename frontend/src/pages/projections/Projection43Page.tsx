@@ -15,6 +15,7 @@ import {
   type DCFResults,
 } from '../../services/projections.service';
 import { companyService } from '../../services/company.service';
+import { useCompanyStore } from '../../store/companyStore';
 import { toast } from 'sonner';
 import { ArrowLeft, Calculator, DollarSign, Save, Sparkles } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -28,10 +29,10 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
   const navigate = useNavigate();
   const companyId = searchParams.get('companyId');
   const scenarioId = searchParams.get('scenarioId');
+  const setSelectedCompanyInStore = useCompanyStore((state) => state.setSelectedCompany);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [companies, setCompanies] = useState<any[]>([]);
   const [company, setCompany] = useState<any>(null);
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
   const [_dcfResults, setDcfResults] = useState<DCFResults | null>(null);
@@ -58,34 +59,11 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
   // ─── Data loading ──────────────────────────────────────────────────────────
 
   useEffect(() => {
+    waccFetchedRef.current = false;
     if (companyId) {
       loadData();
-    } else {
-      loadCompanies();
     }
-    // Reset fetch guard when scenarioId changes
-    waccFetchedRef.current = false;
   }, [companyId, scenarioId]);
-
-  // Auto-fetch WACC from AI whenever we have a valid scenarioId
-  useEffect(() => {
-    if (!scenarioId || waccFetchedRef.current) return;
-    waccFetchedRef.current = true;
-    fetchWACCFromAI();
-  }, [scenarioId]);
-
-  const loadCompanies = async () => {
-    try {
-      setLoading(true);
-      const data = await companyService.getCompanies();
-      setCompanies(data);
-    } catch (error: any) {
-      console.error('Error loading companies:', error);
-      toast.error('Error al cargar empresas');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadData = async () => {
     try {
@@ -93,15 +71,22 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
 
       const companyData = await companyService.getCompany(companyId!);
       setCompany(companyData);
+      setSelectedCompanyInStore(companyData);
 
       if (scenarioId) {
         const scenarioData = await projectionsService.getScenario(scenarioId);
         setScenario(scenarioData);
 
-        // Pre-populate with previously saved WACC (shown while AI re-fetches)
+          // Si el WACC ya está guardado, usarlo directamente sin llamar a la IA
         if (scenarioData.wacc != null) {
           setWaccPct(parseFloat((Number(scenarioData.wacc) * 100).toFixed(2)));
+        } else if (!waccFetchedRef.current) {
+          // Primera vez: WACC no guardado → estimar con IA
+          waccFetchedRef.current = true;
+          fetchWACCFromAI();
         }
+
+        // La tasa de crecimiento siempre se carga del valor guardado (editable por el usuario)
         if (scenarioData.terminalGrowthRate != null) {
           setTerminalGrowthPct(parseFloat((Number(scenarioData.terminalGrowthRate) * 100).toFixed(2)));
         }
@@ -130,7 +115,6 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
       setWaccError(null);
       const result = await projectionsService.estimateWACCWithAI(scenarioId);
       setWaccPct(parseFloat((result.wacc * 100).toFixed(2)));
-      setTerminalGrowthPct(parseFloat((result.terminalGrowthRate * 100).toFixed(2)));
       setCostOfEquityPct(parseFloat((result.costOfEquity * 100).toFixed(2)));
       setCostOfDebtPct(parseFloat((result.costOfDebt * 100).toFixed(2)));
       setDebtPct(parseFloat((result.debtPercentage * 100).toFixed(1)));
@@ -265,51 +249,6 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
 
   // ─── Company selection ─────────────────────────────────────────────────────
 
-  if (!companyId) {
-    return (
-      <DashboardLayout>
-        {tabsHeader}
-        <div className="max-w-2xl mx-auto mt-16">
-          <div className="bg-white rounded-lg shadow-md p-8">
-            <div className="text-center mb-6">
-              <DollarSign className="w-16 h-16 mx-auto text-blue-600 mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Valoración DCF - Hoja 4.3</h2>
-              <p className="text-gray-600">Selecciona una empresa para realizar valoración por Flujo de Caja Descontado</p>
-            </div>
-            <div className="space-y-3">
-              {companies.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No tienes empresas creadas</p>
-                  <Button onClick={() => navigate('/empresas')} className="mt-4">Crear primera empresa</Button>
-                </div>
-              ) : (
-                companies.map((comp) => (
-                  <button
-                    key={comp.id}
-                    onClick={() => navigate(`/proyecciones-43?companyId=${comp.id}`)}
-                    className="w-full p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors text-left"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{comp.name}</h3>
-                        <p className="text-sm text-gray-600">{comp.taxId || 'Sin RUT'}</p>
-                      </div>
-                      <ArrowLeft className="w-5 h-5 rotate-180 text-blue-600" />
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-            <div className="mt-6 text-center">
-              <Button onClick={() => navigate('/dashboard')} variant="outline">
-                <ArrowLeft className="w-4 h-4 mr-2" />Volver al Dashboard
-              </Button>
-            </div>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
 
   // ─── Create scenario ───────────────────────────────────────────────────────
 
@@ -531,8 +470,24 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
               </label>
               <div className="flex items-center gap-6">
                 <div className="flex-1 max-w-xs">
-                  <ReadOnlyValue value={terminalGrowthPct} large />
-                  <p className="text-xs text-gray-400 mt-1">Estimada por IA según sector y país</p>
+                  <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="20"
+                      value={terminalGrowthPct ?? ''}
+                      onChange={(e) =>
+                        setTerminalGrowthPct(e.target.value === '' ? null : parseFloat(e.target.value))
+                      }
+                      placeholder="Ej: 2.00"
+                      className="flex-1 px-3 py-2 text-right font-semibold text-gray-900 text-lg focus:outline-none bg-transparent"
+                    />
+                    <span className="px-3 py-2 bg-gray-100 text-gray-600 font-semibold border-l border-gray-300 text-sm">
+                      %
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Ingresada manualmente por el usuario</p>
                 </div>
                 <div className="flex-1 text-xs text-gray-600">
                   <p className="bg-blue-50 p-2 rounded border border-blue-200">

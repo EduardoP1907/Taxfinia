@@ -7,6 +7,8 @@ import { PrivateRoute } from './components/PrivateRoute';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { VerifyOtpPage } from './pages/auth/VerifyOtpPage';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 
 // Dashboard pages
 import { DashboardPage } from './pages/dashboard/DashboardPage';
@@ -42,6 +44,8 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/verify-otp" element={<VerifyOtpPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Rutas protegidas */}
         <Route

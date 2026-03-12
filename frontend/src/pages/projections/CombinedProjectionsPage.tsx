@@ -3,15 +3,44 @@
  * Muestra las hojas de proyecciones: 4.0 (configurar tasas), 4.1 (completa), 4.2 (simplificada), 4.3 (DCF)
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { TrendingUp } from 'lucide-react';
 import { Projection41Page } from './Projection41Page';
 import { ProjectionsPage } from './ProjectionsPage';
 import { Projection43Page } from './Projection43Page';
 import { GrowthRatesConfigPage } from './GrowthRatesConfigPage';
+import { CompanySelector } from '../../components/companies/CompanySelector';
+import { companyService } from '../../services/company.service';
+import type { Company } from '../../types/company';
 
 export const CombinedProjectionsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [companies, setCompanies] = useState<Company[]>([]);
+
+  useEffect(() => {
+    companyService.getCompanies().then(setCompanies).catch(console.error);
+  }, []);
+
+  const companyId = searchParams.get('companyId');
+
+  // Si no hay empresa seleccionada, mostrar el selector primero
+  if (!companyId) {
+    return (
+      <CompanySelector
+        companies={companies}
+        onSelect={(comp) => {
+          const newParams = new URLSearchParams(searchParams);
+          newParams.set('companyId', comp.id);
+          if (!newParams.get('view')) newParams.set('view', '4.0');
+          setSearchParams(newParams);
+        }}
+        title="Proyecciones Financieras"
+        description="Selecciona una empresa para crear o ver sus proyecciones"
+        icon={<TrendingUp className="w-7 h-7 text-slate-900" />}
+      />
+    );
+  }
 
   // Leer el tab activo de la URL, por defecto 4.0 (configuración)
   const activeTab = searchParams.get('view') || '4.0';

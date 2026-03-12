@@ -7,9 +7,11 @@ import { CompanyFormModal } from '../../components/companies/CompanyFormModal';
 import { companyService } from '../../services/company.service';
 import type { Company, CreateCompanyData, UpdateCompanyData } from '../../types/company';
 import { useNavigate } from 'react-router-dom';
+import { useCompanyStore } from '../../store/companyStore';
 
 export const CompaniesPage: React.FC = () => {
   const navigate = useNavigate();
+  const setSelectedCompanyInStore = useCompanyStore((state) => state.setSelectedCompany);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,7 +42,8 @@ export const CompaniesPage: React.FC = () => {
 
   const handleUpdateCompany = async (data: UpdateCompanyData) => {
     if (selectedCompany) {
-      await companyService.updateCompany(selectedCompany.id, data);
+      const updatedCompany = await companyService.updateCompany(selectedCompany.id, data);
+      setSelectedCompanyInStore(updatedCompany);
       await loadCompanies();
     }
   };
@@ -219,7 +222,10 @@ export const CompaniesPage: React.FC = () => {
                         <Button
                           size="sm"
                           variant="primary"
-                          onClick={() => navigate(`/datos?companyId=${company.id}&year=${company.baseYear || new Date().getFullYear()}`)}
+                          onClick={() => {
+                            setSelectedCompanyInStore(company);
+                            navigate(`/datos?companyId=${company.id}&year=${company.baseYear || new Date().getFullYear()}`);
+                          }}
                           className="flex-1"
                         >
                           <FileText className="w-4 h-4 mr-1" />

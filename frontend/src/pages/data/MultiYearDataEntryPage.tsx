@@ -6,6 +6,8 @@ import { Button } from '../../components/ui/Button';
 import { Save, Building2, Plus, Trash2 } from 'lucide-react';
 import { companyService } from '../../services/company.service';
 import { financialService } from '../../services/financial.service';
+import { useCompanyStore } from '../../store/companyStore';
+import { CompanySelector } from '../../components/companies/CompanySelector';
 import type { Company } from '../../types/company';
 import type {
   CreateBalanceSheetData,
@@ -48,6 +50,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const companyId = searchParams.get('companyId');
+  const setSelectedCompanyInStore = useCompanyStore((state) => state.setSelectedCompany);
 
   const [company, setCompany] = useState<Company | null>(null);
   const [availableCompanies, setAvailableCompanies] = useState<Company[]>([]);
@@ -91,6 +94,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
       setLoading(true);
       const companyData = await companyService.getCompany(companyId);
       setCompany(companyData);
+      setSelectedCompanyInStore(companyData);
 
       // Obtener años fiscales existentes
       const fiscalYears = await financialService.getFiscalYears(companyId);
@@ -325,55 +329,13 @@ export const MultiYearDataEntryPage: React.FC = () => {
 
   if (!companyId) {
     return (
-      <DashboardLayout>
-        <div className="max-w-7xl mx-auto">
-          <Card>
-            <div className="text-center py-12">
-              <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Selecciona una empresa
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Elige la empresa para la cual deseas ingresar datos financieros
-              </p>
-
-              {availableCompanies.length > 0 ? (
-                <div className="max-w-md mx-auto">
-                  <select
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent mb-4"
-                    onChange={(e) => {
-                      const selectedCompany = availableCompanies.find(c => c.id === e.target.value);
-                      if (selectedCompany) {
-                        navigate(`/datos?companyId=${selectedCompany.id}`);
-                      }
-                    }}
-                    defaultValue=""
-                  >
-                    <option value="" disabled>Selecciona una empresa...</option>
-                    {availableCompanies.map(company => (
-                      <option key={company.id} value={company.id}>
-                        {company.name} {company.taxId ? `- ${company.taxId}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <Button onClick={() => navigate('/empresas')} variant="outline">
-                    Gestionar Empresas
-                  </Button>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-gray-600 mb-4">
-                    No tienes empresas creadas aún
-                  </p>
-                  <Button onClick={() => navigate('/empresas')}>
-                    Crear Primera Empresa
-                  </Button>
-                </div>
-              )}
-            </div>
-          </Card>
-        </div>
-      </DashboardLayout>
+      <CompanySelector
+        companies={availableCompanies}
+        onSelect={(company) => navigate(`/datos?companyId=${company.id}`)}
+        title="Ingreso de Datos Financieros"
+        description="Selecciona una empresa para ingresar sus datos financieros"
+        icon={<Building2 className="w-7 h-7 text-slate-900" />}
+      />
     );
   }
 
@@ -549,34 +511,9 @@ export const MultiYearDataEntryPage: React.FC = () => {
                 Agregar Año Comercial
               </h3>
 
-              {availableYears.length > 0 ? (
-                <div className="mb-4">
-                  <p className="text-sm text-gray-600 text-center mb-3">
-                    Los años deben ser consecutivos (máximo 5 años)
-                  </p>
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-                    <p className="text-sm font-medium text-slate-900 text-center">
-                      Años válidos:
-                    </p>
-                    <div className="flex justify-center gap-3 mt-2">
-                      <span className="px-3 py-1 bg-amber-500 text-white rounded-md font-semibold">
-                        {Math.min(...availableYears) - 1}
-                      </span>
-                      <span className="text-amber-600 font-bold">o</span>
-                      <span className="px-3 py-1 bg-amber-500 text-white rounded-md font-semibold">
-                        {Math.max(...availableYears) + 1}
-                      </span>
-                    </div>
-                    <p className="text-xs text-amber-700 text-center mt-2">
-                      {availableYears.length} de 5 años utilizados
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-600 text-center mb-4">
-                  Ingrese el año comercial inicial (máximo 5 años)
-                </p>
-              )}
+              <p className="text-sm text-gray-600 text-center mb-4">
+                Los años deben ser consecutivos (máximo 5 años)
+              </p>
 
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">

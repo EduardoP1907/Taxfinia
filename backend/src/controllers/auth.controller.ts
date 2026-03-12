@@ -103,6 +103,42 @@ export class AuthController {
   }
 
   /**
+   * POST /api/auth/forgot-password
+   */
+  async forgotPassword(req: Request, res: Response) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { email } = req.body;
+      const result = await authService.forgotPassword(email);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /api/auth/reset-password
+   */
+  async resetPassword(req: Request, res: Response) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { email, code, newPassword } = req.body;
+      const result = await authService.resetPassword(email, code, newPassword);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+
+  /**
    * POST /api/auth/logout
    */
   async logout(req: Request, res: Response) {
