@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { projectionsService, type ProjectionScenarioWithData } from '../../services/projections.service';
 import { companyService } from '../../services/company.service';
@@ -19,7 +19,6 @@ interface GrowthRatesConfigPageProps {
 
 export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ tabsHeader }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const companyId = searchParams.get('companyId');
   const scenarioId = searchParams.get('scenarioId');
 

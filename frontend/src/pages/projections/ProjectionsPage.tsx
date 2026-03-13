@@ -4,7 +4,7 @@ import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { projectionsService, type ProjectionScenarioWithData, type FinancialProjection } from '../../services/projections.service';
 import { companyService } from '../../services/company.service';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, TrendingUp, Settings, Calculator, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, TrendingUp, Settings, Calculator } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
