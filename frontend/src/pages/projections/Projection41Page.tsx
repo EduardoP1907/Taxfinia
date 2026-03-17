@@ -28,12 +28,14 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-const [company, setCompany] = useState<any>(null);
+  const [company, setCompany] = useState<any>(null);
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
   const [projections, setProjections] = useState<any[]>([]);
   const [showGrowthRatesModal, setShowGrowthRatesModal] = useState(false);
   // Cambios pendientes de guardar: { projectionId: { field: value } }
   const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, any>>>({});
+  // Key para forzar remount de inputs no-controlados tras guardar
+  const [tableKey, setTableKey] = useState(0);
   const hasUnsavedChanges = Object.keys(pendingChanges).length > 0;
 
   useEffect(() => {
@@ -145,20 +147,27 @@ const [company, setCompany] = useState<any>(null);
     }));
   };
 
-  // Guarda todos los cambios pendientes al backend de una sola vez
+  // Guarda todos los cambios pendientes al backend de forma SECUENCIAL por año
+  // (no en paralelo para evitar race conditions en recalculos encadenados)
   const handleSaveAll = async () => {
     if (!scenarioId) return;
     try {
       setSaving(true);
-      await Promise.all(
-        Object.entries(pendingChanges).map(([projId, changes]) =>
-          projectionsService.updateProjection(projId, changes)
-        )
-      );
+      // Ordenar cambios por año para que el recalculo encadenado sea correcto
+      const sortedChanges = Object.entries(pendingChanges).sort(([aId], [bId]) => {
+        const aYear = projections.find((p) => p.id === aId)?.year ?? 0;
+        const bYear = projections.find((p) => p.id === bId)?.year ?? 0;
+        return aYear - bYear;
+      });
+      for (const [projId, changes] of sortedChanges) {
+        await projectionsService.updateProjection(projId, changes);
+      }
       setPendingChanges({});
       // Recargar para obtener valores recalculados por el backend
       const refreshed = await projectionsService.getScenario(scenarioId!);
       setProjections(refreshed.projections || []);
+      // Incrementar tableKey para forzar remount de todos los inputs de tasas
+      setTableKey((k) => k + 1);
       toast.success('Proyección guardada correctamente');
     } catch (error: any) {
       toast.error('Error al guardar la proyección');
@@ -614,18 +623,15 @@ const [company, setCompany] = useState<any>(null);
                         <td key={proj.id} className="px-2 py-2">
                           <div className="relative">
                             <Input
+                              key={`rev-${proj.id}-${tableKey}`}
                               type="text"
-                              defaultValue={proj.revenueGrowthRate !== null ? (proj.revenueGrowthRate * 100).toFixed(2) : ''}
+                              defaultValue={proj.revenueGrowthRate !== null ? (Number(proj.revenueGrowthRate) * 100).toFixed(2) : ''}
                               onBlur={(e) => {
                                 const value = e.target.value.replace(/[^0-9.,-]/g, '');
                                 const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
                                 handleUpdateProjection(proj.id, 'revenueGrowthRate', numValue);
                               }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.currentTarget.blur();
-                                }
-                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                               className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
                               placeholder="0.00"
                             />
@@ -640,18 +646,15 @@ const [company, setCompany] = useState<any>(null);
                         <td key={proj.id} className="px-2 py-2">
                           <div className="relative">
                             <Input
+                              key={`cos-${proj.id}-${tableKey}`}
                               type="text"
-                              defaultValue={proj.costOfSalesGrowthRate !== null ? (proj.costOfSalesGrowthRate * 100).toFixed(2) : ''}
+                              defaultValue={proj.costOfSalesGrowthRate !== null ? (Number(proj.costOfSalesGrowthRate) * 100).toFixed(2) : ''}
                               onBlur={(e) => {
                                 const value = e.target.value.replace(/[^0-9.,-]/g, '');
                                 const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
                                 handleUpdateProjection(proj.id, 'costOfSalesGrowthRate', numValue);
                               }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.currentTarget.blur();
-                                }
-                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                               className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
                               placeholder="0.00"
                             />
@@ -666,18 +669,15 @@ const [company, setCompany] = useState<any>(null);
                         <td key={proj.id} className="px-2 py-2">
                           <div className="relative">
                             <Input
+                              key={`ope-${proj.id}-${tableKey}`}
                               type="text"
-                              defaultValue={proj.otherOperatingExpensesGrowthRate !== null ? (proj.otherOperatingExpensesGrowthRate * 100).toFixed(2) : ''}
+                              defaultValue={proj.otherOperatingExpensesGrowthRate !== null ? (Number(proj.otherOperatingExpensesGrowthRate) * 100).toFixed(2) : ''}
                               onBlur={(e) => {
                                 const value = e.target.value.replace(/[^0-9.,-]/g, '');
                                 const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
                                 handleUpdateProjection(proj.id, 'otherOperatingExpensesGrowthRate', numValue);
                               }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.currentTarget.blur();
-                                }
-                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                               className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
                               placeholder="0.00"
                             />
@@ -692,18 +692,15 @@ const [company, setCompany] = useState<any>(null);
                         <td key={proj.id} className="px-2 py-2">
                           <div className="relative">
                             <Input
+                              key={`dep-${proj.id}-${tableKey}`}
                               type="text"
-                              defaultValue={proj.depreciationGrowthRate !== null ? (proj.depreciationGrowthRate * 100).toFixed(2) : ''}
+                              defaultValue={proj.depreciationGrowthRate !== null ? (Number(proj.depreciationGrowthRate) * 100).toFixed(2) : ''}
                               onBlur={(e) => {
                                 const value = e.target.value.replace(/[^0-9.,-]/g, '');
                                 const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
                                 handleUpdateProjection(proj.id, 'depreciationGrowthRate', numValue);
                               }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.currentTarget.blur();
-                                }
-                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                               className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
                               placeholder="0.00"
                             />
@@ -718,18 +715,15 @@ const [company, setCompany] = useState<any>(null);
                         <td key={proj.id} className="px-2 py-2">
                           <div className="relative">
                             <Input
+                              key={`exc-${proj.id}-${tableKey}`}
                               type="text"
-                              defaultValue={proj.exceptionalNetGrowthRate !== null ? (proj.exceptionalNetGrowthRate * 100).toFixed(2) : ''}
+                              defaultValue={proj.exceptionalNetGrowthRate !== null ? (Number(proj.exceptionalNetGrowthRate) * 100).toFixed(2) : ''}
                               onBlur={(e) => {
                                 const value = e.target.value.replace(/[^0-9.,-]/g, '');
                                 const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
                                 handleUpdateProjection(proj.id, 'exceptionalNetGrowthRate', numValue);
                               }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.currentTarget.blur();
-                                }
-                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                               className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
                               placeholder="0.00"
                             />
@@ -740,27 +734,29 @@ const [company, setCompany] = useState<any>(null);
                     </tr>
                     <tr className="bg-orange-50">
                       <td className="px-4 py-2 text-xs italic text-gray-600">Financieros Netos (+ -)</td>
-                      {projections.map((proj, index) => {
-                        const isBaseYear = index === 0;
-                        // Financieros Netos: En año base se calcula, en proyecciones usa valor del año base
-                        // Excel: I21=SI(I123=0;$G21;I123) → Como I123=0, usa $G21 (año base) siempre
-                        const baseFinancialNet = projections[0]?.financialNet;
-                        const displayValue = proj.financialNet ?? baseFinancialNet ?? 0;
-
-                        return (
-                          <td key={proj.id} className="px-2 py-2">
+                      {projections.map((proj, index) => (
+                        <td key={proj.id} className="px-2 py-2">
+                          <div className="relative">
                             <Input
+                              key={`fin-${proj.id}-${tableKey}`}
                               type="text"
-                              value={Number(displayValue).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                              readOnly
-                              className="text-right text-xs bg-gray-50 text-gray-700 border-orange-200"
-                              title={isBaseYear
-                                ? "Calculado: Ingresos Financieros - Gastos Financieros"
-                                : "Usa el valor del año base (constante en todas las proyecciones)"}
+                              defaultValue={proj.financialIncomeGrowthRate !== null ? (Number(proj.financialIncomeGrowthRate) * 100).toFixed(2) : ''}
+                              readOnly={index === 0}
+                              onBlur={(e) => {
+                                if (index === 0) return;
+                                const value = e.target.value.replace(/[^0-9.,-]/g, '');
+                                const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
+                                handleUpdateProjection(proj.id, 'financialIncomeGrowthRate', numValue);
+                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                              className={`text-right text-xs border-orange-200 pr-6 ${index === 0 ? 'bg-gray-50 text-gray-500' : 'bg-orange-50'}`}
+                              placeholder={index === 0 ? '' : '0.00'}
+                              title={index === 0 ? 'Año base: cifra calculada automáticamente' : 'Tasa de variación anual de Financieros Netos (%)'}
                             />
-                          </td>
-                        );
-                      })}
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">%</span>
+                          </div>
+                        </td>
+                      ))}
                     </tr>
                     <tr className="bg-orange-50">
                       <td className="px-4 py-2 text-xs italic text-gray-600">TOTAL ACTIVO</td>

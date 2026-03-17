@@ -742,9 +742,16 @@ export class ProjectionsService {
         operatingResultTemp,
         newExceptionalNet
       );
+      // Proyectar Financieros Netos usando financialIncomeGrowthRate como tasa del neto
+      const baseFinancialNetForApply = toNumber(baseProjection.financialNet);
+      const priorFinancialNetForApply = toNumber(priorProjection.financialNet) || baseFinancialNetForApply;
+      const newFinancialNet = rates.financialIncomeGrowthRate && rates.financialIncomeGrowthRate !== 0
+        ? projFormulas.applyGrowthRateFromPriorYear(priorFinancialNetForApply, rates.financialIncomeGrowthRate)
+        : baseFinancialNetForApply;
+
       const ebtTemp = projFormulas.calculateEBT(
         ebitTemp,
-        newFinancialIncome - newFinancialExpenses
+        newFinancialNet
       );
 
       const newIncomeTax = rates.incomeTaxRate
@@ -767,6 +774,7 @@ export class ProjectionsService {
         financialIncomeGrowthRate: rates.financialIncomeGrowthRate,
         financialExpenses: newFinancialExpenses,
         financialExpensesGrowthRate: rates.financialExpensesGrowthRate,
+        financialNet: newFinancialNet,
         totalAssets: newTotalAssets,
         totalAssetsGrowthRate: rates.totalAssetsGrowthRate,
         equity: newEquity,
@@ -938,11 +946,16 @@ export class ProjectionsService {
         ? toNumber(currentProjection.incomeTaxRate)
         : toNumber(baseProjection.incomeTaxRate);
 
-      // Financieros Netos: En proyecciones, siempre usa el valor del año base
-      // Fórmula Excel I21: SI(I123=0;$G21;I123) → Como I123=0, usa $G21 (año base)
-      // Fórmula Excel J21: SI(J123=0;I21;J123) → Como J123=0, usa I21 (que es igual a G21)
-      // Resultado: Todos los años proyectados tienen el mismo Financieros Netos del año base
+      // Financieros Netos: si hay tasa definida (financialIncomeGrowthRate), proyectar desde año anterior;
+      // si no hay tasa, usar el valor del año base como fallback.
       const baseFinancialNet = toNumber(baseProjection.financialNet);
+      const priorFinancialNet = toNumber((priorProjection as any).financialNet) || baseFinancialNet;
+      const financialNetGrowthRate = currentProjection.financialIncomeGrowthRate !== null
+        ? toNumber(currentProjection.financialIncomeGrowthRate)
+        : null;
+      const newFinancialNet = financialNetGrowthRate !== null && financialNetGrowthRate !== 0
+        ? projFormulas.applyGrowthRateFromPriorYear(priorFinancialNet, financialNetGrowthRate)
+        : baseFinancialNet;
 
       // Calcular métricas con los nuevos valores
       const calculated = this.calculateAllMetrics({
@@ -953,7 +966,7 @@ export class ProjectionsService {
         exceptionalNet: newExceptionalNet,
         financialIncome: newFinancialIncome,
         financialExpenses: newFinancialExpenses,
-        financialNet: baseFinancialNet, // Usar valor del año base, NO porcentaje
+        financialNet: newFinancialNet,
         incomeTax: 0, // Se recalculará según la tasa
         totalAssets: newTotalAssets,
         equity: newEquity,
@@ -998,6 +1011,7 @@ export class ProjectionsService {
         exceptionalNet: newExceptionalNet as any,
         financialIncome: newFinancialIncome as any,
         financialExpenses: newFinancialExpenses as any,
+        financialNet: newFinancialNet as any,
         totalAssets: newTotalAssets as any,
         equity: newEquity as any,
         totalLiabilities: newTotalLiabilities as any,

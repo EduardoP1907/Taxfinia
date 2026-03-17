@@ -243,6 +243,6 @@ curl -X POST http://localhost:5000/api/auth/login \
 
 ## 👨‍💻 Autor
 
-**Claude** - AI Assistant by Anthropic
+**Eduardo Perez Silva**
 **Proyecto:** TAXFINIA 2025
 **Fecha:** Noviembre 2024
