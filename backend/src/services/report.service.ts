@@ -13,6 +13,7 @@ import { generateNarrativeDocx, type DocxReportData } from '../utils/docx-genera
 import { convertDocxToPdf } from '../utils/docx-to-pdf';
 import { Decimal } from '@prisma/client/runtime/library';
 import { lockCompany } from './company.service';
+import { isS3Enabled, uploadToS3 } from '../utils/s3';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function toNum(value: Decimal | null | undefined): number {
@@ -274,14 +275,34 @@ export async function generateReport(companyId: string, userId: string, year?: n
     };
     await generateNarrativeDocx(docxData, docxPath);
 
-    // ── Step 4: Update report record ──
+    // ── Step 4: Upload to S3 if configured, otherwise keep local ──
+    let storedPdfPath = pdfFilename;
+    let storedDocxPath = docxFilename;
+
+    if (isS3Enabled()) {
+      console.log('[REPORT] Uploading files to S3...');
+      const s3Prefix = `reports/${report.id}`;
+
+      // Upload tables PDF
+      storedPdfPath = await uploadToS3(pdfPath, `${s3Prefix}/${pdfFilename}`, 'application/pdf');
+
+      // Upload narrative DOCX
+      storedDocxPath = await uploadToS3(docxPath, `${s3Prefix}/${docxFilename}`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+      // Clean up tables DOCX temp file (not stored)
+      fs.unlink(tablesDocxPath, () => {});
+
+      console.log('[REPORT] Files uploaded to S3 successfully');
+    }
+
+    // ── Step 5: Update report record ──
     await prisma.report.update({
       where: { id: report.id },
       data: {
         status: 'COMPLETED',
         aiAnalysis: aiAnalysis as any,
-        pdfPath: pdfFilename,
-        docxPath: docxFilename,
+        pdfPath: storedPdfPath,
+        docxPath: storedDocxPath,
         generatedAt: new Date(),
       },
     });

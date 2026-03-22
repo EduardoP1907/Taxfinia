@@ -12,6 +12,7 @@ import {
 import { convertDocxToPdf } from '../utils/docx-to-pdf';
 import { generatePreviewToken, verifyPreviewToken, PREVIEW_TTL } from '../utils/preview-token';
 import { sendAdminReportCodeEmail } from '../utils/email';
+import { isS3Enabled, getS3SignedUrl, streamS3ToResponse } from '../utils/s3';
 
 /** Generate random code like TXFIN-A4K9-M2P7 */
 function generateDownloadCode(): string {
@@ -19,15 +20,49 @@ function generateDownloadCode(): string {
   return `TXFIN-${part()}-${part()}`;
 }
 
-/** Return cached analysis PDF path (converts DOCX on first access).
- *  Uses _analisis.pdf suffix to avoid collision with the tables PDF which
- *  shares the same base name (report_<id>_<year>.pdf). */
-async function getAnalysisPdf(docxFilePath: string): Promise<string> {
+/** Return cached analysis PDF path (local disk).
+ *  If the DOCX comes from S3, it is first downloaded to /tmp. */
+async function getAnalysisPdfFromLocal(docxFilePath: string): Promise<string> {
   const pdfPath = docxFilePath.replace(/\.docx$/i, '_analisis.pdf');
   if (!fs.existsSync(pdfPath)) {
     await convertDocxToPdf(docxFilePath, pdfPath);
   }
   return pdfPath;
+}
+
+/** Resolve DOCX to a local path, downloading from S3 if necessary.
+ *  Returns { localDocxPath, cleanup } — call cleanup() when done. */
+async function resolveDocxLocally(
+  storedPath: string
+): Promise<{ localDocxPath: string; cleanup: () => void }> {
+  // S3 keys contain a slash (e.g. "reports/<id>/filename.docx")
+  if (isS3Enabled() && storedPath.includes('/')) {
+    const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+    const { S3Client } = await import('@aws-sdk/client-s3');
+    const { config } = await import('../config/env');
+    const tmpPath = path.join(require('os').tmpdir(), path.basename(storedPath));
+
+    const s3 = new S3Client({
+      region: config.aws.region,
+      credentials: { accessKeyId: config.aws.accessKeyId, secretAccessKey: config.aws.secretAccessKey },
+    });
+    const res = await s3.send(new GetObjectCommand({ Bucket: config.aws.s3Bucket, Key: storedPath }));
+    const chunks: Buffer[] = [];
+    for await (const chunk of res.Body as AsyncIterable<Buffer>) chunks.push(chunk);
+    fs.writeFileSync(tmpPath, Buffer.concat(chunks));
+
+    return {
+      localDocxPath: tmpPath,
+      cleanup: () => { try { fs.unlinkSync(tmpPath); } catch {} },
+    };
+  }
+
+  // Local disk
+  const { getReportFilePath } = await import('../services/report.service');
+  return {
+    localDocxPath: getReportFilePath(storedPath),
+    cleanup: () => {},
+  };
 }
 
 export class ReportController {
@@ -169,20 +204,24 @@ export class ReportController {
         return;
       }
 
-      const docxFilePath = getReportFilePath(report.docxPath);
-      if (!fs.existsSync(docxFilePath)) {
-        res.status(404).json({ error: 'Archivo no encontrado en servidor' });
-        return;
+      const { localDocxPath, cleanup } = await resolveDocxLocally(report.docxPath);
+
+      try {
+        if (!fs.existsSync(localDocxPath)) {
+          res.status(404).json({ error: 'Archivo no encontrado en servidor' });
+          return;
+        }
+
+        const analysisPdfPath = await getAnalysisPdfFromLocal(localDocxPath);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="preview_analisis.pdf"');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.sendFile(analysisPdfPath, () => cleanup());
+      } catch (err) {
+        cleanup();
+        throw err;
       }
-
-      const analysisPdfPath = await getAnalysisPdf(docxFilePath);
-
-      // Serve inline so the browser renders it in the iframe
-      // Do NOT set X-Frame-Options — that would block cross-origin iframes (dev ports differ)
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline; filename="preview_analisis.pdf"');
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-      res.sendFile(analysisPdfPath);
     } catch (error) {
       console.error('[REPORT] Preview serve error:', error);
       res.status(500).json({ error: 'Error al servir la previsualización' });
@@ -289,19 +328,44 @@ export class ReportController {
       const filename = format === 'pdf' ? report.pdfPath : report.docxPath;
       if (!filename) { res.status(404).json({ error: 'Archivo no disponible' }); return; }
 
+      const companyName = (report as any).company?.name || 'empresa';
+      const sanitizedName = companyName.replace(/[^a-zA-Z0-9_\- ]/g, '').trim().replace(/ /g, '_');
+
+      // ── S3 path (key contains '/') ──────────────────────────────────────────
+      if (isS3Enabled() && filename.includes('/')) {
+        if (format === 'docx') {
+          // Narrative DOCX → download locally from S3, convert to PDF, send
+          const { localDocxPath, cleanup } = await resolveDocxLocally(filename);
+          try {
+            const analysisPdfPath = await getAnalysisPdfFromLocal(localDocxPath);
+            const downloadName = `TAXFIN_${sanitizedName}_${report.year}_analisis.pdf`;
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+            res.sendFile(analysisPdfPath, () => cleanup());
+          } catch (err) {
+            cleanup();
+            throw err;
+          }
+        } else {
+          // Tables PDF → stream directly from S3
+          const downloadName = `TAXFIN_${sanitizedName}_${report.year}_tablas.pdf`;
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+          await streamS3ToResponse(filename, res);
+        }
+        return;
+      }
+
+      // ── Local disk path ─────────────────────────────────────────────────────
       const filePath = getReportFilePath(filename);
       if (!fs.existsSync(filePath)) {
         res.status(404).json({ error: 'Archivo no encontrado en servidor' });
         return;
       }
 
-      const companyName = (report as any).company?.name || 'empresa';
-      const sanitizedName = companyName.replace(/[^a-zA-Z0-9_\- ]/g, '').trim().replace(/ /g, '_');
-
-      // DOCX → convert to PDF on the fly (cached)
       if (format === 'docx') {
         try {
-          const analysisPdfPath = await getAnalysisPdf(filePath);
+          const analysisPdfPath = await getAnalysisPdfFromLocal(filePath);
           const downloadName = `TAXFIN_${sanitizedName}_${report.year}_analisis.pdf`;
           res.setHeader('Content-Type', 'application/pdf');
           res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);

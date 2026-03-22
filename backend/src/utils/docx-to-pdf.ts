@@ -38,22 +38,47 @@ async function convertWithWord(docxPath: string, pdfPath: string): Promise<void>
 }
 
 // ─── Linux/macOS: LibreOffice headless ───────────────────────────────────────
+
+/** Find the LibreOffice binary — handles versioned names like libreoffice26.2 */
+function findLibreOfficeBin(): string {
+  const candidates = [
+    'libreoffice',
+    'libreoffice26.2',
+    'libreoffice25.8',
+    'libreoffice24.8',
+    'libreoffice7.6',
+    '/opt/libreoffice26.2/program/soffice',
+    '/opt/libreoffice25.8/program/soffice',
+    '/opt/libreoffice24.8/program/soffice',
+    '/opt/libreoffice7.6/program/soffice',
+    '/usr/bin/soffice',
+  ];
+
+  for (const bin of candidates) {
+    try {
+      require('child_process').execFileSync(bin, ['--version'], { stdio: 'ignore', timeout: 5000 });
+      return bin;
+    } catch {}
+  }
+
+  return 'libreoffice'; // fallback
+}
+
+const LIBRE_OFFICE_BIN = findLibreOfficeBin();
+
 async function convertWithLibreOffice(docxPath: string, pdfPath: string): Promise<void> {
   const outDir = path.dirname(pdfPath);
   const docxAbsolute = path.resolve(docxPath);
   const pdfAbsolute = path.resolve(pdfPath);
 
-  // libreoffice outputs <filename>.pdf in the same dir as the docx by default,
-  // so we redirect output to the desired directory.
   await execAsync(
-    `libreoffice --headless --convert-to pdf --outdir "${outDir}" "${docxAbsolute}"`,
-    { timeout: 60000 }
+    `"${LIBRE_OFFICE_BIN}" --headless --convert-to pdf --outdir "${outDir}" "${docxAbsolute}"`,
+    { timeout: 120000 }
   );
 
   // LibreOffice names the output file after the input file (replaces .docx with .pdf)
   const autoNamed = path.join(outDir, path.basename(docxAbsolute).replace(/\.docx$/i, '.pdf'));
 
-  // Rename to the exact path the caller expects (if different)
   if (autoNamed !== pdfAbsolute && fs.existsSync(autoNamed)) {
     fs.renameSync(autoNamed, pdfAbsolute);
   }
