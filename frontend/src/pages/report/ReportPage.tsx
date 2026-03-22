@@ -16,7 +16,11 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  FileSpreadsheet,
+  Eye,
+  Lock,
+  KeyRound,
+  ShieldCheck,
+  X,
 } from 'lucide-react';
 import { companyService } from '../../services/company.service';
 import { ratiosService, type CompanyAnalysis } from '../../services/ratios.service';
@@ -26,10 +30,12 @@ import { IncomeStatementSection } from '../../components/report/IncomeStatementS
 import { BalanceSheetSection } from '../../components/report/BalanceSheetSection';
 import { RatiosSection } from '../../components/report/RatiosSection';
 import { generateFinancialReport } from '../../utils/pdfGenerator';
+import { CompanyChat } from '../../components/report/CompanyChat';
+import { ProtectedPdfViewer } from '../../components/report/ProtectedPdfViewer';
 
 type TabType = 'resultados' | 'balance' | 'ratios';
 
-// ─── Report Status Badge ──────────────────────────────────────────────────────
+// ─── Status Badge ─────────────────────────────────────────────────────────────
 const StatusBadge: React.FC<{ status: Report['status'] }> = ({ status }) => {
   const config = {
     PENDING:    { icon: Clock,         label: 'Pendiente',  color: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
@@ -46,6 +52,159 @@ const StatusBadge: React.FC<{ status: Report['status'] }> = ({ status }) => {
   );
 };
 
+// ─── Preview Modal ─────────────────────────────────────────────────────────────
+interface PreviewModalProps {
+  previewUrl: string;
+  companyName: string;
+  year: number;
+  expiresIn: number; // seconds
+  onClose: () => void;
+}
+
+const PreviewModal: React.FC<PreviewModalProps> = ({ previewUrl, companyName, year, expiresIn, onClose }) => {
+  const [secondsLeft, setSecondsLeft] = useState(expiresIn);
+
+  // Countdown timer
+  useEffect(() => {
+    if (secondsLeft <= 0) { onClose(); return; }
+    const t = setTimeout(() => setSecondsLeft(s => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [secondsLeft, onClose]);
+
+  // Block keyboard shortcuts (Ctrl+S, Ctrl+P, Ctrl+A, PrintScreen, Win+Shift+S)
+  useEffect(() => {
+    const blockShortcuts = (e: KeyboardEvent) => {
+      // Block print, save, select all, and screenshot shortcuts
+      if ((e.ctrlKey || e.metaKey) && ['s', 'p', 'a'].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      if (e.key === 'PrintScreen') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener('keydown', blockShortcuts, true);
+    return () => document.removeEventListener('keydown', blockShortcuts, true);
+  }, []);
+
+  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const pct = (secondsLeft / expiresIn) * 100;
+  const timerColor = secondsLeft < 60 ? 'text-red-600' : secondsLeft < 180 ? 'text-orange-500' : 'text-emerald-600';
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-700 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="w-5 h-5 text-amber-400" />
+          <div>
+            <p className="text-sm font-semibold text-white">Vista Previa Protegida</p>
+            <p className="text-xs text-slate-400">{companyName} · Informe {year} · Solo visualización</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          {/* Timer */}
+          <div className="flex items-center gap-2">
+            <div className="w-20 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-amber-400 rounded-full transition-all duration-1000"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className={`text-sm font-mono font-bold ${timerColor}`}>{fmt(secondsLeft)}</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+            title="Cerrar vista previa"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* PDF viewer area — canvas-based, watermark burned in, no download button */}
+      <div className="flex-1 relative overflow-hidden">
+        <ProtectedPdfViewer
+          pdfUrl={previewUrl}
+          watermarkText={`SOLO PREVISUALIZACIÓN · ${companyName}`}
+        />
+      </div>
+
+      {/* Footer notice */}
+      <div className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 border-t border-slate-700 flex-shrink-0">
+        <Lock className="w-3.5 h-3.5 text-slate-500" />
+        <p className="text-xs text-slate-400">
+          Esta vista previa expira en <span className={`font-semibold ${timerColor}`}>{fmt(secondsLeft)}</span>.
+          Para descargar el informe completo, solicita el código de descarga al administrador tras confirmar el pago.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ─── Download Code Modal ───────────────────────────────────────────────────────
+interface DownloadCodeModalProps {
+  onConfirm: (code: string) => void;
+  onCancel: () => void;
+  loading: boolean;
+  error?: string;
+}
+
+const DownloadCodeModal: React.FC<DownloadCodeModalProps> = ({ onConfirm, onCancel, loading, error }) => {
+  const [code, setCode] = useState('');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-amber-100 rounded-lg">
+            <KeyRound className="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Código de Descarga</h3>
+            <p className="text-xs text-slate-500">Ingresa el código proporcionado por el administrador</p>
+          </div>
+        </div>
+
+        <input
+          type="text"
+          value={code}
+          onChange={e => setCode(e.target.value.toUpperCase())}
+          placeholder="TXFIN-XXXX-XXXX"
+          className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-center font-mono text-lg tracking-widest text-slate-900 mb-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
+          autoFocus
+          onKeyDown={e => { if (e.key === 'Enter' && code.trim()) onConfirm(code.trim()); }}
+        />
+
+        {error && (
+          <p className="text-sm text-red-600 mb-3 flex items-center gap-1">
+            <XCircle className="w-4 h-4 flex-shrink-0" /> {error}
+          </p>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => code.trim() && onConfirm(code.trim())}
+            disabled={!code.trim() || loading}
+            className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+          >
+            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Descargar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── AI Report Panel ──────────────────────────────────────────────────────────
 interface AIReportPanelProps {
   companyId: string;
@@ -56,21 +215,30 @@ interface AIReportPanelProps {
 const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, selectedYear }) => {
   const [reports, setReports] = useState<Report[]>([]);
   const [generating, setGenerating] = useState(false);
-  const [downloading, setDownloading] = useState<{ [key: string]: boolean }>({});
+  const [downloading, setDownloading] = useState<Record<string, boolean>>({});
+  const [generatingCode, setGeneratingCode] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+
+  // Preview state
+  const [previewState, setPreviewState] = useState<{
+    url: string; expiresIn: number;
+  } | null>(null);
+
+  // Download code modal state
+  const [codeModal, setCodeModal] = useState<{
+    reportId: string; format: 'pdf' | 'docx';
+  } | null>(null);
+  const [codeError, setCodeError] = useState<string | undefined>();
+  const [codeLoading, setCodeLoading] = useState(false);
 
   const loadReports = useCallback(async () => {
     try {
       const data = await reportService.getCompanyReports(companyId);
       setReports(data);
-    } catch {
-      // silently fail
-    }
+    } catch { /* silently fail */ }
   }, [companyId]);
 
-  useEffect(() => {
-    loadReports();
-  }, [loadReports]);
+  useEffect(() => { loadReports(); }, [loadReports]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -85,162 +253,299 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
     }
   };
 
-  const handleDownload = async (reportId: string, format: 'pdf' | 'docx') => {
+  const handlePreview = async (reportId: string) => {
+    try {
+      const storageKey = `preview_token_${reportId}`;
+      const stored = localStorage.getItem(storageKey);
+      let token: string;
+      let secondsLeft: number;
+
+      if (stored) {
+        const { t, expiresAt } = JSON.parse(stored) as { t: string; expiresAt: number };
+        secondsLeft = Math.floor((expiresAt - Date.now()) / 1000);
+
+        if (secondsLeft > 0) {
+          // Reuse existing token — timer keeps counting from first open
+          token = t;
+        } else {
+          // Expired — generate fresh token for a new session
+          const res = await reportService.getPreviewToken(reportId);
+          token = res.token;
+          secondsLeft = res.expiresIn;
+          localStorage.setItem(storageKey, JSON.stringify({ t: token, expiresAt: Date.now() + secondsLeft * 1000 }));
+        }
+      } else {
+        // First time opening — generate and persist
+        const res = await reportService.getPreviewToken(reportId);
+        token = res.token;
+        secondsLeft = res.expiresIn;
+        localStorage.setItem(storageKey, JSON.stringify({ t: token, expiresAt: Date.now() + secondsLeft * 1000 }));
+      }
+
+      setPreviewState({ url: reportService.getPreviewUrl(token), expiresIn: secondsLeft });
+    } catch {
+      alert('Error al generar la vista previa. Inténtalo de nuevo.');
+    }
+  };
+
+  const handleDownloadClick = (reportId: string, format: 'pdf' | 'docx') => {
+    const report = reports.find(r => r.id === reportId);
+    // Analysis PDF (docx) requires code if one has been set
+    if (format === 'docx' && report?.hasDownloadCode) {
+      setCodeError(undefined);
+      setCodeModal({ reportId, format });
+    } else {
+      doDownload(reportId, format);
+    }
+  };
+
+  const doDownload = async (reportId: string, format: 'pdf' | 'docx', code?: string) => {
     const key = `${reportId}-${format}`;
     setDownloading(prev => ({ ...prev, [key]: true }));
     try {
-      await reportService.downloadReport(reportId, format, companyName, selectedYear);
-    } catch {
-      alert('Error al descargar el archivo');
+      await reportService.downloadReport(reportId, format, companyName, selectedYear, code);
+      setCodeModal(null);
+    } catch (err: any) {
+      if (err?.response?.data?.requiresCode) {
+        setCodeModal({ reportId, format });
+        setCodeError('Código incorrecto. Inténtalo de nuevo.');
+      } else {
+        alert('Error al descargar el archivo');
+      }
     } finally {
       setDownloading(prev => ({ ...prev, [key]: false }));
     }
   };
 
+  const handleCodeConfirm = async (code: string) => {
+    if (!codeModal) return;
+    setCodeLoading(true);
+    setCodeError(undefined);
+    try {
+      await reportService.downloadReport(codeModal.reportId, codeModal.format, companyName, selectedYear, code);
+      setCodeModal(null);
+    } catch (err: any) {
+      if (err?.response?.data?.requiresCode || err?.response?.status === 401) {
+        setCodeError('Código incorrecto. Verifica e inténtalo de nuevo.');
+      } else {
+        setCodeError('Error al descargar. Inténtalo de nuevo.');
+      }
+    } finally {
+      setCodeLoading(false);
+    }
+  };
+
+  const handleGenerateCode = async (reportId: string) => {
+    setGeneratingCode(prev => ({ ...prev, [reportId]: true }));
+    try {
+      await reportService.generateDownloadCode(reportId);
+      await loadReports(); // refresh to show hasDownloadCode = true
+      alert('Código generado. El administrador recibirá un correo con el código de descarga.');
+    } catch {
+      alert('Error al generar el código. Inténtalo de nuevo.');
+    } finally {
+      setGeneratingCode(prev => ({ ...prev, [reportId]: false }));
+    }
+  };
+
   return (
-    <div className="bg-gradient-to-br from-amber-50 to-slate-50 border border-amber-200 rounded-xl p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-500 rounded-lg">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-slate-900">Informe Profesional con IA</h3>
-            <p className="text-xs text-amber-600">Reporte PDF con tablas + Análisis Word redactado por IA</p>
-          </div>
-        </div>
-        <Button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm disabled:opacity-60"
-        >
-          {generating ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              Generando informe…
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-4 h-4" />
-              Generar Informe IA
-            </>
-          )}
-        </Button>
-      </div>
-
-      {/* What you get */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        <div className="bg-white rounded-lg p-3 border border-amber-100 flex items-start gap-2">
-          <FileDown className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-gray-800">Reporte PDF con Tablas</p>
-            <p className="text-xs text-gray-500">Tablas de ratios, balance y resultados para {selectedYear}. Descarga en formato PDF.</p>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg p-3 border border-amber-100 flex items-start gap-2">
-          <FileSpreadsheet className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-gray-800">Análisis Redactado en Word</p>
-            <p className="text-xs text-gray-500">Análisis profesional redactado por IA con interpretaciones financieras y valoración DCF. Descarga en formato Word.</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-          <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-red-700">{error}</p>
-        </div>
+    <>
+      {/* Preview modal */}
+      {previewState && (
+        <PreviewModal
+          previewUrl={previewState.url}
+          companyName={companyName}
+          year={selectedYear}
+          expiresIn={previewState.expiresIn}
+          onClose={() => setPreviewState(null)}
+        />
       )}
 
-      {/* Loading state */}
-      {generating && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center gap-3 mb-2">
-            <RefreshCw className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
-            <p className="text-sm font-semibold text-blue-800">Claude AI está analizando la empresa…</p>
-          </div>
-          <div className="space-y-1 pl-7">
-            <p className="text-xs text-blue-600">✓ Calculando ratios financieros</p>
-            <p className="text-xs text-blue-600 animate-pulse">⟳ Generando análisis narrativo con IA</p>
-            <p className="text-xs text-blue-400">○ Creando PDF analítico y Word profesional</p>
-          </div>
-        </div>
+      {/* Download code modal */}
+      {codeModal && (
+        <DownloadCodeModal
+          onConfirm={handleCodeConfirm}
+          onCancel={() => setCodeModal(null)}
+          loading={codeLoading}
+          error={codeError}
+        />
       )}
 
-      {/* Generated reports list */}
-      {reports.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Informes Generados</p>
-            <button onClick={loadReports} className="text-xs text-amber-500 hover:text-amber-700 flex items-center gap-1">
-              <RefreshCw className="w-3 h-3" /> Actualizar
-            </button>
+      <div className="bg-gradient-to-br from-amber-50 to-slate-50 border border-amber-200 rounded-xl p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-500 rounded-lg">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Informe Profesional con IA</h3>
+              <p className="text-xs text-amber-600">Reporte PDF con tablas + Análisis redactado por IA</p>
+            </div>
           </div>
-          <div className="space-y-2">
-            {reports.map(report => (
-              <div key={report.id} className="bg-white rounded-lg p-3 border border-amber-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">
-                      Informe {report.year}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {report.generatedAt
-                        ? new Date(report.generatedAt).toLocaleString('es-CL')
-                        : new Date(report.createdAt).toLocaleString('es-CL')}
-                    </p>
+          <Button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm disabled:opacity-60"
+          >
+            {generating ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Generando informe…
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Generar Informe IA
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* What you get */}
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="bg-white rounded-lg p-3 border border-amber-100 flex items-start gap-2">
+            <FileDown className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Reporte PDF con Tablas</p>
+              <p className="text-xs text-gray-500">Tablas de ratios, balance y resultados para {selectedYear}.</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-3 border border-amber-100 flex items-start gap-2">
+            <Eye className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Análisis Narrativo (Vista previa 5 min)</p>
+              <p className="text-xs text-gray-500">Análisis IA con interpretaciones financieras y valoración DCF. Descarga protegida con código.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+            <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {/* Generating state */}
+        {generating && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-3 mb-2">
+              <RefreshCw className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
+              <p className="text-sm font-semibold text-blue-800">Claude AI está analizando la empresa…</p>
+            </div>
+            <div className="space-y-1 pl-7">
+              <p className="text-xs text-blue-600">✓ Calculando ratios financieros</p>
+              <p className="text-xs text-blue-600 animate-pulse">⟳ Generando análisis narrativo con IA</p>
+              <p className="text-xs text-blue-400">○ Creando PDF analítico y Word profesional</p>
+            </div>
+          </div>
+        )}
+
+        {/* Generated reports list */}
+        {reports.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Informes Generados</p>
+              <button onClick={loadReports} className="text-xs text-amber-500 hover:text-amber-700 flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" /> Actualizar
+              </button>
+            </div>
+            <div className="space-y-2">
+              {reports.map(report => (
+                <div key={report.id} className="bg-white rounded-lg p-3 border border-amber-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800">Informe {report.year}</p>
+                        <p className="text-xs text-gray-500">
+                          {report.generatedAt
+                            ? new Date(report.generatedAt).toLocaleString('es-CL')
+                            : new Date(report.createdAt).toLocaleString('es-CL')}
+                        </p>
+                      </div>
+                      <StatusBadge status={report.status} />
+                    </div>
+
+                    {report.status === 'COMPLETED' && (
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        {/* Tables PDF — always free */}
+                        <button
+                          onClick={() => handleDownloadClick(report.id, 'pdf')}
+                          disabled={downloading[`${report.id}-pdf`]}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                          title="Descargar PDF con tablas"
+                        >
+                          {downloading[`${report.id}-pdf`]
+                            ? <RefreshCw className="w-3 h-3 animate-spin" />
+                            : <FileDown className="w-3 h-3" />}
+                          PDF
+                        </button>
+
+                        {/* Analysis PDF — preview button */}
+                        {report.docxPath && (
+                          <button
+                            onClick={() => handlePreview(report.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                            title="Vista previa del análisis (15 min)"
+                          >
+                            <Eye className="w-3 h-3" />
+                            Vista Previa
+                          </button>
+                        )}
+
+                        {/* Analysis PDF download — requires code if set */}
+                        {report.docxPath && (
+                          report.hasDownloadCode ? (
+                            <button
+                              onClick={() => handleDownloadClick(report.id, 'docx')}
+                              disabled={downloading[`${report.id}-docx`]}
+                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+                              title="Descargar análisis (requiere código)"
+                            >
+                              {downloading[`${report.id}-docx`]
+                                ? <RefreshCw className="w-3 h-3 animate-spin" />
+                                : <Lock className="w-3 h-3" />}
+                              Descargar
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleGenerateCode(report.id)}
+                              disabled={generatingCode[report.id]}
+                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition-colors"
+                              title="Generar código de descarga y notificar al administrador"
+                            >
+                              {generatingCode[report.id]
+                                ? <RefreshCw className="w-3 h-3 animate-spin" />
+                                : <KeyRound className="w-3 h-3" />}
+                              Solicitar
+                            </button>
+                          )
+                        )}
+                      </div>
+                    )}
+
+                    {report.status === 'FAILED' && (
+                      <p className="text-xs text-red-500 max-w-[200px] truncate ml-2" title={report.errorMessage || ''}>
+                        {report.errorMessage || 'Error desconocido'}
+                      </p>
+                    )}
                   </div>
-                  <StatusBadge status={report.status} />
                 </div>
-
-                {report.status === 'COMPLETED' && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleDownload(report.id, 'pdf')}
-                      disabled={downloading[`${report.id}-pdf`]}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
-                      title="Descargar Reporte PDF con Tablas"
-                    >
-                      {downloading[`${report.id}-pdf`]
-                        ? <RefreshCw className="w-3 h-3 animate-spin" />
-                        : <FileDown className="w-3 h-3" />}
-                      PDF
-                    </button>
-                    <button
-                      onClick={() => handleDownload(report.id, 'docx')}
-                      disabled={downloading[`${report.id}-docx`]}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
-                      title="Descargar Análisis Redactado en Word"
-                    >
-                      {downloading[`${report.id}-docx`]
-                        ? <RefreshCw className="w-3 h-3 animate-spin" />
-                        : <FileSpreadsheet className="w-3 h-3" />}
-                      Word
-                    </button>
-                  </div>
-                )}
-
-                {report.status === 'FAILED' && (
-                  <p className="text-xs text-red-500 max-w-[200px] truncate" title={report.errorMessage || ''}>
-                    {report.errorMessage || 'Error desconocido'}
-                  </p>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {reports.length === 0 && !generating && (
-        <p className="text-sm text-amber-500 text-center py-2">
-          Aún no hay informes generados para esta empresa. Haz clic en "Generar Informe IA" para crear el primero.
-        </p>
-      )}
-    </div>
+        {reports.length === 0 && !generating && (
+          <p className="text-sm text-amber-500 text-center py-2">
+            Aún no hay informes generados para esta empresa. Haz clic en "Generar Informe IA" para crear el primero.
+          </p>
+        )}
+      </div>
+    </>
   );
 };
 
@@ -257,6 +562,18 @@ export const ReportPage: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number>(parseInt(yearParam || '') || new Date().getFullYear());
   const [analysis, setAnalysis] = useState<CompanyAnalysis | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>(tabParam || 'resultados');
+
+  // Chat lock state — persisted per company in localStorage
+  const chatStorageKey = companyId ? `chat_unlocked_${companyId}` : null;
+  const [chatUnlocked, setChatUnlocked] = useState(() => {
+    if (!companyId) return true;
+    return localStorage.getItem(`chat_unlocked_${companyId}`) === 'true';
+  });
+
+  // Chat unlock modal state (reuses DownloadCodeModal)
+  const [chatCodeModal, setChatCodeModal] = useState(false);
+  const [chatCodeError, setChatCodeError] = useState<string | undefined>();
+  const [chatCodeLoading, setChatCodeLoading] = useState(false);
 
   useEffect(() => {
     if (companyId) {
@@ -325,6 +642,46 @@ export const ReportPage: React.FC = () => {
     });
   };
 
+  const handleChatUnlock = async (code: string) => {
+    if (!companyId) return;
+    setChatCodeLoading(true);
+    setChatCodeError(undefined);
+    try {
+      // Find any report with a download code to validate against
+      const reports = await reportService.getCompanyReports(companyId);
+      const reportWithCode = reports.find(r => r.hasDownloadCode);
+      if (!reportWithCode) {
+        // No code set — unlock freely
+        setChatUnlocked(true);
+        if (chatStorageKey) localStorage.setItem(chatStorageKey, 'true');
+        setChatCodeModal(false);
+        return;
+      }
+      const valid = await reportService.validateCode(reportWithCode.id, code);
+      if (valid) {
+        setChatUnlocked(true);
+        if (chatStorageKey) localStorage.setItem(chatStorageKey, 'true');
+        setChatCodeModal(false);
+      } else {
+        setChatCodeError('Código incorrecto. Verifica e inténtalo de nuevo.');
+      }
+    } catch {
+      setChatCodeError('Error al validar el código. Inténtalo de nuevo.');
+    } finally {
+      setChatCodeLoading(false);
+    }
+  };
+
+  // Determine if chat should be locked: locked only if any report has a download code
+  // and the user hasn't unlocked yet
+  const [chatShouldLock, setChatShouldLock] = useState(false);
+  useEffect(() => {
+    if (!companyId || chatUnlocked) return;
+    reportService.getCompanyReports(companyId).then(reports => {
+      setChatShouldLock(reports.some(r => r.hasDownloadCode));
+    }).catch(() => {});
+  }, [companyId, chatUnlocked]);
+
   const handleDownloadPDF = () => {
     if (!analysis) return;
     try {
@@ -346,7 +703,6 @@ export const ReportPage: React.FC = () => {
     }
   };
 
-  // ── Loading ──
   if (loading) {
     return (
       <DashboardLayout>
@@ -362,7 +718,6 @@ export const ReportPage: React.FC = () => {
     );
   }
 
-  // ── No company selected ──
   if (!companyId || !company) {
     return (
       <DashboardLayout>
@@ -380,7 +735,6 @@ export const ReportPage: React.FC = () => {
     );
   }
 
-  // ── No data ──
   if (!analysis || analysis.analysis.length === 0) {
     return (
       <DashboardLayout>
@@ -450,11 +804,29 @@ export const ReportPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── AI Report Panel ── */}
+        {/* AI Report Panel */}
         <AIReportPanel
           companyId={companyId}
           companyName={company.name}
           selectedYear={selectedYear}
+        />
+
+        {/* Chat unlock modal */}
+        {chatCodeModal && (
+          <DownloadCodeModal
+            onConfirm={handleChatUnlock}
+            onCancel={() => { setChatCodeModal(false); setChatCodeError(undefined); }}
+            loading={chatCodeLoading}
+            error={chatCodeError}
+          />
+        )}
+
+        {/* Company Chat */}
+        <CompanyChat
+          companyId={companyId}
+          companyName={company.name}
+          isLocked={!chatUnlocked && chatShouldLock}
+          onUnlock={() => { setChatCodeError(undefined); setChatCodeModal(true); }}
         />
 
         {/* Financial Tabs */}
@@ -502,9 +874,9 @@ export const ReportPage: React.FC = () => {
             <div>
               <h4 className="text-sm font-semibold text-slate-900 mb-1">Nota Importante</h4>
               <p className="text-sm text-slate-800">
-                El informe generado con IA incluye un <strong>Análisis Redactado en Word</strong> (interpretaciones narrativas y valoración DCF) y un <strong>Reporte PDF con Tablas</strong> (ratios, balance y resultados en formato estructurado).
-                Los análisis son generados por Claude AI de Anthropic basándose en los datos financieros ingresados.
-                Los resultados deben ser interpretados por profesionales cualificados.
+                El informe generado con IA incluye un <strong>Análisis Redactado</strong> (interpretaciones narrativas y valoración DCF)
+                disponible en vista previa de 15 minutos, y un <strong>Reporte PDF con Tablas</strong> descargable.
+                La descarga del análisis completo requiere un <strong>código de acceso</strong> obtenido tras confirmar el pago con el administrador.
               </p>
             </div>
           </div>

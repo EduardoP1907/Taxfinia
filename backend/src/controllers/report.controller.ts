@@ -1,17 +1,39 @@
 import { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import {
   generateReport,
   getCompanyReports,
   getReport,
   getReportFilePath,
+  setReportDownloadCode,
 } from '../services/report.service';
+import { convertDocxToPdf } from '../utils/docx-to-pdf';
+import { generatePreviewToken, verifyPreviewToken, PREVIEW_TTL } from '../utils/preview-token';
+import { sendAdminReportCodeEmail } from '../utils/email';
+
+/** Generate random code like TXFIN-A4K9-M2P7 */
+function generateDownloadCode(): string {
+  const part = () => crypto.randomBytes(2).toString('hex').toUpperCase();
+  return `TXFIN-${part()}-${part()}`;
+}
+
+/** Return cached analysis PDF path (converts DOCX on first access).
+ *  Uses _analisis.pdf suffix to avoid collision with the tables PDF which
+ *  shares the same base name (report_<id>_<year>.pdf). */
+async function getAnalysisPdf(docxFilePath: string): Promise<string> {
+  const pdfPath = docxFilePath.replace(/\.docx$/i, '_analisis.pdf');
+  if (!fs.existsSync(pdfPath)) {
+    await convertDocxToPdf(docxFilePath, pdfPath);
+  }
+  return pdfPath;
+}
 
 export class ReportController {
   /**
    * POST /api/reports/generate/:companyId
-   * Trigger report generation for a company
+   * Trigger report generation (async)
    */
   async generate(req: Request, res: Response): Promise<void> {
     try {
@@ -19,24 +41,13 @@ export class ReportController {
       const userId = (req as any).user?.userId;
       const year = req.body.year ? parseInt(req.body.year) : undefined;
 
-      if (!userId) {
-        res.status(401).json({ error: 'No autorizado' });
-        return;
-      }
+      if (!userId) { res.status(401).json({ error: 'No autorizado' }); return; }
+      if (!companyId) { res.status(400).json({ error: 'ID de empresa requerido' }); return; }
 
-      if (!companyId) {
-        res.status(400).json({ error: 'ID de empresa requerido' });
-        return;
-      }
-
-      // Respond immediately, generation runs async
       res.json({ message: 'Generando informe...', status: 'GENERATING' });
-
-      // Generate in background (non-blocking response already sent)
       generateReport(companyId, userId, year).catch(err => {
         console.error('[REPORT] Background generation failed:', err.message);
       });
-
     } catch (error) {
       console.error('[REPORT] Generate error:', error);
       res.status(500).json({ error: 'Error al iniciar la generación del informe' });
@@ -45,7 +56,7 @@ export class ReportController {
 
   /**
    * POST /api/reports/generate-sync/:companyId
-   * Generate and wait for completion (for frontend that needs to know when it's done)
+   * Generate and wait for completion
    */
   async generateSync(req: Request, res: Response): Promise<void> {
     try {
@@ -53,10 +64,7 @@ export class ReportController {
       const userId = (req as any).user?.userId;
       const year = req.body.year ? parseInt(req.body.year) : undefined;
 
-      if (!userId) {
-        res.status(401).json({ error: 'No autorizado' });
-        return;
-      }
+      if (!userId) { res.status(401).json({ error: 'No autorizado' }); return; }
 
       const reportId = await generateReport(companyId, userId, year);
       const report = await getReport(reportId);
@@ -71,6 +79,7 @@ export class ReportController {
           generatedAt: report!.generatedAt,
           pdfPath: report!.pdfPath,
           docxPath: report!.docxPath,
+          hasDownloadCode: !!(report as any).downloadCode,
         },
       });
     } catch (error) {
@@ -97,16 +106,13 @@ export class ReportController {
 
   /**
    * GET /api/reports/:id
-   * Get a single report details
+   * Get a single report
    */
   async getById(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       const report = await getReport(id);
-      if (!report) {
-        res.status(404).json({ error: 'Informe no encontrado' });
-        return;
-      }
+      if (!report) { res.status(404).json({ error: 'Informe no encontrado' }); return; }
       res.json({ report });
     } catch (error) {
       console.error('[REPORT] Get by id error:', error);
@@ -115,8 +121,144 @@ export class ReportController {
   }
 
   /**
+   * POST /api/reports/:id/preview-token
+   * Generate a 15-minute signed token to preview the analysis PDF (auth required)
+   */
+  async getPreviewToken(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const report = await getReport(id);
+
+      if (!report) { res.status(404).json({ error: 'Informe no encontrado' }); return; }
+      if (report.status !== 'COMPLETED') {
+        res.status(400).json({ error: 'El informe aún no está listo' });
+        return;
+      }
+      if (!report.docxPath) {
+        res.status(404).json({ error: 'Archivo de análisis no disponible' });
+        return;
+      }
+
+      const token = generatePreviewToken(id);
+      res.json({ token, expiresIn: PREVIEW_TTL });
+    } catch (error) {
+      console.error('[REPORT] Preview token error:', error);
+      res.status(500).json({ error: 'Error al generar el token de previsualización' });
+    }
+  }
+
+  /**
+   * GET /api/reports/preview/:token
+   * Serve the analysis PDF inline (NO auth — token-based access, 15-min limit)
+   */
+  async previewServe(req: Request, res: Response): Promise<void> {
+    try {
+      const { token } = req.params;
+
+      let reportId: string;
+      try {
+        ({ reportId } = verifyPreviewToken(token));
+      } catch {
+        res.status(401).json({ error: 'Token de previsualización inválido o expirado' });
+        return;
+      }
+
+      const report = await getReport(reportId);
+      if (!report || report.status !== 'COMPLETED' || !report.docxPath) {
+        res.status(404).json({ error: 'Informe no disponible' });
+        return;
+      }
+
+      const docxFilePath = getReportFilePath(report.docxPath);
+      if (!fs.existsSync(docxFilePath)) {
+        res.status(404).json({ error: 'Archivo no encontrado en servidor' });
+        return;
+      }
+
+      const analysisPdfPath = await getAnalysisPdf(docxFilePath);
+
+      // Serve inline so the browser renders it in the iframe
+      // Do NOT set X-Frame-Options — that would block cross-origin iframes (dev ports differ)
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="preview_analisis.pdf"');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.sendFile(analysisPdfPath);
+    } catch (error) {
+      console.error('[REPORT] Preview serve error:', error);
+      res.status(500).json({ error: 'Error al servir la previsualización' });
+    }
+  }
+
+  /**
+   * POST /api/reports/:id/generate-code
+   * Generate a download code, store it, send email to admin (auth required)
+   */
+  async generateCode(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const report = await getReport(id);
+
+      if (!report) { res.status(404).json({ error: 'Informe no encontrado' }); return; }
+      if (report.status !== 'COMPLETED') {
+        res.status(400).json({ error: 'El informe aún no está completado' });
+        return;
+      }
+
+      const code = generateDownloadCode();
+      await setReportDownloadCode(id, code);
+
+      const companyName = (report as any).company?.name || 'Empresa';
+      const companyTaxId = (report as any).company?.taxId;
+
+      // Send email to admin (fire and forget)
+      sendAdminReportCodeEmail({
+        companyName,
+        companyTaxId,
+        year: report.year,
+        downloadCode: code,
+        reportId: id,
+      }).catch(err => console.error('[REPORT] Admin email error:', err.message));
+
+      res.json({ success: true, message: 'Código generado. El administrador recibirá un correo con el código.' });
+    } catch (error) {
+      console.error('[REPORT] Generate code error:', error);
+      res.status(500).json({ error: 'Error al generar el código de descarga' });
+    }
+  }
+
+  /**
+   * POST /api/reports/:id/validate-code
+   * Validate a download code without downloading anything (used to unlock chat)
+   */
+  async validateCode(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const providedCode = ((req.body.code as string) || '').trim().toUpperCase();
+
+      const report = await getReport(id);
+      if (!report) { res.status(404).json({ error: 'Informe no encontrado' }); return; }
+
+      const storedCode = (report as any).downloadCode as string | null;
+      if (!storedCode) {
+        res.status(400).json({ error: 'Este informe no tiene código de acceso' });
+        return;
+      }
+
+      if (!providedCode || providedCode !== storedCode.toUpperCase()) {
+        res.status(401).json({ error: 'Código incorrecto', requiresCode: true });
+        return;
+      }
+
+      res.json({ valid: true });
+    } catch (error) {
+      console.error('[REPORT] Validate code error:', error);
+      res.status(500).json({ error: 'Error al validar el código' });
+    }
+  }
+
+  /**
    * GET /api/reports/:id/download/:format
-   * Download PDF or DOCX
+   * Download PDF or DOCX — validates download code if one has been set
    */
   async download(req: Request, res: Response): Promise<void> {
     try {
@@ -128,21 +270,24 @@ export class ReportController {
       }
 
       const report = await getReport(id);
-      if (!report) {
-        res.status(404).json({ error: 'Informe no encontrado' });
-        return;
-      }
-
+      if (!report) { res.status(404).json({ error: 'Informe no encontrado' }); return; }
       if (report.status !== 'COMPLETED') {
         res.status(400).json({ error: 'El informe aún no está listo', status: report.status });
         return;
       }
 
-      const filename = format === 'pdf' ? report.pdfPath : report.docxPath;
-      if (!filename) {
-        res.status(404).json({ error: 'Archivo no disponible' });
-        return;
+      // Check download code if one has been generated
+      const storedCode = (report as any).downloadCode as string | null;
+      if (storedCode) {
+        const providedCode = (req.query.code as string || '').trim().toUpperCase();
+        if (!providedCode || providedCode !== storedCode.toUpperCase()) {
+          res.status(401).json({ error: 'Código de descarga incorrecto', requiresCode: true });
+          return;
+        }
       }
+
+      const filename = format === 'pdf' ? report.pdfPath : report.docxPath;
+      if (!filename) { res.status(404).json({ error: 'Archivo no disponible' }); return; }
 
       const filePath = getReportFilePath(filename);
       if (!fs.existsSync(filePath)) {
@@ -152,16 +297,26 @@ export class ReportController {
 
       const companyName = (report as any).company?.name || 'empresa';
       const sanitizedName = companyName.replace(/[^a-zA-Z0-9_\- ]/g, '').trim().replace(/ /g, '_');
-      const downloadName = `TAXFIN_${sanitizedName}_${report.year}.${format}`;
 
-      const mimeType = format === 'pdf'
-        ? 'application/pdf'
-        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      // DOCX → convert to PDF on the fly (cached)
+      if (format === 'docx') {
+        try {
+          const analysisPdfPath = await getAnalysisPdf(filePath);
+          const downloadName = `TAXFIN_${sanitizedName}_${report.year}_analisis.pdf`;
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+          res.sendFile(analysisPdfPath);
+        } catch (convErr) {
+          console.error('[REPORT] DOCX→PDF conversion failed:', convErr);
+          res.status(500).json({ error: 'Error al convertir el informe a PDF' });
+        }
+        return;
+      }
 
-      res.setHeader('Content-Type', mimeType);
+      const downloadName = `TAXFIN_${sanitizedName}_${report.year}_tablas.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
       res.sendFile(filePath);
-
     } catch (error) {
       console.error('[REPORT] Download error:', error);
       res.status(500).json({ error: 'Error al descargar el archivo' });

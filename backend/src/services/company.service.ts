@@ -188,3 +188,11 @@ export class CompanyService {
 }
 
 export const companyService = new CompanyService();
+
+/** Lock a company so its financial data can no longer be edited */
+export async function lockCompany(companyId: string): Promise<void> {
+  await prisma.company.update({
+    where: { id: companyId },
+    data: { isLocked: true },
+  });
+}

@@ -18,6 +18,23 @@ import {
 import fs from 'fs';
 import type { AIAnalysisResult } from '../services/ai-analysis.service';
 
+// ─── Sanitize text for XML 1.0 (DOCX internal format) ───────────────────────
+// Removes control characters invalid in XML 1.0 that cause Word's "unreadable content" error.
+// Also replaces box-drawing / arrow chars the AI may echo from the prompt.
+function sanitize(text: string): string {
+  return text
+    // Strip XML 1.0 illegal characters (except \t \n \r which are valid)
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // Replace box-drawing characters (from the multi-year table in the prompt)
+    .replace(/[╔╗╚╝═║]/g, '-')
+    // Replace arrow characters the AI may use
+    .replace(/[▲▼]/g, (c) => c === '▲' ? '↑' : '↓')
+    // Collapse multiple spaces
+    .replace(/ {3,}/g, '  ')
+    .trim();
+}
+
 // ─── Color palette (PROMETHEIA: navy + amber) ────────────────────────────────
 const NAVY_DARK = '0f172a';
 const AMBER = 'f59e0b';
@@ -40,7 +57,7 @@ function styledParagraph(text: string, options?: {
     indent: options?.indent ? { left: options.indent } : undefined,
     children: [
       new TextRun({
-        text,
+        text: sanitize(text),
         bold: options?.bold ?? false,
         size: options?.size ?? 20,
         color: options?.color ?? '374151',
@@ -109,7 +126,7 @@ function bodyText(text: string): Paragraph[] {
         spacing: { after: 100, before: 0 },
         children: [
           new TextRun({
-            text: line.trim().replace(/[\n\r]/g, ' '),
+            text: sanitize(line.trim()),
             size: 20,
             color: '374151',
             font: 'Calibri',
@@ -129,7 +146,7 @@ function infoBox(label: string, value: string): TableRow {
         children: [
           new Paragraph({
             children: [
-              new TextRun({ text: label, bold: true, size: 20, color: NAVY_DARK, font: 'Calibri' }),
+              new TextRun({ text: sanitize(label), bold: true, size: 20, color: NAVY_DARK, font: 'Calibri' }),
             ],
           }),
         ],
@@ -139,7 +156,7 @@ function infoBox(label: string, value: string): TableRow {
         children: [
           new Paragraph({
             children: [
-              new TextRun({ text: value, size: 20, color: '374151', font: 'Calibri' }),
+              new TextRun({ text: sanitize(value), size: 20, color: '374151', font: 'Calibri' }),
             ],
           }),
         ],
@@ -217,7 +234,7 @@ export async function generateNarrativeDocx(data: DocxReportData, outputPath: st
                 border: { top: { style: BorderStyle.SINGLE, size: 4, color: AMBER } },
                 spacing: { before: 80 },
                 children: [
-                  new TextRun({ text: `SOCIEDAD DE INVERSIONES FM02 LTDA.  |  ${data.company.name}  |  Pág. `, size: 16, color: '6b7280', font: 'Calibri' }),
+                  new TextRun({ text: sanitize(`SOCIEDAD DE INVERSIONES FM02 LTDA.  |  ${data.company.name}  |  Pág. `), size: 16, color: '6b7280', font: 'Calibri' }),
                   new TextRun({ children: [PageNumber.CURRENT], size: 16, color: '6b7280', font: 'Calibri' }),
                 ],
               }),

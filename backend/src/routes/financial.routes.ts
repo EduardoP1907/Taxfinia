@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { financialController } from '../controllers/financial.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
+import { companyLockMiddleware } from '../middlewares/company-lock.middleware';
 
 const router = Router();
 
@@ -8,39 +9,24 @@ const router = Router();
 router.use(authMiddleware);
 
 // ============= FISCAL YEARS =============
-// GET /api/financial/companies/:companyId/fiscal-years
 router.get('/companies/:companyId/fiscal-years', financialController.getFiscalYears);
-
-// POST /api/financial/companies/:companyId/fiscal-years
-router.post('/companies/:companyId/fiscal-years', financialController.createFiscalYear);
+router.post('/companies/:companyId/fiscal-years', companyLockMiddleware, financialController.createFiscalYear);
 
 // ============= BALANCE SHEET =============
-// GET /api/financial/fiscal-years/:fiscalYearId/balance-sheet
 router.get('/fiscal-years/:fiscalYearId/balance-sheet', financialController.getBalanceSheet);
-
-// POST /api/financial/fiscal-years/:fiscalYearId/balance-sheet
-router.post('/fiscal-years/:fiscalYearId/balance-sheet', financialController.upsertBalanceSheet);
+router.post('/fiscal-years/:fiscalYearId/balance-sheet', companyLockMiddleware, financialController.upsertBalanceSheet);
 
 // ============= INCOME STATEMENT =============
-// GET /api/financial/fiscal-years/:fiscalYearId/income-statement
 router.get('/fiscal-years/:fiscalYearId/income-statement', financialController.getIncomeStatement);
-
-// POST /api/financial/fiscal-years/:fiscalYearId/income-statement
-router.post('/fiscal-years/:fiscalYearId/income-statement', financialController.upsertIncomeStatement);
+router.post('/fiscal-years/:fiscalYearId/income-statement', companyLockMiddleware, financialController.upsertIncomeStatement);
 
 // ============= CASH FLOW =============
-// GET /api/financial/fiscal-years/:fiscalYearId/cash-flow
 router.get('/fiscal-years/:fiscalYearId/cash-flow', financialController.getCashFlow);
-
-// POST /api/financial/fiscal-years/:fiscalYearId/cash-flow
-router.post('/fiscal-years/:fiscalYearId/cash-flow', financialController.upsertCashFlow);
+router.post('/fiscal-years/:fiscalYearId/cash-flow', companyLockMiddleware, financialController.upsertCashFlow);
 
 // ============= ADDITIONAL DATA =============
-// GET /api/financial/fiscal-years/:fiscalYearId/additional-data
 router.get('/fiscal-years/:fiscalYearId/additional-data', financialController.getAdditionalData);
-
-// POST /api/financial/fiscal-years/:fiscalYearId/additional-data
-router.post('/fiscal-years/:fiscalYearId/additional-data', financialController.upsertAdditionalData);
+router.post('/fiscal-years/:fiscalYearId/additional-data', companyLockMiddleware, financialController.upsertAdditionalData);
 
 // ============= SUMMARY =============
 // GET /api/financial/fiscal-years/:fiscalYearId/summary

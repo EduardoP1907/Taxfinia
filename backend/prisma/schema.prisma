@@ -71,6 +71,7 @@ model Company {
   deletedAt        DateTime?            @map("deleted_at")
   baseYear         Int?                 @map("base_year")
   businessActivity String?              @map("business_activity")
+  isLocked         Boolean              @default(false) @map("is_locked")
   user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   fiscalYears      FiscalYear[]
   projections      ProjectionScenario[]
@@ -319,20 +320,21 @@ model FinancialProjection {
 }
 
 model Report {
-  id           String       @id @default(uuid())
-  companyId    String       @map("company_id")
-  userId       String       @map("user_id")
-  year         Int
-  status       ReportStatus @default(PENDING)
-  aiAnalysis   Json?        @map("ai_analysis")
-  pdfPath      String?      @map("pdf_path")
-  docxPath     String?      @map("docx_path")
-  errorMessage String?      @map("error_message")
-  generatedAt  DateTime?    @map("generated_at")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
-  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String       @id @default(uuid())
+  companyId      String       @map("company_id")
+  userId         String       @map("user_id")
+  year           Int
+  status         ReportStatus @default(PENDING)
+  aiAnalysis     Json?        @map("ai_analysis")
+  pdfPath        String?      @map("pdf_path")
+  docxPath       String?      @map("docx_path")
+  downloadCode   String?      @map("download_code")
+  errorMessage   String?      @map("error_message")
+  generatedAt    DateTime?    @map("generated_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([userId])

@@ -10,6 +10,7 @@ export interface Company {
   foundedYear?: number;
   baseYear: number;
   currency?: string;
+  isLocked?: boolean;
   createdAt: string;
   updatedAt: string;
 }

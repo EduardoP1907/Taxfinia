@@ -19,6 +19,8 @@
     "@prisma/client": "^6.19.0",
     "@types/pdfkit": "^0.17.5",
     "bcryptjs": "^3.0.3",
+    "chart.js": "^4.5.1",
+    "chartjs-node-canvas": "^5.0.0",
     "cors": "^2.8.5",
     "docx": "^9.5.3",
     "dotenv": "^17.2.3",

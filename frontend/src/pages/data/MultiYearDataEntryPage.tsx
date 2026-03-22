@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Save, Building2, Plus, Trash2 } from 'lucide-react';
+import { Save, Building2, Plus, Trash2, Lock } from 'lucide-react';
 import { companyService } from '../../services/company.service';
 import { financialService } from '../../services/financial.service';
 import { useCompanyStore } from '../../store/companyStore';
@@ -347,6 +347,35 @@ export const MultiYearDataEntryPage: React.FC = () => {
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
               <p className="text-gray-600">Cargando datos...</p>
+            </div>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (company?.isLocked) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-2xl mx-auto mt-16">
+          <Card>
+            <div className="text-center py-14 px-8">
+              <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                <Lock className="w-8 h-8 text-amber-400" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">Empresa bloqueada</h2>
+              <p className="text-slate-600 text-sm max-w-md mx-auto mb-6">
+                Los datos financieros de <strong>{company.name}</strong> no pueden modificarse porque ya se ha generado un informe IA o se ha utilizado el asistente financiero.
+              </p>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                Para ingresar datos de una empresa diferente, crea una nueva empresa desde el panel de empresas.
+              </p>
+              <button
+                onClick={() => navigate('/empresas')}
+                className="mt-6 px-5 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-700 transition-colors"
+              >
+                Ir a Empresas
+              </button>
             </div>
           </Card>
         </div>

@@ -13,6 +13,7 @@ import financialRoutes from './routes/financial.routes';
 import ratiosRoutes from './routes/ratios.routes';
 import projectionsRoutes from './routes/projections.routes';
 import reportRoutes from './routes/report.routes';
+import chatRoutes from './routes/chat.routes';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/financial', financialRoutes);
 app.use('/api/ratios', ratiosRoutes);
 app.use('/api/projections', projectionsRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Manejo de errores global
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

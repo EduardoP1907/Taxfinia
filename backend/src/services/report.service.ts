@@ -7,9 +7,12 @@ import path from 'path';
 import fs from 'fs';
 import prisma from '../config/database';
 import { generateAIAnalysis, type FinancialDataForAI } from './ai-analysis.service';
-import { generateAnalyticalPDF, type PDFReportData } from '../utils/pdf-generator';
+import { generateTablesDocx } from '../utils/docx-tables-generator';
+import type { PDFReportData } from '../utils/pdf-generator';
 import { generateNarrativeDocx, type DocxReportData } from '../utils/docx-generator';
+import { convertDocxToPdf } from '../utils/docx-to-pdf';
 import { Decimal } from '@prisma/client/runtime/library';
+import { lockCompany } from './company.service';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function toNum(value: Decimal | null | undefined): number {
@@ -225,9 +228,11 @@ export async function generateReport(companyId: string, userId: string, year?: n
 
     const aiAnalysis = await generateAIAnalysis(aiData);
 
-    // ── Step 2: Generate PDF ──
-    console.log('[REPORT] Generating PDF...');
-    const pdfFilename = `report_${report.id}_${reportYear}.pdf`;
+    // ── Step 2: Generate Tables DOCX (with charts) → convert to PDF ──
+    console.log('[REPORT] Generating Tables DOCX...');
+    const tablesDocxFilename = `report_${report.id}_${reportYear}_tablas.docx`;
+    const tablesDocxPath = path.join(REPORTS_DIR, tablesDocxFilename);
+    const pdfFilename = `report_${report.id}_${reportYear}_tablas.pdf`;
     const pdfPath = path.join(REPORTS_DIR, pdfFilename);
 
     const pdfData: PDFReportData = {
@@ -244,7 +249,9 @@ export async function generateReport(companyId: string, userId: string, year?: n
       balanceData: financialData.balanceData,
       ratiosData: financialData.ratiosData,
     };
-    await generateAnalyticalPDF(pdfData, pdfPath);
+    await generateTablesDocx(pdfData, tablesDocxPath);
+    console.log('[REPORT] Converting Tables DOCX → PDF...');
+    await convertDocxToPdf(tablesDocxPath, pdfPath);
 
     // ── Step 3: Generate DOCX ──
     console.log('[REPORT] Generating DOCX...');
@@ -279,6 +286,11 @@ export async function generateReport(companyId: string, userId: string, year?: n
       },
     });
 
+    // Lock the company so financial data cannot be modified after report generation
+    await lockCompany(companyId).catch(err =>
+      console.error('[REPORT] Failed to lock company:', err.message)
+    );
+
     console.log(`[REPORT] Report ${report.id} generated successfully`);
     return report.id;
 
@@ -297,7 +309,7 @@ export async function generateReport(companyId: string, userId: string, year?: n
 
 // ─── Get reports for a company ────────────────────────────────────────────────
 export async function getCompanyReports(companyId: string) {
-  return prisma.report.findMany({
+  const rows = await prisma.report.findMany({
     where: { companyId },
     orderBy: { createdAt: 'desc' },
     select: {
@@ -307,9 +319,18 @@ export async function getCompanyReports(companyId: string) {
       generatedAt: true,
       pdfPath: true,
       docxPath: true,
+      downloadCode: true,
       errorMessage: true,
       createdAt: true,
     },
+  });
+  return rows.map(r => ({ ...r, hasDownloadCode: !!r.downloadCode }));
+}
+
+export async function setReportDownloadCode(reportId: string, code: string) {
+  return prisma.report.update({
+    where: { id: reportId },
+    data: { downloadCode: code },
   });
 }
 
