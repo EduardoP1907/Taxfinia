@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config/env';
 
 const PREVIEW_SECRET = config.jwtSecret + '_preview';
-const PREVIEW_TTL_SECONDS = 5 * 60; // 5 minutes
+const PREVIEW_TTL_SECONDS = 20 * 60; // 20 minutes
 
 export function generatePreviewToken(reportId: string): string {
   return jwt.sign(

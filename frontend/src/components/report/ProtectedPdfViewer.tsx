@@ -17,12 +17,11 @@ async function getPdfJs() {
 
 interface Props {
   pdfUrl: string;
-  watermarkText: string;
 }
 
 const SCALE = 1.5;
 
-export const ProtectedPdfViewer: React.FC<Props> = ({ pdfUrl, watermarkText }) => {
+export const ProtectedPdfViewer: React.FC<Props> = ({ pdfUrl }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,9 +91,6 @@ export const ProtectedPdfViewer: React.FC<Props> = ({ pdfUrl, watermarkText }) =
 
           if (cancelled) return;
 
-          // Burn watermark into canvas pixels
-          drawWatermark(ctx, viewport.width, viewport.height, watermarkText);
-
           setRenderedPages(pageNum);
         }
 
@@ -110,7 +106,7 @@ export const ProtectedPdfViewer: React.FC<Props> = ({ pdfUrl, watermarkText }) =
 
     render();
     return () => { cancelled = true; };
-  }, [pdfUrl, watermarkText]);
+  }, [pdfUrl]);
 
   return (
     <div
@@ -139,42 +135,3 @@ export const ProtectedPdfViewer: React.FC<Props> = ({ pdfUrl, watermarkText }) =
   );
 };
 
-// ─── Watermark helper ──────────────────────────────────────────────────────────
-function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, text: string) {
-  // Tiled diagonal watermark
-  ctx.save();
-  const fontSize = Math.round(w / 18);
-  ctx.font = `bold ${fontSize}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#1e293b';
-  ctx.globalAlpha = 0.18;
-
-  const tileW = w * 0.6;
-  const tileH = h * 0.12;
-  const cols = Math.ceil(w / tileW) + 2;
-  const rows = Math.ceil(h / tileH) + 6;
-
-  ctx.translate(w / 2, h / 2);
-  ctx.rotate(-Math.PI / 6);
-
-  for (let r = -rows; r <= rows; r++) {
-    for (let c = -cols; c <= cols; c++) {
-      ctx.fillText(text, c * tileW, r * tileH);
-    }
-  }
-  ctx.restore();
-
-  // Large center watermark
-  ctx.save();
-  ctx.globalAlpha = 0.10;
-  ctx.fillStyle = '#0f172a';
-  const bigSize = Math.round(w / 9);
-  ctx.font = `900 ${bigSize}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.translate(w / 2, h / 2);
-  ctx.rotate(-Math.PI / 6);
-  ctx.fillText('SOLO PREVISUALIZACIÓN', 0, 0);
-  ctx.restore();
-}

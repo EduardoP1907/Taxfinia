@@ -124,11 +124,10 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ previewUrl, companyName, ye
         </div>
       </div>
 
-      {/* PDF viewer area — canvas-based, watermark burned in, no download button */}
+      {/* PDF viewer area — canvas-based, no download button */}
       <div className="flex-1 relative overflow-hidden">
         <ProtectedPdfViewer
           pdfUrl={previewUrl}
-          watermarkText={`SOLO PREVISUALIZACIÓN · ${companyName}`}
         />
       </div>
 
