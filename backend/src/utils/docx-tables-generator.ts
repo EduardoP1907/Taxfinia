@@ -453,6 +453,33 @@ export async function generateTablesDocx(data: PDFReportData, outputPath: string
     'Evolución de Liquidez',
   );
 
+  const debtChart = await renderLineChart(
+    yearLabels,
+    [
+      { label: 'Deuda / Equity',       data: years.map(y => data.ratiosData[y]?.debtToEquity  ?? null), color: '#dc2626' },
+      { label: 'Deuda / Activo Total', data: years.map(y => data.ratiosData[y]?.debtToAssets  ?? null), color: '#f59e0b' },
+      { label: 'Deuda / EBITDA',       data: years.map(y => data.ratiosData[y]?.debtToEbitda  ?? null), color: '#7c3aed' },
+    ],
+    'Endeudamiento y Solvencia',
+  );
+
+  const activity1Chart = await renderBarChart(
+    yearLabels,
+    [
+      { label: 'Rotación de Activo', data: years.map(y => data.ratiosData[y]?.assetTurnover ?? null), color: '#0891b2' },
+    ],
+    'Actividad Eficiencia 1 — Rotación de Activo',
+  );
+
+  const activity2Chart = await renderBarChart(
+    yearLabels,
+    [
+      { label: 'Días Promedio de Cobro', data: years.map(y => data.ratiosData[y]?.daysSalesOutstanding  ?? null), color: '#7c3aed' },
+      { label: 'Días Promedio de Pago',  data: years.map(y => data.ratiosData[y]?.daysPayableOutstanding ?? null), color: '#64748b' },
+    ],
+    'Actividad Eficiencia 2 — Días Promedio de Cobro y Pago',
+  );
+
   const today = new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' });
 
   // ── Document ─────────────────────────────────────────────────────────────────
@@ -563,15 +590,76 @@ export async function generateTablesDocx(data: PDFReportData, outputPath: string
           spacer(),
           buildRatiosTable(data, years.slice().reverse()),
           spacer(),
-          subheading('Evolución de Rentabilidad'),
-          imgParagraph(rentabilityChart, 580, 260),
-          spacer(),
-          subheading('Evolución de Liquidez'),
-          imgParagraph(liquidityChart, 580, 260),
-          spacer(),
           new Paragraph({
             children: [new TextRun({
               text: 'Z-Score Altman:  > 2.9 = Zona segura  |  1.23 – 2.9 = Zona gris  |  < 1.23 = Zona de alerta',
+              size: 16, color: TEXT_S, font: 'Calibri', italics: true,
+            })],
+          }),
+        ],
+      },
+
+      // ── SECCIÓN 4: ANALÍTICA — RESULTADOS Y ESTRUCTURA ───────────────────────
+      {
+        properties: { page: { size: { orientation: PageOrientation.LANDSCAPE } } },
+        children: [
+          heading('4', 'ANALÍTICA — EVOLUCIÓN DE RESULTADOS Y ESTRUCTURA'),
+          spacer(),
+          subheading('Evolución de Resultados'),
+          imgParagraph(revenueChart, 600, 270),
+          spacer(),
+          subheading('Estructura Financiera'),
+          imgParagraph(balanceChart, 600, 270),
+        ],
+      },
+
+      // ── SECCIÓN 5: ANALÍTICA — RENTABILIDAD Y LIQUIDEZ ───────────────────────
+      {
+        properties: { page: { size: { orientation: PageOrientation.LANDSCAPE } } },
+        children: [
+          heading('5', 'ANALÍTICA — RENTABILIDAD Y LIQUIDEZ'),
+          spacer(),
+          subheading('Evolución de Rentabilidad'),
+          imgParagraph(rentabilityChart, 600, 270),
+          spacer(),
+          subheading('Evolución de Liquidez'),
+          imgParagraph(liquidityChart, 600, 270),
+        ],
+      },
+
+      // ── SECCIÓN 6: ANALÍTICA — ENDEUDAMIENTO Y SOLVENCIA ─────────────────────
+      {
+        properties: { page: { size: { orientation: PageOrientation.LANDSCAPE } } },
+        children: [
+          heading('6', 'ANALÍTICA — ENDEUDAMIENTO Y SOLVENCIA'),
+          spacer(),
+          subheading('Endeudamiento y Solvencia  (Deuda / Equity  ·  Deuda / Activo Total  ·  Deuda / EBITDA)'),
+          imgParagraph(debtChart, 660, 320),
+          spacer(),
+          new Paragraph({
+            children: [new TextRun({
+              text: 'Referencias:  Deuda/Equity < 1.5  |  Deuda/Activo < 0.6  |  Deuda/EBITDA < 3×',
+              size: 16, color: TEXT_S, font: 'Calibri', italics: true,
+            })],
+          }),
+        ],
+      },
+
+      // ── SECCIÓN 7: ANALÍTICA — ACTIVIDAD Y EFICIENCIA ────────────────────────
+      {
+        properties: { page: { size: { orientation: PageOrientation.LANDSCAPE } } },
+        children: [
+          heading('7', 'ANALÍTICA — ACTIVIDAD Y EFICIENCIA'),
+          spacer(),
+          subheading('Actividad Eficiencia 1 — Rotación de Activo'),
+          imgParagraph(activity1Chart, 600, 270),
+          spacer(),
+          subheading('Actividad Eficiencia 2 — Días Promedio de Cobro y Días Promedio de Pago'),
+          imgParagraph(activity2Chart, 600, 270),
+          spacer(),
+          new Paragraph({
+            children: [new TextRun({
+              text: 'Referencias:  Rotación Activo > 1.0×  |  Días de Cobro < 60  |  Días de Pago 60–90',
               size: 16, color: TEXT_S, font: 'Calibri', italics: true,
             })],
           }),
