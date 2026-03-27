@@ -284,7 +284,7 @@ export class ReportController {
       }
 
       if (!providedCode || providedCode !== storedCode.toUpperCase()) {
-        res.status(401).json({ error: 'Código incorrecto', requiresCode: true });
+        res.status(403).json({ error: 'Código incorrecto', requiresCode: true });
         return;
       }
 
@@ -320,7 +320,7 @@ export class ReportController {
       if (storedCode) {
         const providedCode = (req.query.code as string || '').trim().toUpperCase();
         if (!providedCode || providedCode !== storedCode.toUpperCase()) {
-          res.status(401).json({ error: 'Código de descarga incorrecto', requiresCode: true });
+          res.status(403).json({ error: 'Código de descarga incorrecto', requiresCode: true });
           return;
         }
       }
