@@ -290,8 +290,8 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
 
   const handleDownloadClick = (reportId: string, format: 'pdf' | 'docx') => {
     const report = reports.find(r => r.id === reportId);
-    // Analysis PDF (docx) requires code if one has been set
-    if (format === 'docx' && report?.hasDownloadCode) {
+    // Both formats require code if one has been set
+    if (report?.hasDownloadCode) {
       setCodeError(undefined);
       setCodeModal({ reportId, format });
     } else {
@@ -325,7 +325,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
       await reportService.downloadReport(codeModal.reportId, codeModal.format, companyName, selectedYear, code);
       setCodeModal(null);
     } catch (err: any) {
-      if (err?.response?.data?.requiresCode || err?.response?.status === 401) {
+      if (err?.response?.data?.requiresCode || err?.response?.status === 403) {
         setCodeError('Código incorrecto. Verifica e inténtalo de nuevo.');
       } else {
         setCodeError('Error al descargar. Inténtalo de nuevo.');

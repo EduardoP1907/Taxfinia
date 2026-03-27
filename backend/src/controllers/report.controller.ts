@@ -14,10 +14,10 @@ import { generatePreviewToken, verifyPreviewToken, PREVIEW_TTL } from '../utils/
 import { sendAdminReportCodeEmail } from '../utils/email';
 import { isS3Enabled, getS3SignedUrl, streamS3ToResponse } from '../utils/s3';
 
-/** Generate random code like TXFIN-A4K9-M2P7 */
+/** Generate random code like PROMETHEIA-A4K9-M2P7 */
 function generateDownloadCode(): string {
   const part = () => crypto.randomBytes(2).toString('hex').toUpperCase();
-  return `TXFIN-${part()}-${part()}`;
+  return `PROMETHEIA-${part()}-${part()}`;
 }
 
 /** Return cached analysis PDF path (local disk).
