@@ -32,6 +32,7 @@ import { RatiosSection } from '../../components/report/RatiosSection';
 import { generateFinancialReport } from '../../utils/pdfGenerator';
 import { CompanyChat } from '../../components/report/CompanyChat';
 import { ProtectedPdfViewer } from '../../components/report/ProtectedPdfViewer';
+import { CompanySelector } from '../../components/companies/CompanySelector';
 
 type TabType = 'resultados' | 'balance' | 'ratios';
 
@@ -557,6 +558,7 @@ export const ReportPage: React.FC = () => {
   const tabParam = searchParams.get('tab') as TabType;
 
   const [loading, setLoading] = useState(true);
+  const [availableCompanies, setAvailableCompanies] = useState<any[]>([]);
   const [company, setCompany] = useState<any>(null);
   const [selectedYear, setSelectedYear] = useState<number>(parseInt(yearParam || '') || new Date().getFullYear());
   const [analysis, setAnalysis] = useState<CompanyAnalysis | null>(null);
@@ -591,9 +593,7 @@ export const ReportPage: React.FC = () => {
   const loadAvailableCompanies = async () => {
     try {
       const companies = await companyService.getCompanies();
-      if (companies.length > 0 && !companyId) {
-        navigate(`/informe?companyId=${companies[0].id}&year=${companies[0].baseYear || new Date().getFullYear()}`);
-      }
+      setAvailableCompanies(companies);
     } catch (error) {
       console.error('Error loading companies:', error);
     } finally {
@@ -717,16 +717,28 @@ export const ReportPage: React.FC = () => {
     );
   }
 
-  if (!companyId || !company) {
+  if (!companyId) {
+    return (
+      <CompanySelector
+        companies={availableCompanies}
+        title="Informe Económico-Financiero"
+        description="Selecciona la empresa para ver su informe"
+        icon={<FileText className="w-7 h-7 text-slate-900" />}
+        onSelect={(c) => navigate(`/informe?companyId=${c.id}&year=${c.baseYear || new Date().getFullYear()}`)}
+      />
+    );
+  }
+
+  if (!company) {
     return (
       <DashboardLayout>
         <div className="max-w-7xl mx-auto">
           <Card>
             <div className="text-center py-12">
               <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Selecciona una empresa</h3>
-              <p className="text-gray-600 mb-6">Elige la empresa para ver su informe económico-financiero</p>
-              <Button onClick={() => navigate('/empresas')}>Ver Empresas</Button>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Empresa no encontrada</h3>
+              <p className="text-gray-600 mb-6">No se pudo cargar la empresa seleccionada</p>
+              <Button onClick={() => navigate('/informe')}>Volver al selector</Button>
             </div>
           </Card>
         </div>
