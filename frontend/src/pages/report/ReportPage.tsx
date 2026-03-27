@@ -29,13 +29,12 @@ import { YearSelector } from '../../components/data/YearSelector';
 import { IncomeStatementSection } from '../../components/report/IncomeStatementSection';
 import { BalanceSheetSection } from '../../components/report/BalanceSheetSection';
 import { RatiosSection } from '../../components/report/RatiosSection';
-import { AnalyticsSection } from '../../components/report/AnalyticsSection';
 import { generateFinancialReport } from '../../utils/pdfGenerator';
 import { CompanyChat } from '../../components/report/CompanyChat';
 import { ProtectedPdfViewer } from '../../components/report/ProtectedPdfViewer';
 import { CompanySelector } from '../../components/companies/CompanySelector';
 
-type TabType = 'resultados' | 'balance' | 'ratios' | 'analitica';
+type TabType = 'resultados' | 'balance' | 'ratios';
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 const StatusBadge: React.FC<{ status: Report['status'] }> = ({ status }) => {
@@ -586,7 +585,7 @@ export const ReportPage: React.FC = () => {
   }, [companyId]);
 
   useEffect(() => {
-    if (tabParam && ['resultados', 'balance', 'ratios', 'analitica'].includes(tabParam)) {
+    if (tabParam && ['resultados', 'balance', 'ratios'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -776,7 +775,6 @@ export const ReportPage: React.FC = () => {
     { id: 'resultados' as TabType, label: 'Pérdidas y Ganancias', icon: FileText },
     { id: 'balance' as TabType, label: 'Balance de Situación', icon: BarChart3 },
     { id: 'ratios' as TabType, label: 'Ratios Financieros', icon: TrendingUp },
-    { id: 'analitica' as TabType, label: 'Analítica', icon: Sparkles },
   ];
 
   return (
@@ -876,9 +874,6 @@ export const ReportPage: React.FC = () => {
             )}
             {activeTab === 'ratios' && (
               <RatiosSection years={analysis.analysis} />
-            )}
-            {activeTab === 'analitica' && (
-              <AnalyticsSection years={analysis.analysis} />
             )}
           </div>
         </div>
