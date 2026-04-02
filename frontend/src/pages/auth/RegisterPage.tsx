@@ -13,9 +13,11 @@ export const RegisterPage: React.FC = () => {
   useEffect(() => {
     if (!inviteToken) return;
     // Silently validate the invite token
-    fetch(`${import.meta.env.VITE_API_URL}/auth/invite-tokens/${inviteToken}/validate`)
-      .then(r => r.json())
-      .then(d => { if (d.valid) setIsTrialInvite(true); })
+    fetch(`${import.meta.env.VITE_API_URL}/auth/invite-tokens/${inviteToken}/validate`, {
+      credentials: 'omit',
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.valid) setIsTrialInvite(true); })
       .catch(() => {});
   }, [inviteToken]);
 

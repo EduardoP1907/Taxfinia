@@ -65,10 +65,27 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleCopy = (url: string, id: string) => {
-    navigator.clipboard.writeText(url).then(() => {
+    const doCopy = () => {
       setCopied(id);
       setTimeout(() => setCopied(null), 2000);
-    });
+    };
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(doCopy).catch(() => fallbackCopy(url, doCopy));
+    } else {
+      fallbackCopy(url, doCopy);
+    }
+  };
+
+  const fallbackCopy = (text: string, onSuccess: () => void) => {
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.style.position = 'fixed';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    el.focus();
+    el.select();
+    try { document.execCommand('copy'); onSuccess(); } catch {}
+    document.body.removeChild(el);
   };
 
   const available = tokens.filter(t => !t.usedById).length;
