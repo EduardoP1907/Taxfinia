@@ -10,10 +10,9 @@ import { projectionsService, type ProjectionScenarioWithData } from '../../servi
 import { companyService } from '../../services/company.service';
 import { useCompanyStore } from '../../store/companyStore';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Calculator, TrendingUp, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Calculator } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { GrowthRatesModal } from '../../components/projections/GrowthRatesModal';
 
 interface Projection41PageProps {
   tabsHeader?: React.ReactNode;
@@ -31,12 +30,8 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
   const [company, setCompany] = useState<any>(null);
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
   const [projections, setProjections] = useState<any[]>([]);
-  const [showGrowthRatesModal, setShowGrowthRatesModal] = useState(false);
-  // Cambios pendientes de guardar: { projectionId: { field: value } }
-  const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, any>>>({});
   // Key para forzar remount de inputs no-controlados tras guardar
   const [tableKey, setTableKey] = useState(0);
-  const hasUnsavedChanges = Object.keys(pendingChanges).length > 0;
 
   useEffect(() => {
     console.log('[EFFECT] companyId:', companyId, 'scenarioId:', scenarioId);
@@ -136,70 +131,26 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
     return isNaN(num) ? 0 : num;
   };
 
-  // Actualiza solo el estado local y acumula los cambios pendientes
+  // Actualiza el estado local
   const handleUpdateProjection = (projectionId: string, field: string, value: any) => {
     setProjections((prev) =>
       prev.map((proj) => (proj.id === projectionId ? { ...proj, [field]: value } : proj))
     );
-    setPendingChanges((prev) => ({
-      ...prev,
-      [projectionId]: { ...(prev[projectionId] || {}), [field]: value },
-    }));
   };
 
-  // Guarda todos los cambios pendientes al backend de forma SECUENCIAL por año
-  // (no en paralelo para evitar race conditions en recalculos encadenados)
-  const handleSaveAll = async () => {
+  // Guarda un campo al backend y recarga los valores calculados
+  const autoSaveProjection = async (projectionId: string, field: string, value: any) => {
     if (!scenarioId) return;
     try {
       setSaving(true);
-      // Ordenar cambios por año para que el recalculo encadenado sea correcto
-      const sortedChanges = Object.entries(pendingChanges).sort(([aId], [bId]) => {
-        const aYear = projections.find((p) => p.id === aId)?.year ?? 0;
-        const bYear = projections.find((p) => p.id === bId)?.year ?? 0;
-        return aYear - bYear;
-      });
-      for (const [projId, changes] of sortedChanges) {
-        await projectionsService.updateProjection(projId, changes);
-      }
-      setPendingChanges({});
-      // Recargar para obtener valores recalculados por el backend
+      await projectionsService.updateProjection(projectionId, { [field]: value });
       const refreshed = await projectionsService.getScenario(scenarioId!);
       setProjections(refreshed.projections || []);
-      // Incrementar tableKey para forzar remount de todos los inputs de tasas
       setTableKey((k) => k + 1);
-      toast.success('Proyección guardada correctamente');
     } catch (error: any) {
-      toast.error('Error al guardar la proyección');
+      toast.error('Error al guardar');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleApplyGrowthRates = async (rates: any[]) => {
-    try {
-      // Convertir rates array al formato esperado por el backend
-      const ratesObject: any = {};
-      rates.forEach((rate) => {
-        if (rate.rate !== 0) {
-          ratesObject[rate.field] = rate.rate;
-        }
-      });
-
-      // Llamar al servicio
-      const updated = await projectionsService.applyUniformGrowthRates(
-        scenarioId!,
-        ratesObject
-      );
-
-      // Actualizar el estado local con los nuevos datos
-      setScenario(updated);
-      setProjections(updated.projections || []);
-
-      toast.success('Tasas de crecimiento aplicadas exitosamente');
-    } catch (error: any) {
-      console.error('Error applying growth rates:', error);
-      throw error; // Re-lanzar para que el modal maneje el error
     }
   };
 
@@ -279,28 +230,11 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {hasUnsavedChanges && (
-              <span className="text-xs text-amber-600 font-medium bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
-                ● Cambios sin guardar
+            {saving && (
+              <span className="text-xs text-blue-600 font-medium bg-blue-50 border border-blue-200 px-2 py-1 rounded-lg">
+                Guardando...
               </span>
             )}
-            <Button
-              onClick={() => setShowGrowthRatesModal(true)}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <TrendingUp className="w-4 h-4" />
-              Configurar Tasas
-            </Button>
-            <Button
-              onClick={handleSaveAll}
-              disabled={saving}
-              isLoading={saving}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              {saving ? 'Guardando...' : 'Guardar'}
-            </Button>
           </div>
         </div>
 
@@ -356,6 +290,10 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                                 const numValue = parseFormattedNumber(e.target.value);
                                 handleUpdateProjection(proj.id, 'totalAssets', numValue);
                               }}
+                              onBlur={(e) => {
+                                const numValue = parseFormattedNumber(e.target.value);
+                                autoSaveProjection(proj.id, 'totalAssets', numValue);
+                              }}
                               className="text-right text-sm"
                               title={isBaseYear ? 'Editable - Año base' : 'Editable - Se calcula tasa de crecimiento automáticamente'}
                             />
@@ -376,6 +314,10 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                                 const numValue = parseFormattedNumber(e.target.value);
                                 handleUpdateProjection(proj.id, 'equity', numValue);
                               }}
+                              onBlur={(e) => {
+                                const numValue = parseFormattedNumber(e.target.value);
+                                autoSaveProjection(proj.id, 'equity', numValue);
+                              }}
                               className="text-right text-sm"
                               title={isBaseYear ? 'Editable - Año base' : 'Editable - Se calcula tasa de crecimiento automáticamente'}
                             />
@@ -395,6 +337,10 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                               onChange={(e) => {
                                 const numValue = parseFormattedNumber(e.target.value);
                                 handleUpdateProjection(proj.id, 'totalLiabilities', numValue);
+                              }}
+                              onBlur={(e) => {
+                                const numValue = parseFormattedNumber(e.target.value);
+                                autoSaveProjection(proj.id, 'totalLiabilities', numValue);
                               }}
                               className="text-right text-sm"
                               title={isBaseYear ? 'Editable - Año base' : 'Editable - Se calcula tasa de crecimiento automáticamente'}
@@ -418,25 +364,13 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                             <Input
                               type="text"
                               value={formatNumber(proj.revenue)}
-                              onChange={async (e) => {
+                              onChange={(e) => {
                                 const numValue = parseFormattedNumber(e.target.value);
-
-                                // Si es año futuro, calcular la tasa de crecimiento automáticamente
-                                if (!isBaseYear && index > 0) {
-                                  const priorYear = projections[index - 1];
-                                  const priorRevenue = Number(priorYear.revenue);
-
-                                  if (priorRevenue > 0) {
-                                    // Calcular tasa: (Nuevo - Anterior) / Anterior
-                                    const growthRate = (numValue - priorRevenue) / priorRevenue;
-                                    // Actualizar tanto el valor como la tasa
-                                    await handleUpdateProjection(proj.id, 'revenue', numValue);
-                                    await handleUpdateProjection(proj.id, 'revenueGrowthRate', growthRate);
-                                  }
-                                } else {
-                                  // Año base, solo actualizar el valor
-                                  handleUpdateProjection(proj.id, 'revenue', numValue);
-                                }
+                                handleUpdateProjection(proj.id, 'revenue', numValue);
+                              }}
+                              onBlur={(e) => {
+                                const numValue = parseFormattedNumber(e.target.value);
+                                autoSaveProjection(proj.id, 'revenue', numValue);
                               }}
                               className="text-right text-sm"
                               title={isBaseYear ? 'Editable' : 'Editable - Al cambiar se calcula la tasa de crecimiento'}
@@ -629,7 +563,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                               onBlur={(e) => {
                                 const value = e.target.value.replace(/[^0-9.,-]/g, '');
                                 const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                handleUpdateProjection(proj.id, 'revenueGrowthRate', numValue);
+                                autoSaveProjection(proj.id, 'revenueGrowthRate', numValue);
                               }}
                               onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                               className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
@@ -652,7 +586,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                               onBlur={(e) => {
                                 const value = e.target.value.replace(/[^0-9.,-]/g, '');
                                 const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                handleUpdateProjection(proj.id, 'costOfSalesGrowthRate', numValue);
+                                autoSaveProjection(proj.id, 'costOfSalesGrowthRate', numValue);
                               }}
                               onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                               className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
@@ -675,7 +609,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                               onBlur={(e) => {
                                 const value = e.target.value.replace(/[^0-9.,-]/g, '');
                                 const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                handleUpdateProjection(proj.id, 'otherOperatingExpensesGrowthRate', numValue);
+                                autoSaveProjection(proj.id, 'otherOperatingExpensesGrowthRate', numValue);
                               }}
                               onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                               className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
@@ -698,7 +632,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                               onBlur={(e) => {
                                 const value = e.target.value.replace(/[^0-9.,-]/g, '');
                                 const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                handleUpdateProjection(proj.id, 'depreciationGrowthRate', numValue);
+                                autoSaveProjection(proj.id, 'depreciationGrowthRate', numValue);
                               }}
                               onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                               className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
@@ -721,7 +655,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                               onBlur={(e) => {
                                 const value = e.target.value.replace(/[^0-9.,-]/g, '');
                                 const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                handleUpdateProjection(proj.id, 'exceptionalNetGrowthRate', numValue);
+                                autoSaveProjection(proj.id, 'exceptionalNetGrowthRate', numValue);
                               }}
                               onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                               className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
@@ -746,7 +680,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                                 if (index === 0) return;
                                 const value = e.target.value.replace(/[^0-9.,-]/g, '');
                                 const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                handleUpdateProjection(proj.id, 'financialIncomeGrowthRate', numValue);
+                                autoSaveProjection(proj.id, 'financialIncomeGrowthRate', numValue);
                               }}
                               onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                               className={`text-right text-xs border-orange-200 pr-6 ${index === 0 ? 'bg-gray-50 text-gray-500' : 'bg-orange-50'}`}
@@ -850,12 +784,6 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
         </div>
       </div>
 
-      {/* Modal de tasas de crecimiento */}
-      <GrowthRatesModal
-        isOpen={showGrowthRatesModal}
-        onClose={() => setShowGrowthRatesModal(false)}
-        onApply={handleApplyGrowthRates}
-      />
     </DashboardLayout>
   );
 };

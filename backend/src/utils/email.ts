@@ -154,9 +154,11 @@ export const sendAdminReportCodeEmail = async (data: ReportCodeEmailData): Promi
   const adminEmail = config.adminEmail || config.email.user;
   if (!adminEmail) return;
 
+  const recipients = [adminEmail, config.secondAdminEmail].filter(Boolean).join(', ');
+
   const mailOptions = {
     from: config.email.from,
-    to: adminEmail,
+    to: recipients,
     subject: `[PROMETHEIA] Código de descarga — ${data.companyName} (${data.year})`,
     html: `
       <!DOCTYPE html>

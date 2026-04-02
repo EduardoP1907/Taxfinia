@@ -40,6 +40,41 @@ const unformatNumber = (value: string): number => {
   return isNaN(num) ? 0 : num;
 };
 
+// Evalúa expresiones aritméticas simples (+/-) respetando separadores de miles españoles
+// Ej: "5+6" → 11, "1.000+2.500" → 3500, "10-3" → 7
+const evaluateExpression = (raw: string): number => {
+  if (!raw || raw.trim() === '') return 0;
+  const s = raw.trim().replace(/\s/g, '');
+
+  // Sin operadores aritméticos: parsear directamente como número
+  if (!/\d[+\-]/.test(s)) {
+    return unformatNumber(s);
+  }
+
+  // Tokenizar la expresión en términos con signo
+  const tokens: string[] = [];
+  let current = '';
+  for (let i = 0; i < s.length; i++) {
+    if ((s[i] === '+' || s[i] === '-') && current.length > 0 && /\d$/.test(current)) {
+      tokens.push(current);
+      current = s[i];
+    } else {
+      current += s[i];
+    }
+  }
+  if (current) tokens.push(current);
+
+  let sum = 0;
+  for (const token of tokens) {
+    let sign = 1;
+    let numStr = token;
+    if (token.startsWith('-')) { sign = -1; numStr = token.slice(1); }
+    else if (token.startsWith('+')) { numStr = token.slice(1); }
+    sum += sign * unformatNumber(numStr);
+  }
+  return Math.round(sum);
+};
+
 const TABS = [
   { id: 'balance', name: 'Balance de Situación' },
   { id: 'income', name: 'Pérdidas y Ganancias' },
@@ -627,6 +662,61 @@ export const MultiYearDataEntryPage: React.FC = () => {
   );
 };
 
+// ==================== EXPRESSION INPUT ====================
+// Input que permite expresiones aritméticas simples (ej: 5+6, 1.000+2.500, 10-3)
+// La expresión se evalúa al perder el foco; el signo del campo lo maneja la fórmula
+const ExpressionInput: React.FC<{
+  value: number | string | undefined;
+  onChange: (val: string) => void;
+}> = ({ value, onChange }) => {
+  const [raw, setRaw] = React.useState<string | null>(null);
+  const isExpression = raw !== null && /\d[+\-]/.test(raw);
+  const displayValue = raw !== null ? raw : formatNumber(value);
+  const computedResult = isExpression ? evaluateExpression(raw!) : null;
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={displayValue}
+        onFocus={() => {
+          // Al enfocar, mostrar el número sin formato (ej. "1000" en vez de "1.000")
+          // para que el usuario pueda escribir sin que los separadores de miles interfieran
+          const num = value !== undefined && value !== null && value !== ''
+            ? Number(value)
+            : null;
+          setRaw(num !== null && !isNaN(num) ? String(num) : '');
+        }}
+        onChange={(e) => {
+          const val = e.target.value;
+          setRaw(val);
+          // Para números simples, actualizar el estado padre en tiempo real
+          if (!/\d[+\-]/.test(val)) {
+            onChange(val);
+          }
+        }}
+        onBlur={(e) => {
+          const val = e.target.value;
+          onChange(val === '' ? '' : String(evaluateExpression(val)));
+          setRaw(null);
+        }}
+        title={computedResult !== null ? `= ${computedResult.toLocaleString('es-ES')}` : undefined}
+        className={`w-full px-2 py-1 border rounded text-sm text-right focus:ring-2 focus:border-transparent transition-colors ${
+          isExpression
+            ? 'border-blue-400 focus:ring-blue-400 bg-blue-50 text-blue-700'
+            : 'border-gray-300 focus:ring-amber-500'
+        }`}
+        placeholder="0"
+      />
+      {isExpression && computedResult !== null && (
+        <span className="absolute right-0 -bottom-3.5 text-[10px] text-blue-500 leading-none pointer-events-none whitespace-nowrap">
+          = {computedResult.toLocaleString('es-ES')}
+        </span>
+      )}
+    </div>
+  );
+};
+
 // ==================== BALANCE SHEET TABLE ====================
 interface TableProps {
   yearDataList: YearData[];
@@ -791,12 +881,9 @@ const BalanceSheetTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onRem
               ) : (
                 yearDataList.map((yearData) => (
                   <td key={yearData.year} className="px-4 py-2">
-                    <input
-                      type="text"
-                      value={formatNumber(yearData.balance[row.field as keyof CreateBalanceSheetData])}
-                      onChange={(e) => onUpdate(yearData.year, 'balance', row.field!, e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                      placeholder="0"
+                    <ExpressionInput
+                      value={yearData.balance[row.field as keyof CreateBalanceSheetData]}
+                      onChange={(val) => onUpdate(yearData.year, 'balance', row.field!, val)}
                     />
                   </td>
                 ))
@@ -935,12 +1022,9 @@ const IncomeStatementTable: React.FC<TableProps> = ({ yearDataList, onUpdate, on
               ) : (
                 yearDataList.map((yearData) => (
                   <td key={yearData.year} className="px-4 py-2">
-                    <input
-                      type="text"
-                      value={formatNumber(yearData.income[row.field as keyof CreateIncomeStatementData])}
-                      onChange={(e) => onUpdate(yearData.year, 'income', row.field!, e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                      placeholder="0"
+                    <ExpressionInput
+                      value={yearData.income[row.field as keyof CreateIncomeStatementData]}
+                      onChange={(val) => onUpdate(yearData.year, 'income', row.field!, val)}
                     />
                   </td>
                 ))
@@ -1015,12 +1099,9 @@ const AdditionalDataTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onR
             ) : (
               yearDataList.map((yearData) => (
                 <td key={yearData.year} className="px-4 py-2">
-                  <input
-                    type="text"
-                    value={formatNumber(yearData.additional[row.field as keyof CreateAdditionalDataData])}
-                    onChange={(e) => onUpdate(yearData.year, 'additional', row.field!, e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                    placeholder="0"
+                  <ExpressionInput
+                    value={yearData.additional[row.field as keyof CreateAdditionalDataData]}
+                    onChange={(val) => onUpdate(yearData.year, 'additional', row.field!, val)}
                   />
                 </td>
               ))

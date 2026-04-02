@@ -5,6 +5,8 @@ export interface User {
   lastName?: string;
   role: 'ADMIN' | 'ANALYST' | 'VIEWER' | 'CLIENT';
   isVerified: boolean;
+  planType?: string;
+  freeReportsUsed?: number;
   createdAt: string;
 }
 
@@ -19,6 +21,7 @@ export interface RegisterData {
   password: string;
   firstName?: string;
   lastName?: string;
+  inviteToken?: string;
 }
 
 export interface LoginData {

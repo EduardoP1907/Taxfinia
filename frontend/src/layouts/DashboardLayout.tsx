@@ -13,6 +13,7 @@ import {
   FileBarChart,
   TrendingUp,
   Flame,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -41,6 +42,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     { name: 'Informe Final', href: '/informe', icon: FileBarChart, public: true },
     { name: 'Análisis Detallado', href: '/analisis', icon: FileBarChart, admin: true },
     { name: 'Configuración', href: '/configuracion', icon: Settings, public: true },
+    { name: 'Admin', href: '/admin', icon: ShieldCheck, admin: true },
   ];
 
   const visibleNavigation = navigation.filter(

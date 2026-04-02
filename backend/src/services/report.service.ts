@@ -204,6 +204,13 @@ export async function generateReport(companyId: string, userId: string, year?: n
     ? year
     : financialData.latestYear;
 
+  // Check if user is on TRIAL plan and has free reports remaining
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { planType: true, freeReportsUsed: true },
+  });
+  const isFreeTrialReport = user?.planType === 'TRIAL' && (user?.freeReportsUsed ?? 0) < 2;
+
   // Create report record in DB (status: GENERATING)
   const report = await prisma.report.create({
     data: {
@@ -304,8 +311,18 @@ export async function generateReport(companyId: string, userId: string, year?: n
         pdfPath: storedPdfPath,
         docxPath: storedDocxPath,
         generatedAt: new Date(),
+        // TRIAL users get free reports (no download code required)
+        ...(isFreeTrialReport ? { downloadCode: null } : {}),
       },
     });
+
+    // Increment free reports counter for TRIAL users
+    if (isFreeTrialReport) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { freeReportsUsed: { increment: 1 } },
+      });
+    }
 
     // Lock the company so financial data cannot be modified after report generation
     await lockCompany(companyId).catch(err =>

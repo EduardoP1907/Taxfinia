@@ -18,6 +18,7 @@ import { ReportPage } from './pages/report/ReportPage';
 import { CombinedProjectionsPage } from './pages/projections/CombinedProjectionsPage';
 import { Projection41Page } from './pages/projections/Projection41Page';
 import { Projection43Page } from './pages/projections/Projection43Page';
+import { AdminPage } from './pages/admin/AdminPage';
 
 function App() {
   const { initializeAuth, isLoading } = useAuthStore();
@@ -101,6 +102,15 @@ function App() {
           element={
             <PrivateRoute>
               <Projection43Page />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/admin"
+          element={
+            <PrivateRoute>
+              <AdminPage />
             </PrivateRoute>
           }
         />

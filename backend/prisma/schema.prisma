@@ -8,23 +8,38 @@ datasource db {
 }
 
 model User {
-  id         String    @id @default(uuid())
-  email      String    @unique
-  password   String
-  firstName  String?   @map("first_name")
-  lastName   String?   @map("last_name")
-  role       Role      @default(ANALYST)
-  isVerified Boolean   @default(false) @map("is_verified")
-  isActive   Boolean   @default(true) @map("is_active")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-  lastLogin  DateTime? @map("last_login")
-  companies  Company[]
-  otpCodes   OtpCode[]
-  reports    Report[]
-  sessions   Session[]
+  id              String        @id @default(uuid())
+  email           String        @unique
+  password        String
+  firstName       String?       @map("first_name")
+  lastName        String?       @map("last_name")
+  role            Role          @default(ANALYST)
+  isVerified      Boolean       @default(false) @map("is_verified")
+  isActive        Boolean       @default(true) @map("is_active")
+  planType        String        @default("FREE") @map("plan_type")
+  freeReportsUsed Int           @default(0) @map("free_reports_used")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  lastLogin       DateTime?     @map("last_login")
+  companies       Company[]
+  otpCodes        OtpCode[]
+  reports         Report[]
+  sessions        Session[]
+  inviteTokens    InviteToken[] @relation("creator")
 
   @@map("users")
+}
+
+model InviteToken {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  createdById String    @map("created_by_id")
+  usedById    String?   @map("used_by_id")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   User      @relation("creator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@map("invite_tokens")
 }
 
 model OtpCode {

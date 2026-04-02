@@ -9,7 +9,7 @@ export class AuthService {
   /**
    * Registrar un nuevo usuario
    */
-  async register(email: string, password: string, firstName?: string, lastName?: string) {
+  async register(email: string, password: string, firstName?: string, lastName?: string, inviteToken?: string) {
     // Verificar si el usuario ya existe
     const existingUser = await prisma.user.findUnique({ where: { email } });
 
@@ -22,6 +22,16 @@ export class AuthService {
       await prisma.user.delete({ where: { id: existingUser.id } });
     }
 
+    // Validate invite token (if provided)
+    let validToken: { id: string } | null = null;
+    if (inviteToken) {
+      validToken = await (prisma as any).inviteToken.findFirst({
+        where: { token: inviteToken, usedById: null },
+        select: { id: true },
+      });
+      // If token is invalid, just ignore it (don't block registration)
+    }
+
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -32,8 +42,17 @@ export class AuthService {
         password: hashedPassword,
         firstName,
         lastName,
+        ...(validToken ? { planType: 'TRIAL' } : {}),
       },
     });
+
+    // Mark invite token as used
+    if (validToken) {
+      await (prisma as any).inviteToken.update({
+        where: { id: validToken.id },
+        data: { usedById: user.id, usedAt: new Date() },
+      });
+    }
 
     // Generar OTP
     const otpCode = generateOtp(6);
@@ -134,6 +153,8 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        planType: user.planType,
+        freeReportsUsed: user.freeReportsUsed,
       },
       accessToken,
       refreshToken,
@@ -202,6 +223,8 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        planType: user.planType,
+        freeReportsUsed: user.freeReportsUsed,
       },
       accessToken,
       refreshToken,
@@ -253,6 +276,8 @@ export class AuthService {
         lastName: true,
         role: true,
         isVerified: true,
+        planType: true,
+        freeReportsUsed: true,
         createdAt: true,
       },
     });

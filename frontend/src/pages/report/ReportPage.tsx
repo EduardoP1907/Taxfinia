@@ -21,10 +21,12 @@ import {
   KeyRound,
   ShieldCheck,
   X,
+  Gift,
 } from 'lucide-react';
 import { companyService } from '../../services/company.service';
 import { ratiosService, type CompanyAnalysis } from '../../services/ratios.service';
 import { reportService, type Report } from '../../services/report.service';
+import { useAuthStore } from '../../store/authStore';
 import { YearSelector } from '../../components/data/YearSelector';
 import { IncomeStatementSection } from '../../components/report/IncomeStatementSection';
 import { BalanceSheetSection } from '../../components/report/BalanceSheetSection';
@@ -172,7 +174,7 @@ const DownloadCodeModal: React.FC<DownloadCodeModalProps> = ({ onConfirm, onCanc
           type="text"
           value={code}
           onChange={e => setCode(e.target.value.toUpperCase())}
-          placeholder="TXFIN-XXXX-XXXX"
+          placeholder="PROMETHEIA-XXXX-XXXX"
           className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-center font-mono text-lg tracking-widest text-slate-900 mb-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
           autoFocus
           onKeyDown={e => { if (e.key === 'Enter' && code.trim()) onConfirm(code.trim()); }}
@@ -213,6 +215,11 @@ interface AIReportPanelProps {
 }
 
 const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, selectedYear }) => {
+  const { user } = useAuthStore();
+  const isTrial = user?.planType === 'TRIAL';
+  const freeUsed = user?.freeReportsUsed ?? 0;
+  const freeRemaining = Math.max(0, 2 - freeUsed);
+
   const [reports, setReports] = useState<Report[]>([]);
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
@@ -382,6 +389,18 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
               <h3 className="text-base font-bold text-slate-900">Informe Profesional con IA</h3>
               <p className="text-xs text-amber-600">Reporte PDF con tablas + Análisis redactado por IA</p>
             </div>
+            {isTrial && (
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                freeRemaining > 0
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  : 'bg-slate-50 border-slate-200 text-slate-500'
+              }`}>
+                <Gift className="w-3 h-3" />
+                {freeRemaining > 0
+                  ? `${freeRemaining} informe${freeRemaining > 1 ? 's' : ''} gratuito${freeRemaining > 1 ? 's' : ''}`
+                  : 'Sin informes gratuitos'}
+              </span>
+            )}
           </div>
           <Button
             onClick={handleGenerate}

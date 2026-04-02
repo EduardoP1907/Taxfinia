@@ -1,11 +1,24 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { authService } from '../../services/auth.service';
-import { Mail, Lock, User, Flame } from 'lucide-react';
+import { Mail, Lock, User, Flame, Gift } from 'lucide-react';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite') || '';
+  const [isTrialInvite, setIsTrialInvite] = useState(false);
+
+  useEffect(() => {
+    if (!inviteToken) return;
+    // Silently validate the invite token
+    fetch(`${import.meta.env.VITE_API_URL}/auth/invite-tokens/${inviteToken}/validate`)
+      .then(r => r.json())
+      .then(d => { if (d.valid) setIsTrialInvite(true); })
+      .catch(() => {});
+  }, [inviteToken]);
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -57,6 +70,7 @@ export const RegisterPage: React.FC = () => {
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
+        ...(inviteToken ? { inviteToken } : {}),
       });
 
       setSuccessMessage('¡Registro exitoso! Revisa tu email para el código de verificación.');
@@ -112,6 +126,12 @@ export const RegisterPage: React.FC = () => {
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-white mb-1">Crear cuenta</h1>
             <p className="text-slate-400 text-sm">Accede a la plataforma de análisis financiero</p>
+            {isTrialInvite && (
+              <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <Gift className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <p className="text-xs text-amber-300 font-medium">Invitación activa — 2 informes gratuitos incluidos</p>
+              </div>
+            )}
           </div>
 
           {successMessage && (

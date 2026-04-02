@@ -22,6 +22,7 @@ export const config = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   nodeEnv: process.env.NODE_ENV || 'development',
   adminEmail: process.env.ADMIN_EMAIL || process.env.EMAIL_USER || '',
+  secondAdminEmail: process.env.SECOND_ADMIN_EMAIL || 'fmonroy@fm02.cl',
 
   aws: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',

@@ -31,7 +31,7 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Persist history to localStorage
@@ -39,10 +39,12 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
     localStorage.setItem(STORAGE_KEY(companyId), JSON.stringify(history));
   }, [history, companyId]);
 
-  // Scroll to bottom on new message
+  // Scroll to bottom on new message — scroll the container directly to avoid mover la página
   useEffect(() => {
-    if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history, open]);
+    if (open && messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [history, loading, open]);
 
   // Focus input when opened
   useEffect(() => {
@@ -130,7 +132,7 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
       {open && !isLocked && (
         <div className="border-t border-slate-200">
           {/* Messages area */}
-          <div className="h-96 overflow-y-auto p-4 space-y-3 bg-slate-50">
+          <div ref={messagesContainerRef} className="h-96 overflow-y-auto p-4 space-y-3 bg-slate-50">
             {history.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <div className="p-3 bg-slate-900 rounded-xl">
@@ -202,7 +204,6 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
               </div>
             )}
 
-            <div ref={bottomRef} />
           </div>
 
           {/* Input area */}

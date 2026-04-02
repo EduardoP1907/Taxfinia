@@ -15,9 +15,9 @@ export class AuthController {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { email, password, firstName, lastName } = req.body;
+      const { email, password, firstName, lastName, inviteToken } = req.body;
 
-      const result = await authService.register(email, password, firstName, lastName);
+      const result = await authService.register(email, password, firstName, lastName, inviteToken);
 
       res.status(201).json(result);
     } catch (error: any) {
