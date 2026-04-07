@@ -28,6 +28,7 @@ export const RegisterPage: React.FC = () => {
     firstName: '',
     lastName: '',
   });
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -54,6 +55,10 @@ export const RegisterPage: React.FC = () => {
 
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Las contraseñas no coinciden';
+    }
+
+    if (!acceptedTerms) {
+      newErrors.terms = 'Debes aceptar los términos y condiciones para continuar';
     }
 
     setErrors(newErrors);
@@ -227,6 +232,32 @@ export const RegisterPage: React.FC = () => {
                 />
               </div>
               {errors.confirmPassword && <p className="mt-1 text-xs text-red-400">{errors.confirmPassword}</p>}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="flex items-start gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={e => {
+                    setAcceptedTerms(e.target.checked);
+                    setErrors(prev => ({ ...prev, terms: '' }));
+                  }}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500/30 cursor-pointer"
+                />
+                <span className="text-sm text-slate-400">
+                  Acepto los{' '}
+                  <a
+                    href="/contrato.pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors"
+                  >
+                    términos y condiciones
+                  </a>
+                </span>
+              </label>
+              {errors.terms && <p className="text-xs text-red-400">{errors.terms}</p>}
             </div>
 
             <Button type="submit" className="w-full mt-2" isLoading={isLoading} size="lg">

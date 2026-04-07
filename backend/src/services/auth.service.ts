@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../config/database';
 import { generateOtp, isOtpExpired } from '../utils/otp';
-import { sendOtpEmail, sendPasswordResetEmail } from '../utils/email';
+import { sendOtpEmail, sendPasswordResetEmail, sendNewUserNotificationEmail } from '../utils/email';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
 import { config } from '../config/env';
 
@@ -68,6 +68,15 @@ export class AuthService {
 
     // Enviar email con OTP
     await sendOtpEmail(email, otpCode);
+
+    // Notificar al administrador del nuevo registro (sin bloquear la respuesta)
+    sendNewUserNotificationEmail({
+      email,
+      firstName,
+      lastName,
+      planType: validToken ? 'TRIAL' : 'STANDARD',
+      hasInviteToken: !!validToken,
+    }).catch(() => {});
 
     return {
       userId: user.id,

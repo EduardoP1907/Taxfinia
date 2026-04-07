@@ -808,10 +808,6 @@ export const ReportPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <YearSelector companyId={companyId} currentYear={selectedYear} onYearChange={handleYearChange} />
-              <Button className="flex items-center gap-2" variant="outline" onClick={handleDownloadPDF}>
-                <Download className="w-4 h-4" />
-                Exportar PDF básico
-              </Button>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200">

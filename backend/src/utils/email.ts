@@ -150,6 +150,84 @@ export const sendPasswordResetEmail = async (email: string, code: string): Promi
   await transporter.sendMail(mailOptions);
 };
 
+export const sendNewUserNotificationEmail = async (userData: {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  planType?: string;
+  hasInviteToken?: boolean;
+}): Promise<void> => {
+  const adminEmail = 'fmonroy@fm02.cl';
+  const fullName = [userData.firstName, userData.lastName].filter(Boolean).join(' ') || '(sin nombre)';
+  const plan = userData.hasInviteToken ? 'TRIAL (con invitación)' : (userData.planType || 'STANDARD');
+
+  const mailOptions = {
+    from: config.email.from,
+    to: adminEmail,
+    subject: `[PROMETHEIA] Nuevo usuario registrado — ${userData.email}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #334155; margin: 0; padding: 0; background: #f8fafc; }
+          .wrapper { padding: 40px 20px; }
+          .container { max-width: 580px; margin: 0 auto; }
+          .header { background: #0f172a; padding: 28px 36px; border-radius: 12px 12px 0 0; }
+          .brand { color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: 2px; }
+          .tagline { color: #94a3b8; font-size: 13px; margin-top: 4px; }
+          .content { background: #ffffff; padding: 36px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; }
+          h2 { color: #0f172a; margin: 0 0 8px 0; font-size: 20px; }
+          .info-row { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; }
+          .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 600; margin-bottom: 2px; }
+          .val { font-size: 15px; color: #0f172a; font-weight: 600; }
+          .footer { text-align: center; margin-top: 28px; color: #94a3b8; font-size: 12px; }
+          hr { border: none; border-top: 1px solid #e2e8f0; margin: 24px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="wrapper">
+          <div class="container">
+            <div class="header">
+              <div class="brand">🔥 PROMETHEIA</div>
+              <div class="tagline">Panel de Administración</div>
+            </div>
+            <div class="content">
+              <h2>Nuevo Usuario Registrado</h2>
+              <p style="color:#64748b; margin:0 0 20px 0; font-size:15px;">Se ha creado una nueva cuenta en la plataforma.</p>
+
+              <div class="info-row">
+                <div class="lbl">Nombre</div>
+                <div class="val">${fullName}</div>
+              </div>
+              <div class="info-row">
+                <div class="lbl">Email</div>
+                <div class="val">${userData.email}</div>
+              </div>
+              <div class="info-row">
+                <div class="lbl">Plan</div>
+                <div class="val">${plan}</div>
+              </div>
+              <div class="info-row">
+                <div class="lbl">Fecha de Registro</div>
+                <div class="val">${new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' })}</div>
+              </div>
+
+              <hr>
+              <div class="footer">
+                <p>© ${new Date().getFullYear()} PROMETHEIA · Administración</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
 export const sendAdminReportCodeEmail = async (data: ReportCodeEmailData): Promise<void> => {
   const adminEmail = config.adminEmail || config.email.user;
   if (!adminEmail) return;
