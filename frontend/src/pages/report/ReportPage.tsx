@@ -31,7 +31,6 @@ import { YearSelector } from '../../components/data/YearSelector';
 import { IncomeStatementSection } from '../../components/report/IncomeStatementSection';
 import { BalanceSheetSection } from '../../components/report/BalanceSheetSection';
 import { RatiosSection } from '../../components/report/RatiosSection';
-import { generateFinancialReport } from '../../utils/pdfGenerator';
 import { CompanyChat } from '../../components/report/CompanyChat';
 import { ProtectedPdfViewer } from '../../components/report/ProtectedPdfViewer';
 import { CompanySelector } from '../../components/companies/CompanySelector';
@@ -699,27 +698,6 @@ export const ReportPage: React.FC = () => {
       setChatShouldLock(reports.some(r => r.hasDownloadCode));
     }).catch(() => {});
   }, [companyId, chatUnlocked]);
-
-  const handleDownloadPDF = () => {
-    if (!analysis) return;
-    try {
-      const pdfData = {
-        company: { name: company.name, taxId: company.taxId },
-        years: analysis.analysis.map(yearData => ({
-          year: yearData.year,
-          incomeStatement: yearData.incomeStatement,
-          balanceSheet: yearData.balanceSheet,
-          cashFlow: yearData.cashFlow,
-          additionalData: yearData.additionalData,
-        })),
-        ratios: analysis.analysis.map(yearData => yearData.ratios),
-      };
-      generateFinancialReport(pdfData);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Error al generar el PDF. Por favor, intente nuevamente.');
-    }
-  };
 
   if (loading) {
     return (
