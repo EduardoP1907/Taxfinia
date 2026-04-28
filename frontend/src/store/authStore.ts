@@ -30,6 +30,23 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   initializeAuth: () => {
+    if (import.meta.env.VITE_DEV_BYPASS_AUTH === 'true') {
+      set({
+        user: {
+          id: 'dev-user',
+          email: 'dev@local.com',
+          firstName: 'Dev',
+          lastName: 'Local',
+          role: 'ADMIN',
+          isVerified: true,
+          createdAt: new Date().toISOString(),
+        },
+        isAuthenticated: true,
+        isLoading: false,
+      });
+      return;
+    }
+
     const userStr = localStorage.getItem('user');
     const token = localStorage.getItem('accessToken');
 

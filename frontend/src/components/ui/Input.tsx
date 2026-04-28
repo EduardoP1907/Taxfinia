@@ -10,30 +10,29 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, className = ''
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-xs font-medium text-slate-600 mb-1.5 uppercase tracking-wide">
           {label}
         </label>
       )}
       <div className="relative">
         {icon && (
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
             {icon}
           </div>
         )}
         <input
-          className={`
-            w-full px-4 py-2 border rounded-lg transition-colors duration-200
-            focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent
-            ${error ? 'border-red-500' : 'border-gray-300'}
-            ${icon ? 'pl-10' : ''}
-            ${className}
-          `}
+          className={[
+            'w-full px-3 py-2 text-sm bg-white border rounded-lg transition-colors duration-150',
+            'placeholder:text-slate-400 text-slate-900',
+            'focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400',
+            error ? 'border-red-400 bg-red-50' : 'border-slate-300 hover:border-slate-400',
+            icon ? 'pl-9' : '',
+            className,
+          ].join(' ')}
           {...props}
         />
       </div>
-      {error && (
-        <p className="mt-1 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
     </div>
   );
 };

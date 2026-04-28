@@ -174,57 +174,46 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
     return (
       <DashboardLayout>
         {tabsHeader}
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+        <div className="flex items-center justify-center py-32">
+          <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
         </div>
       </DashboardLayout>
     );
   }
 
-
   if (!scenarioId) {
     return (
       <DashboardLayout>
         {tabsHeader}
-        <div className="max-w-2xl mx-auto mt-16">
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="mb-6">
-              <Calculator className="w-16 h-16 mx-auto text-amber-600 mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Proyección Simplificada (Hoja 4.2)
-              </h2>
-              <p className="text-gray-600 mb-4">
-                {company?.name}
-              </p>
+        <div className="max-w-lg mx-auto mt-12">
+          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+            <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Calculator className="w-7 h-7 text-slate-400" />
             </div>
+            <h2 className="font-semibold text-slate-900 mb-1">Proyección Simplificada</h2>
+            <p className="text-slate-500 text-sm mb-6">{company?.name}</p>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-              <p className="text-blue-800 font-medium mb-3">
-                ℹ️ Para crear una nueva proyección
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-left">
+              <p className="text-xs font-semibold text-amber-800 mb-1 uppercase tracking-wide">Antes de continuar</p>
+              <p className="text-amber-700 text-sm">
+                Crea primero el escenario desde <strong>"Hoja 4.1 - Proyección Completa"</strong>. Luego podrás editarlo aquí.
               </p>
-              <p className="text-blue-700 text-sm mb-4">
-                Debes crear primero el escenario desde la pestaña <strong>"Hoja 4.1 - Proyección Completa"</strong>.
-                Una vez creado, podrás editarlo desde esta vista simplificada.
-              </p>
-              <Button
-                onClick={() => {
-                  const newParams = new URLSearchParams(searchParams);
-                  newParams.set('view', '4.1');
-                  navigate(`/proyecciones?${newParams.toString()}`);
-                }}
-                className="mx-auto"
-              >
-                Ir a Hoja 4.1 para crear proyección
-              </Button>
             </div>
 
             <div className="flex gap-3 justify-center">
+              <Button variant="outline" onClick={() => navigate('/empresas')}>
+                <ArrowLeft className="w-4 h-4" />
+                Empresas
+              </Button>
               <Button
-                onClick={() => navigate('/empresas')}
-                variant="outline"
+                onClick={() => {
+                  const p = new URLSearchParams(searchParams);
+                  p.set('view', '4.1');
+                  navigate(`/proyecciones?${p.toString()}`);
+                }}
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Volver a Empresas
+                Ir a Hoja 4.1
+                <ArrowLeft className="w-4 h-4 rotate-180" />
               </Button>
             </div>
           </div>
@@ -236,105 +225,87 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
   return (
     <DashboardLayout>
       {tabsHeader}
-      <div className="space-y-6">
-        {/* Header */}
+      <div className="space-y-5">
+
+        {/* ── Header ───────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              onClick={() => navigate('/empresas')}
-              variant="outline"
-              size="sm"
-            >
+          <div className="flex items-center gap-3">
+            <Button onClick={() => navigate('/empresas')} variant="outline" size="sm">
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Proyecciones Financieras
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="font-data text-[10px] text-slate-400 tracking-[0.2em] uppercase">/ Proyecciones</span>
+              </div>
+              <h1 className="font-display text-2xl font-extrabold text-slate-900 leading-tight">
+                {company?.name}
               </h1>
-              <p className="text-gray-600">
-                {company?.name} - {scenario?.name}
-              </p>
+              <p className="text-slate-500 text-xs mt-0.5">{scenario?.name}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             {hasUnsavedChanges && (
-              <span className="text-xs text-amber-600 font-medium">
-                Cambios sin guardar
+              <span className="font-data text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                SIN GUARDAR
               </span>
             )}
-            <Button
-              onClick={handleSaveAll}
-              disabled={saving}
-              size="sm"
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              {saving ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
-              {saving ? 'Guardando...' : 'Guardar'}
+            <Button onClick={handleSaveAll} disabled={saving} size="sm" isLoading={saving} variant="secondary">
+              <Save className="w-4 h-4" />
+              {saving ? 'Guardando…' : 'Guardar'}
             </Button>
-            <Button
-              onClick={() => setShowGrowthRatesModal(true)}
-              variant="outline"
-              size="sm"
-            >
-              <TrendingUp className="w-4 h-4 mr-2" />
-              Aplicar Tasas
+            <Button onClick={() => setShowGrowthRatesModal(true)} variant="outline" size="sm">
+              <TrendingUp className="w-4 h-4" />
+              Tasas
             </Button>
-            <Button
-              onClick={() => setShowConfigModal(true)}
-              variant="outline"
-              size="sm"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              Configurar
+            <Button onClick={() => setShowConfigModal(true)} variant="outline" size="sm">
+              <Settings className="w-4 h-4" />
             </Button>
           </div>
         </div>
 
-        {/* Info Card */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800">
-            <strong>Año Base:</strong> {scenario?.baseYear} | <strong>Años Proyectados:</strong> {scenario?.projectionYears}
-          </p>
-          <p className="text-xs text-blue-600 mt-1">
-            Los cálculos de EBIT, NOPAT, Flujo de Caja Bruto y FCF se actualizan automáticamente
-          </p>
+        {/* ── Info strip ───────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-6 px-4 py-2.5 bg-white border border-slate-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <span className="font-data text-[10px] text-slate-400 uppercase tracking-wide">Año base</span>
+            <span className="font-data text-sm font-medium text-slate-900">{scenario?.baseYear}</span>
+          </div>
+          <div className="h-3 w-px bg-slate-200" />
+          <div className="flex items-center gap-2">
+            <span className="font-data text-[10px] text-slate-400 uppercase tracking-wide">Proyectados</span>
+            <span className="font-data text-sm font-medium text-slate-900">{scenario?.projectionYears} años</span>
+          </div>
+          <div className="h-3 w-px bg-slate-200" />
+          <p className="text-xs text-slate-400">EBIT, NOPAT, FCF se calculan automáticamente</p>
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        {/* ── Table ────────────────────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="border-b border-slate-200 bg-slate-50">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-900 sticky left-0 bg-gray-50 z-10">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide sticky left-0 bg-slate-50 z-10">
                     Concepto
                   </th>
                   {projections.map((proj) => (
-                    <th
-                      key={proj.year}
-                      className="px-4 py-3 text-center font-medium text-gray-900 min-w-[140px]"
-                    >
+                    <th key={proj.year} className="px-4 py-3 text-center font-data text-xs font-medium text-slate-900 min-w-[140px]">
                       {proj.year}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-slate-100">
                 {/* RESULTADOS Section */}
-                <tr className="bg-amber-50">
-                  <td colSpan={projections.length + 1} className="px-4 py-2 font-bold text-slate-900">
+                <tr className="bg-slate-900">
+                  <td colSpan={projections.length + 1} className="px-4 py-2 font-data text-[10px] font-medium text-amber-400 tracking-widest uppercase">
                     RESULTADOS
                   </td>
                 </tr>
 
                 {/* Ingresos por VENTAS */}
                 <tr>
-                  <td className="px-4 py-3 font-medium text-gray-700 sticky left-0 bg-white">
+                  <td className="px-4 py-2.5 text-xs font-medium text-slate-700 sticky left-0 bg-white">
                     Ingresos por VENTAS
                   </td>
                   {projections.map((proj) => (
@@ -352,7 +323,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   ))}
                 </tr>
                 <tr className="bg-gray-50">
-                  <td className="px-4 py-2 text-sm text-gray-600 italic sticky left-0 bg-gray-50">
+                  <td className="px-4 py-1.5 text-[10px] font-data text-slate-400 italic sticky left-0 bg-slate-50">
                     % variación anual
                   </td>
                   {projections.map((proj) => (
@@ -375,7 +346,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
 
                 {/* Coste de las ventas */}
                 <tr>
-                  <td className="px-4 py-3 font-medium text-gray-700 sticky left-0 bg-white">
+                  <td className="px-4 py-2.5 text-xs font-medium text-slate-700 sticky left-0 bg-white">
                     Coste de las ventas
                   </td>
                   {projections.map((proj) => (
@@ -393,7 +364,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   ))}
                 </tr>
                 <tr className="bg-gray-50">
-                  <td className="px-4 py-2 text-sm text-gray-600 italic sticky left-0 bg-gray-50">
+                  <td className="px-4 py-1.5 text-[10px] font-data text-slate-400 italic sticky left-0 bg-slate-50">
                     % variación anual
                   </td>
                   {projections.map((proj) => (
@@ -416,7 +387,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
 
                 {/* Otros gastos explotación */}
                 <tr>
-                  <td className="px-4 py-3 font-medium text-gray-700 sticky left-0 bg-white">
+                  <td className="px-4 py-2.5 text-xs font-medium text-slate-700 sticky left-0 bg-white">
                     Otros gastos explotación
                   </td>
                   {projections.map((proj) => (
@@ -434,7 +405,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   ))}
                 </tr>
                 <tr className="bg-gray-50">
-                  <td className="px-4 py-2 text-sm text-gray-600 italic sticky left-0 bg-gray-50">
+                  <td className="px-4 py-1.5 text-[10px] font-data text-slate-400 italic sticky left-0 bg-slate-50">
                     % variación anual
                   </td>
                   {projections.map((proj) => (
@@ -457,7 +428,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
 
                 {/* Depreciaciones */}
                 <tr>
-                  <td className="px-4 py-3 font-medium text-gray-700 sticky left-0 bg-white">
+                  <td className="px-4 py-2.5 text-xs font-medium text-slate-700 sticky left-0 bg-white">
                     Depreciaciones (Amortizaciones)
                   </td>
                   {projections.map((proj) => (
@@ -475,7 +446,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   ))}
                 </tr>
                 <tr className="bg-gray-50">
-                  <td className="px-4 py-2 text-sm text-gray-600 italic sticky left-0 bg-gray-50">
+                  <td className="px-4 py-1.5 text-[10px] font-data text-slate-400 italic sticky left-0 bg-slate-50">
                     % variación anual
                   </td>
                   {projections.map((proj) => (
@@ -498,7 +469,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
 
                 {/* Excepcionales Netos */}
                 <tr>
-                  <td className="px-4 py-3 font-medium text-gray-700 sticky left-0 bg-white">
+                  <td className="px-4 py-2.5 text-xs font-medium text-slate-700 sticky left-0 bg-white">
                     Excepcionales Netos (+ -)
                   </td>
                   {projections.map((proj) => (
@@ -516,7 +487,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   ))}
                 </tr>
                 <tr className="bg-gray-50">
-                  <td className="px-4 py-2 text-sm text-gray-600 italic sticky left-0 bg-gray-50">
+                  <td className="px-4 py-1.5 text-[10px] font-data text-slate-400 italic sticky left-0 bg-slate-50">
                     % variación anual
                   </td>
                   {projections.map((proj) => (
@@ -538,48 +509,48 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                 </tr>
 
                 {/* Calculated Values */}
-                <tr className="bg-green-50 font-medium">
-                  <td className="px-4 py-3 text-gray-900 sticky left-0 bg-green-50">
-                    B.A.I.I. - EBIT
+                <tr className="bg-amber-50/60">
+                  <td className="px-4 py-2.5 font-semibold text-slate-800 text-xs sticky left-0 bg-amber-50/60">
+                    B.A.I.I. — EBIT
                   </td>
                   {projections.map((proj) => (
-                    <td key={proj.id} className="px-4 py-3 text-right text-gray-900">
+                    <td key={proj.id} className="px-4 py-2.5 text-right font-data text-xs font-medium text-slate-800">
                       {formatCurrency(proj.ebit)}
                     </td>
                   ))}
                 </tr>
 
-                <tr className="bg-green-50 font-medium">
-                  <td className="px-4 py-3 text-gray-900 sticky left-0 bg-green-50">
-                    NOPAT - B. Operativo Neto
+                <tr className="bg-amber-50/60">
+                  <td className="px-4 py-2.5 font-semibold text-slate-800 text-xs sticky left-0 bg-amber-50/60">
+                    NOPAT — B. Operativo Neto
                   </td>
                   {projections.map((proj) => (
-                    <td key={proj.id} className="px-4 py-3 text-right text-gray-900">
+                    <td key={proj.id} className="px-4 py-2.5 text-right font-data text-xs font-medium text-slate-800">
                       {formatCurrency(proj.nopat)}
                     </td>
                   ))}
                 </tr>
 
-                <tr className="bg-green-50 font-medium">
-                  <td className="px-4 py-3 text-gray-900 sticky left-0 bg-green-50">
+                <tr className="bg-amber-50/60">
+                  <td className="px-4 py-2.5 font-semibold text-slate-800 text-xs sticky left-0 bg-amber-50/60">
                     Flujo de caja bruto
                   </td>
                   {projections.map((proj) => (
-                    <td key={proj.id} className="px-4 py-3 text-right text-gray-900">
+                    <td key={proj.id} className="px-4 py-2.5 text-right font-data text-xs font-medium text-slate-800">
                       {formatCurrency(proj.grossCashFlow)}
                     </td>
                   ))}
                 </tr>
 
                 {/* INVERSIÓN Section */}
-                <tr className="bg-amber-50">
-                  <td colSpan={projections.length + 1} className="px-4 py-2 font-bold text-slate-900">
+                <tr className="bg-slate-900">
+                  <td colSpan={projections.length + 1} className="px-4 py-2 font-data text-[10px] font-medium text-amber-400 tracking-widest uppercase">
                     INVERSIÓN ACTIVO OPERATIVO
                   </td>
                 </tr>
 
                 <tr>
-                  <td className="px-4 py-3 font-medium text-gray-700 sticky left-0 bg-white">
+                  <td className="px-4 py-2.5 text-xs font-medium text-slate-700 sticky left-0 bg-white">
                     Inversión en activo circulante
                   </td>
                   {projections.map((proj) => (
@@ -598,7 +569,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                 </tr>
 
                 <tr>
-                  <td className="px-4 py-3 font-medium text-gray-700 sticky left-0 bg-white">
+                  <td className="px-4 py-2.5 text-xs font-medium text-slate-700 sticky left-0 bg-white">
                     Inversión en activo fijo
                   </td>
                   {projections.map((proj) => (
@@ -617,16 +588,16 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                 </tr>
 
                 {/* FREE CASH FLOW */}
-                <tr className="bg-blue-100 font-bold">
-                  <td className="px-4 py-3 text-gray-900 sticky left-0 bg-blue-100">
-                    FCF - Flujo de caja libre
+                <tr className="bg-slate-900">
+                  <td className="px-4 py-3 font-data text-xs font-semibold text-amber-400 sticky left-0 bg-slate-900 tracking-wide">
+                    FCF — Flujo de caja libre
                   </td>
                   {projections.map((proj) => {
                     const fcf = (proj.grossCashFlow ?? 0)
                       - (proj.workingCapitalInvestment ?? 0)
                       - (proj.fixedAssetsInvestment ?? 0);
                     return (
-                      <td key={proj.id} className="px-4 py-3 text-right text-gray-900">
+                      <td key={proj.id} className="px-4 py-3 text-right font-data text-xs font-semibold text-amber-400">
                         {formatCurrency(fcf)}
                       </td>
                     );

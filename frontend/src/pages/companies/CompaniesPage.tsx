@@ -1,33 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
-import { Card } from '../../components/ui/Card';
-import { Building2, Plus, Pencil, Trash2, FileText, Calendar } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { CompanyFormModal } from '../../components/companies/CompanyFormModal';
 import { companyService } from '../../services/company.service';
 import type { Company, CreateCompanyData, UpdateCompanyData } from '../../types/company';
 import { useNavigate } from 'react-router-dom';
 import { useCompanyStore } from '../../store/companyStore';
+import { Building2, Plus, Pencil, Trash2, FileText, Calendar, Briefcase, Users, DollarSign } from 'lucide-react';
 
 export const CompaniesPage: React.FC = () => {
   const navigate = useNavigate();
-  const setSelectedCompanyInStore = useCompanyStore((state) => state.setSelectedCompany);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [error, setError] = useState('');
+  const setSelectedCompanyInStore = useCompanyStore((s) => s.setSelectedCompany);
+
+  const [companies, setCompanies]         = useState<Company[]>([]);
+  const [isLoading, setIsLoading]         = useState(true);
+  const [isModalOpen, setIsModalOpen]     = useState(false);
+  const [selectedCompany, setSelected]    = useState<Company | null>(null);
+  const [error, setError]                 = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadCompanies();
-  }, []);
+  useEffect(() => { loadCompanies(); }, []);
 
   const loadCompanies = async () => {
     try {
       setIsLoading(true);
-      const data = await companyService.getCompanies();
-      setCompanies(data);
+      setCompanies(await companyService.getCompanies());
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar las empresas');
     } finally {
@@ -35,20 +32,20 @@ export const CompaniesPage: React.FC = () => {
     }
   };
 
-  const handleCreateCompany = async (data: CreateCompanyData | UpdateCompanyData) => {
+  const handleCreate = async (data: CreateCompanyData | UpdateCompanyData) => {
     await companyService.createCompany(data as CreateCompanyData);
     await loadCompanies();
   };
 
-  const handleUpdateCompany = async (data: UpdateCompanyData) => {
+  const handleUpdate = async (data: UpdateCompanyData) => {
     if (selectedCompany) {
-      const updatedCompany = await companyService.updateCompany(selectedCompany.id, data);
-      setSelectedCompanyInStore(updatedCompany);
+      const updated = await companyService.updateCompany(selectedCompany.id, data);
+      setSelectedCompanyInStore(updated);
       await loadCompanies();
     }
   };
 
-  const handleDeleteCompany = async (id: string) => {
+  const handleDelete = async (id: string) => {
     try {
       await companyService.deleteCompany(id);
       await loadCompanies();
@@ -58,161 +55,137 @@ export const CompaniesPage: React.FC = () => {
     }
   };
 
-  const handleOpenModal = (company?: Company) => {
-    setSelectedCompany(company || null);
-    setIsModalOpen(true);
-  };
+  const openModal = (company?: Company) => { setSelected(company || null); setIsModalOpen(true); };
+  const closeModal = () => { setIsModalOpen(false); setSelected(null); };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedCompany(null);
-  };
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const getCurrencySymbol = (currency: string = 'EUR') => {
-    const symbols: { [key: string]: string } = {
-      EUR: '€',
-      USD: '$',
-      MXN: '$',
-      ARS: '$',
-      COP: '$',
-      CLP: '$',
-      PEN: 'S/',
-      GBP: '£',
-    };
-    return symbols[currency] || currency;
-  };
+  const currencySymbol = (c = 'EUR') =>
+    ({ EUR: '€', USD: '$', MXN: '$', ARS: '$', COP: '$', CLP: '$', PEN: 'S/', GBP: '£' }[c] ?? c);
 
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+
+        {/* ── Page header ──────────────────────────────────────────────────── */}
+        <div className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Mis Empresas</h1>
-            <p className="text-gray-600">
-              Gestiona las empresas que analizas ({companies.length})
+            <div className="flex items-center gap-2 mb-2">
+              <span className="font-data text-[10px] text-slate-400 tracking-[0.2em] uppercase">/ Portfolio</span>
+            </div>
+            <h1 className="font-display text-3xl font-extrabold text-slate-900 leading-tight">Mis Empresas</h1>
+            <p className="text-slate-500 text-sm mt-1">
+              {companies.length === 0
+                ? 'Aún no tienes empresas registradas'
+                : `${companies.length} empresa${companies.length > 1 ? 's' : ''} en el portfolio`}
             </p>
           </div>
-          <Button className="flex items-center gap-2" onClick={() => handleOpenModal()}>
-            <Plus className="w-5 h-5" />
+          <Button onClick={() => openModal()} size="md">
+            <Plus className="w-4 h-4" />
             Nueva Empresa
           </Button>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
+          <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
             {error}
           </div>
         )}
 
+        {/* ── Loading ───────────────────────────────────────────────────────── */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+          <div className="flex items-center justify-center py-24">
+            <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
           </div>
+
+        /* ── Empty state ─────────────────────────────────────────────────── */
         ) : companies.length === 0 ? (
-          <Card>
-            <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-                <Building2 className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                No tienes empresas registradas
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Crea tu primera empresa para comenzar a analizar datos financieros
-              </p>
-              <Button onClick={() => handleOpenModal()}>
-                <Plus className="w-5 h-5 mr-2" />
-                Crear Primera Empresa
-              </Button>
+          <div className="bg-white rounded-xl border border-slate-200 border-dashed py-20 text-center">
+            <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Building2 className="w-7 h-7 text-slate-400" />
             </div>
-          </Card>
+            <h3 className="text-base font-semibold text-slate-900 mb-1">Sin empresas todavía</h3>
+            <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto">
+              Crea tu primera empresa para comenzar a analizar datos financieros
+            </p>
+            <Button onClick={() => openModal()}>
+              <Plus className="w-4 h-4" />
+              Crear Primera Empresa
+            </Button>
+          </div>
+
+        /* ── Company grid ────────────────────────────────────────────────── */
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {companies.map((company) => (
-              <Card key={company.id} className="hover:shadow-lg transition-shadow">
-                <div className="p-6">
+              <div
+                key={company.id}
+                className="group bg-white rounded-xl border border-slate-200 hover:border-amber-200 hover:shadow-md transition-all duration-200 overflow-hidden"
+              >
+                {/* Card top accent */}
+                <div className="h-1 bg-gradient-to-r from-amber-500 to-amber-300 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+
+                <div className="p-5">
                   {/* Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-slate-700 to-slate-900 rounded-lg flex items-center justify-center">
-                        <Building2 className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">
-                          {company.name}
-                        </h3>
-                        {company.taxId && (
-                          <p className="text-sm text-gray-500">{company.taxId}</p>
-                        )}
-                      </div>
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-amber-500 transition-colors duration-200">
+                      <Building2 className="w-5 h-5 text-white group-hover:text-slate-900 transition-colors duration-200" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-slate-900 text-sm leading-tight truncate">
+                        {company.name}
+                      </h3>
+                      {company.taxId && (
+                        <p className="font-data text-[11px] text-slate-400 mt-0.5">{company.taxId}</p>
+                      )}
                     </div>
                   </div>
 
-                  {/* Info */}
-                  <div className="space-y-2 mb-4">
+                  {/* Meta pills */}
+                  <div className="flex flex-wrap gap-1.5 mb-4">
                     {company.industry && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <span className="font-medium mr-2">Sector:</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded text-xs text-slate-600">
+                        <Briefcase className="w-3 h-3" />
                         {company.industry}
-                      </div>
+                      </span>
                     )}
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Calendar className="w-4 h-4 mr-2" />
-                      Año base: {company.baseYear}
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <span className="font-medium mr-2">Moneda:</span>
-                      {getCurrencySymbol(company.currency)}
-                    </div>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded text-xs text-slate-600">
+                      <Calendar className="w-3 h-3" />
+                      {company.baseYear}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded text-xs text-slate-600">
+                      <DollarSign className="w-3 h-3" />
+                      {currencySymbol(company.currency)}
+                    </span>
                     {company.employees && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <span className="font-medium mr-2">Empleados:</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded text-xs text-slate-600">
+                        <Users className="w-3 h-3" />
                         {company.employees}
-                      </div>
+                      </span>
                     )}
                   </div>
 
-                  {/* Description */}
                   {company.description && (
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                    <p className="text-xs text-slate-500 mb-4 line-clamp-2 leading-relaxed">
                       {company.description}
                     </p>
                   )}
 
                   {/* Footer */}
-                  <div className="pt-4 border-t border-gray-200">
-                    <p className="text-xs text-gray-500 mb-3">
-                      Actualizado: {formatDate(company.updatedAt)}
+                  <div className="pt-3 border-t border-slate-100">
+                    <p className="font-data text-[10px] text-slate-400 mb-3">
+                      Actualizado {formatDate(company.updatedAt)}
                     </p>
 
                     {deleteConfirm === company.id ? (
                       <div className="space-y-2">
-                        <p className="text-sm text-red-600 font-medium">
-                          ¿Eliminar esta empresa?
-                        </p>
+                        <p className="text-xs text-red-600 font-medium">¿Eliminar esta empresa?</p>
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            onClick={() => handleDeleteCompany(company.id)}
-                            className="flex-1"
-                          >
+                          <Button size="sm" variant="danger" onClick={() => handleDelete(company.id)} className="flex-1">
                             Sí, eliminar
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setDeleteConfirm(null)}
-                            className="flex-1"
-                          >
+                          <Button size="sm" variant="outline" onClick={() => setDeleteConfirm(null)} className="flex-1">
                             Cancelar
                           </Button>
                         </div>
@@ -222,61 +195,50 @@ export const CompaniesPage: React.FC = () => {
                         <Button
                           size="sm"
                           variant="primary"
+                          className="flex-1"
                           onClick={() => {
                             setSelectedCompanyInStore(company);
                             navigate(`/datos?companyId=${company.id}&year=${company.baseYear || new Date().getFullYear()}`);
                           }}
-                          className="flex-1"
                         >
-                          <FileText className="w-4 h-4 mr-1" />
+                          <FileText className="w-3.5 h-3.5" />
                           Datos
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleOpenModal(company)}
-                        >
-                          <Pencil className="w-4 h-4" />
+                        <Button size="sm" variant="outline" onClick={() => openModal(company)}>
+                          <Pencil className="w-3.5 h-3.5" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setDeleteConfirm(company.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
+                        <Button size="sm" variant="outline" onClick={() => setDeleteConfirm(company.id)}>
+                          <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
                     )}
                   </div>
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
         )}
 
-        {/* Info Card */}
+        {/* ── Tips ─────────────────────────────────────────────────────────── */}
         {companies.length > 0 && (
-          <div className="mt-8">
-            <Card>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                💡 Próximos pasos
-              </h3>
-              <ul className="space-y-2 text-gray-600 text-sm">
-                <li>• Haz clic en "Datos" para ingresar información financiera</li>
-                <li>• Completa los datos de al menos 3 ejercicios fiscales</li>
-                <li>• El sistema calculará automáticamente los ratios financieros</li>
-                <li>• Genera el informe económico-financiero completo</li>
+          <div className="mt-6 px-5 py-4 bg-white rounded-xl border border-slate-200 flex items-start gap-3">
+            <div className="w-1 h-full min-h-[16px] bg-amber-500 rounded-full flex-shrink-0 mt-1" />
+            <div>
+              <p className="text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Próximos pasos</p>
+              <ul className="space-y-1 text-xs text-slate-500">
+                <li>Haz clic en "Datos" para ingresar información financiera</li>
+                <li>Completa los datos de al menos 3 ejercicios fiscales</li>
+                <li>El sistema calculará automáticamente los ratios financieros</li>
               </ul>
-            </Card>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Modal */}
       <CompanyFormModal
         isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onSubmit={selectedCompany ? handleUpdateCompany : handleCreateCompany}
+        onClose={closeModal}
+        onSubmit={selectedCompany ? handleUpdate : handleCreate}
         company={selectedCompany}
         title={selectedCompany ? 'Editar Empresa' : 'Nueva Empresa'}
       />
