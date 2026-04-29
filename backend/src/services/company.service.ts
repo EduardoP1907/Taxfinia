@@ -185,6 +185,32 @@ export class CompanyService {
       lastUpdated: company.updatedAt,
     };
   }
+  async getDashboardStats(userId: string): Promise<{
+    companyCount: number;
+    reportCount: number;
+    analysisCount: number;
+  }> {
+    const companies = await prisma.company.findMany({
+      where: { userId, deletedAt: null },
+      select: { id: true },
+    });
+    const companyIds = companies.map((c) => c.id);
+
+    const [reportCount, analysisCount] = await Promise.all([
+      prisma.report.count({
+        where: { companyId: { in: companyIds }, status: 'COMPLETED' },
+      }),
+      prisma.calculatedRatios.count({
+        where: { fiscalYear: { companyId: { in: companyIds } } },
+      }),
+    ]);
+
+    return {
+      companyCount: companyIds.length,
+      reportCount,
+      analysisCount,
+    };
+  }
 }
 
 export const companyService = new CompanyService();

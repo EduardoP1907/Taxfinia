@@ -10,6 +10,7 @@ import {
   FileText,
   BarChart3,
   TrendingUp,
+  Activity,
   Sparkles,
   FileDown,
   RefreshCw,
@@ -34,8 +35,9 @@ import { RatiosSection } from '../../components/report/RatiosSection';
 import { CompanyChat } from '../../components/report/CompanyChat';
 import { ProtectedPdfViewer } from '../../components/report/ProtectedPdfViewer';
 import { CompanySelector } from '../../components/companies/CompanySelector';
+import { AnalyticsSection } from '../../components/report/AnalyticsSection';
 
-type TabType = 'resultados' | 'balance' | 'ratios';
+type TabType = 'resultados' | 'balance' | 'ratios' | 'analitica';
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 const StatusBadge: React.FC<{ status: Report['status'] }> = ({ status }) => {
@@ -603,7 +605,7 @@ export const ReportPage: React.FC = () => {
   }, [companyId]);
 
   useEffect(() => {
-    if (tabParam && ['resultados', 'balance', 'ratios'].includes(tabParam)) {
+    if (tabParam && ['resultados', 'balance', 'ratios', 'analitica'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -718,6 +720,7 @@ export const ReportPage: React.FC = () => {
     return (
       <CompanySelector
         companies={availableCompanies}
+        loading={loading}
         title="Informe Económico-Financiero"
         description="Selecciona la empresa para ver su informe"
         icon={<FileText className="w-7 h-7 text-slate-900" />}
@@ -772,6 +775,7 @@ export const ReportPage: React.FC = () => {
     { id: 'resultados' as TabType, label: 'Pérdidas y Ganancias', icon: FileText },
     { id: 'balance' as TabType, label: 'Balance de Situación', icon: BarChart3 },
     { id: 'ratios' as TabType, label: 'Ratios Financieros', icon: TrendingUp },
+    { id: 'analitica' as TabType, label: 'Analítica', icon: Activity },
   ];
 
   return (
@@ -867,6 +871,9 @@ export const ReportPage: React.FC = () => {
             )}
             {activeTab === 'ratios' && (
               <RatiosSection years={analysis.analysis} />
+            )}
+            {activeTab === 'analitica' && (
+              <AnalyticsSection years={analysis.analysis} currency={company.currency} />
             )}
           </div>
         </div>

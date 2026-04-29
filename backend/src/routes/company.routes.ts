@@ -112,6 +112,7 @@ const updateCompanyValidation = [
 ];
 
 // Rutas
+router.get('/stats', companyController.getDashboardStats.bind(companyController));
 router.post('/', createCompanyValidation, companyController.createCompany);
 router.get('/', companyController.getCompanies);
 router.get('/:id', companyController.getCompanyById);

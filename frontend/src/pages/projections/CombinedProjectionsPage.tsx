@@ -17,9 +17,13 @@ import type { Company } from '../../types/company';
 export const CombinedProjectionsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
 
   useEffect(() => {
-    companyService.getCompanies().then(setCompanies).catch(console.error);
+    companyService.getCompanies()
+      .then(setCompanies)
+      .catch(console.error)
+      .finally(() => setLoadingCompanies(false));
   }, []);
 
   const companyId = searchParams.get('companyId');
@@ -29,6 +33,7 @@ export const CombinedProjectionsPage: React.FC = () => {
     return (
       <CompanySelector
         companies={companies}
+        loading={loadingCompanies}
         onSelect={(comp) => {
           const newParams = new URLSearchParams(searchParams);
           newParams.set('companyId', comp.id);

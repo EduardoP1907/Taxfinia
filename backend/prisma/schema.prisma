@@ -100,6 +100,7 @@ model FiscalYear {
   id               String            @id @default(uuid())
   companyId        String            @map("company_id")
   year             Int
+  quarter          Int               @default(0) @map("quarter")
   startDate        DateTime?         @map("start_date")
   endDate          DateTime?         @map("end_date")
   createdAt        DateTime          @default(now()) @map("created_at")
@@ -111,7 +112,7 @@ model FiscalYear {
   company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   incomeStatement  IncomeStatement?
 
-  @@unique([companyId, year])
+  @@unique([companyId, year, quarter])
   @@index([companyId])
   @@map("fiscal_years")
 }
@@ -236,6 +237,12 @@ model CalculatedRatios {
   daysPayableOutstanding   Decimal?   @map("days_payable_outstanding") @db.Decimal(10, 2)
   daysInventoryOutstanding Decimal?   @map("days_inventory_outstanding") @db.Decimal(10, 2)
   altmanZScore             Decimal?   @map("altman_z_score") @db.Decimal(10, 4)
+  springateScore           Decimal?   @map("springate_score") @db.Decimal(10, 4)
+  cashConversionCycle      Decimal?   @map("cash_conversion_cycle") @db.Decimal(10, 2)
+  capitalizationRatio      Decimal?   @map("capitalization_ratio") @db.Decimal(10, 4)
+  revenuePerEmployee       Decimal?   @map("revenue_per_employee") @db.Decimal(15, 2)
+  ebitdaPerEmployee        Decimal?   @map("ebitda_per_employee") @db.Decimal(15, 2)
+  netIncomePerEmployee     Decimal?   @map("net_income_per_employee") @db.Decimal(15, 2)
   calculatedAt             DateTime   @default(now()) @map("calculated_at")
   createdAt                DateTime   @default(now()) @map("created_at")
   updatedAt                DateTime   @updatedAt @map("updated_at")

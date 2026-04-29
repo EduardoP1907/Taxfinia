@@ -257,6 +257,14 @@ export class RatiosService {
 
         // Risk
         altmanZScore: calculatedRatios.altmanZScore,
+        springateScore: calculatedRatios.springateScore,
+
+        // Additional
+        cashConversionCycle: calculatedRatios.cashConversionCycle,
+        capitalizationRatio: calculatedRatios.capitalizationRatio,
+        revenuePerEmployee: calculatedRatios.revenuePerEmployee,
+        ebitdaPerEmployee: calculatedRatios.ebitdaPerEmployee,
+        netIncomePerEmployee: calculatedRatios.netIncomePerEmployee,
       },
       update: {
         // Liquidity
@@ -290,6 +298,14 @@ export class RatiosService {
 
         // Risk
         altmanZScore: calculatedRatios.altmanZScore,
+        springateScore: calculatedRatios.springateScore,
+
+        // Additional
+        cashConversionCycle: calculatedRatios.cashConversionCycle,
+        capitalizationRatio: calculatedRatios.capitalizationRatio,
+        revenuePerEmployee: calculatedRatios.revenuePerEmployee,
+        ebitdaPerEmployee: calculatedRatios.ebitdaPerEmployee,
+        netIncomePerEmployee: calculatedRatios.netIncomePerEmployee,
 
         calculatedAt: new Date(),
       },

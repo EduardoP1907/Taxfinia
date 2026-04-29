@@ -125,6 +125,16 @@ export class CompanyController {
     }
   }
 
+  async getDashboardStats(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const stats = await companyService.getDashboardStats(userId);
+      res.status(200).json({ success: true, data: stats });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message || 'Error al obtener estadísticas' });
+    }
+  }
+
   async getCompanySummary(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.user!.userId;

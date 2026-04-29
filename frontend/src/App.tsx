@@ -19,6 +19,8 @@ import { CombinedProjectionsPage } from './pages/projections/CombinedProjections
 import { Projection41Page } from './pages/projections/Projection41Page';
 import { Projection43Page } from './pages/projections/Projection43Page';
 import { AdminPage } from './pages/admin/AdminPage';
+import { QuarterlyDataEntryPage } from './pages/data/QuarterlyDataEntryPage';
+import { QuarterlyReportPage } from './pages/report/QuarterlyReportPage';
 
 function App() {
   const { initializeAuth, isLoading } = useAuthStore();
@@ -106,6 +108,22 @@ function App() {
           }
         />
 
+        <Route
+          path="/datos-trimestrales"
+          element={
+            <PrivateRoute>
+              <QuarterlyDataEntryPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/informe-trimestral"
+          element={
+            <PrivateRoute>
+              <QuarterlyReportPage />
+            </PrivateRoute>
+          }
+        />
         <Route
           path="/admin"
           element={

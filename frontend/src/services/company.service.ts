@@ -35,4 +35,9 @@ export const companyService = {
     const response = await api.get(`/companies/${id}/summary`);
     return response.data.data;
   },
+
+  async getDashboardStats(): Promise<{ companyCount: number; reportCount: number; analysisCount: number }> {
+    const response = await api.get('/companies/stats');
+    return response.data.data;
+  },
 };

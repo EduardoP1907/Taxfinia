@@ -76,10 +76,25 @@ export const RatiosSection: React.FC<Props> = ({ years }) => {
       ]
     },
     {
+      title: 'Ratios de Financiación',
+      color: 'slate',
+      ratios: [
+        { label: 'Capitalización (PN / (PN + PNC))', key: 'capitalizationRatio', format: formatNumber, optimal: '> 0.5' },
+      ]
+    },
+    {
+      title: 'Ciclo de Conversión de Caja',
+      color: 'amber',
+      ratios: [
+        { label: 'Ciclo de Caja (DSO + DIO - DPO)', key: 'cashConversionCycle', format: formatDays, optimal: '< 60 días' },
+      ]
+    },
+    {
       title: 'Análisis de Riesgo',
       color: 'red',
       ratios: [
-        { label: 'Z-Score de Altman (Riesgo de Insolvencia)', key: 'altmanZScore', format: formatNumber, optimal: '> 2.6' },
+        { label: 'Z-Score de Altman (empresas no cotizadas)', key: 'altmanZScore', format: formatNumber, optimal: '> 2.9' },
+        { label: 'S-Score de Springate', key: 'springateScore', format: formatNumber, optimal: '> 0.862' },
       ]
     },
   ];
@@ -113,6 +128,12 @@ export const RatiosSection: React.FC<Props> = ({ years }) => {
     }
 
     return 'text-gray-700';
+  };
+
+  const getSpringateInterpretation = (sScore: number | null | undefined): { text: string; color: string } => {
+    if (sScore === null || sScore === undefined) return { text: 'No disponible', color: 'text-gray-500' };
+    if (sScore > 0.862) return { text: 'Empresa sana - Bajo riesgo de quiebra', color: 'text-green-600' };
+    return { text: 'Empresa en riesgo - Posible insolvencia', color: 'text-red-600' };
   };
 
   const getAltmanInterpretation = (zScore: number | null | undefined): { text: string; color: string } => {
@@ -202,27 +223,37 @@ export const RatiosSection: React.FC<Props> = ({ years }) => {
               </table>
             </div>
 
-            {/* Interpretación especial para Z-Score de Altman */}
+            {/* Interpretaciones para Análisis de Riesgo */}
             {group.title === 'Análisis de Riesgo' && (
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                {sortedYears.slice(0, 3).map((year, index) => {
-                  const zScore = year.ratios?.altmanZScore;
-                  const interpretation = getAltmanInterpretation(zScore);
-
-                  return (
-                    <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
-                      <div className="text-sm font-semibold text-gray-700 mb-1">
-                        {year.year}
+              <div className="mt-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Altman Z-Score</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {sortedYears.slice(0, 3).map((year, index) => {
+                    const zScore = year.ratios?.altmanZScore;
+                    const interpretation = getAltmanInterpretation(zScore);
+                    return (
+                      <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-sm font-semibold text-gray-700 mb-1">{year.year}</div>
+                        <div className={`text-lg font-bold ${interpretation.color} mb-1`}>{formatNumber(zScore)}</div>
+                        <div className={`text-xs ${interpretation.color}`}>{interpretation.text}</div>
                       </div>
-                      <div className={`text-lg font-bold ${interpretation.color} mb-1`}>
-                        {formatNumber(zScore)}
+                    );
+                  })}
+                </div>
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mt-2">Springate S-Score</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {sortedYears.slice(0, 3).map((year, index) => {
+                    const sScore = year.ratios?.springateScore;
+                    const interpretation = getSpringateInterpretation(sScore);
+                    return (
+                      <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-sm font-semibold text-gray-700 mb-1">{year.year}</div>
+                        <div className={`text-lg font-bold ${interpretation.color} mb-1`}>{formatNumber(sScore)}</div>
+                        <div className={`text-xs ${interpretation.color}`}>{interpretation.text}</div>
                       </div>
-                      <div className={`text-xs ${interpretation.color}`}>
-                        {interpretation.text}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

@@ -61,9 +61,10 @@ export const financialService = {
   },
 
   /**
-   * Crear un nuevo año fiscal
+   * Crear un nuevo año fiscal (anual o trimestral)
+   * @param quarter 0=anual, 1=T1, 2=T2, 3=T3
    */
-  async createFiscalYear(companyId: string, userId: string, data: { year: number; startDate?: Date; endDate?: Date }) {
+  async createFiscalYear(companyId: string, userId: string, data: { year: number; quarter?: number; startDate?: Date; endDate?: Date }) {
     // Verificar que la empresa pertenece al usuario
     const company = await prisma.company.findFirst({
       where: { id: companyId, userId, deletedAt: null },
@@ -73,9 +74,11 @@ export const financialService = {
       throw new Error('Empresa no encontrada');
     }
 
-    // Verificar que no existe ya ese año
+    const quarter = data.quarter ?? 0;
+
+    // Verificar que no existe ya ese período
     const existing = await prisma.fiscalYear.findFirst({
-      where: { companyId, year: data.year },
+      where: { companyId, year: data.year, quarter },
     });
 
     if (existing) {
@@ -86,9 +89,26 @@ export const financialService = {
       data: {
         companyId,
         year: data.year,
+        quarter,
         startDate: data.startDate,
         endDate: data.endDate,
       },
+    });
+  },
+
+  /**
+   * Obtener años fiscales trimestrales de una empresa
+   */
+  async getQuarterlyFiscalYears(companyId: string, userId: string) {
+    const company = await prisma.company.findFirst({
+      where: { id: companyId, userId, deletedAt: null },
+    });
+    if (!company) throw new Error('Empresa no encontrada');
+
+    return await prisma.fiscalYear.findMany({
+      where: { companyId, quarter: { gt: 0 } },
+      orderBy: [{ year: 'desc' }, { quarter: 'desc' }],
+      include: { balanceSheet: true, incomeStatement: true, cashFlow: true, additionalData: true },
     });
   },
 

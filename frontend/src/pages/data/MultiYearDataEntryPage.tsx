@@ -89,6 +89,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
 
   const [company, setCompany] = useState<Company | null>(null);
   const [availableCompanies, setAvailableCompanies] = useState<Company[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('balance');
@@ -119,6 +120,8 @@ export const MultiYearDataEntryPage: React.FC = () => {
       setAvailableCompanies(companies);
     } catch (error) {
       console.error('Error loading companies:', error);
+    } finally {
+      setLoadingCompanies(false);
     }
   };
 
@@ -366,6 +369,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
     return (
       <CompanySelector
         companies={availableCompanies}
+        loading={loadingCompanies}
         onSelect={(company) => navigate(`/datos?companyId=${company.id}`)}
         title="Ingreso de Datos Financieros"
         description="Selecciona una empresa para ingresar sus datos financieros"

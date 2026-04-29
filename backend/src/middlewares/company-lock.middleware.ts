@@ -13,12 +13,13 @@ export async function companyLockMiddleware(
   try {
     let companyId: string | undefined = req.params.companyId;
 
-    // If route uses fiscalYearId, resolve to companyId
+    // If route uses fiscalYearId, resolve to companyId — but skip lock for quarterly fiscal years
     if (!companyId && req.params.fiscalYearId) {
       const fy = await prisma.fiscalYear.findUnique({
         where: { id: req.params.fiscalYearId },
-        select: { companyId: true },
+        select: { companyId: true, quarter: true },
       });
+      if (fy && fy.quarter > 0) { next(); return; }
       companyId = fy?.companyId;
     }
 

@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/auth.service';
 import {
   LayoutDashboard, FileText, Settings, LogOut, Menu, X,
-  Building2, FileBarChart, TrendingUp, Flame, ShieldCheck, ChevronRight,
+  Building2, FileBarChart, TrendingUp, Flame, ShieldCheck, ChevronRight, Calendar,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -25,17 +25,34 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     navigate('/login');
   };
 
-  const navigation = [
-    { name: 'Dashboard',         href: '/dashboard',    icon: LayoutDashboard, public: true },
-    { name: 'Mis Empresas',      href: '/empresas',     icon: Building2,       public: true },
-    { name: 'Ingresar Datos',    href: '/datos',        icon: FileText,        public: true },
-    { name: 'Proyecciones',      href: '/proyecciones', icon: TrendingUp,      public: true },
-    { name: 'Informe Final',     href: '/informe',      icon: FileBarChart,    public: true },
-    { name: 'Configuración',     href: '/configuracion',icon: Settings,        public: true },
-    { name: 'Admin',             href: '/admin',        icon: ShieldCheck,     admin: true  },
+  const navGroups = [
+    {
+      label: null,
+      items: [
+        { name: 'Dashboard',    href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Mis Empresas', href: '/empresas',  icon: Building2 },
+      ],
+    },
+    {
+      label: 'Análisis Anual',
+      items: [
+        { name: 'Datos Anuales',  href: '/datos',        icon: FileText },
+        { name: 'Proyecciones',   href: '/proyecciones', icon: TrendingUp },
+        { name: 'Informe Anual',  href: '/informe',      icon: FileBarChart },
+      ],
+    },
+    {
+      label: 'Análisis Trimestral',
+      items: [
+        { name: 'Datos Trimestrales',    href: '/datos-trimestrales',  icon: Calendar },
+        { name: 'Informe Trimestral',    href: '/informe-trimestral',  icon: Calendar },
+      ],
+    },
+    ...(isAdmin ? [{
+      label: 'Administración',
+      items: [{ name: 'Admin', href: '/admin', icon: ShieldCheck }],
+    }] : []),
   ];
-
-  const visible = navigation.filter(i => i.public || (i.admin && isAdmin));
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -48,7 +65,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
           />
           <div className="fixed inset-y-0 left-0 w-64">
             <Sidebar
-              nav={visible}
+              navGroups={navGroups}
               location={location}
               user={user}
               isAdmin={isAdmin}
@@ -62,7 +79,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       {/* ── Desktop sidebar ─────────────────────────────────────────────────── */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <Sidebar
-          nav={visible}
+          navGroups={navGroups}
           location={location}
           user={user}
           isAdmin={isAdmin}
@@ -100,8 +117,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
 };
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
+interface NavItem  { name: string; href: string; icon: React.ElementType }
+interface NavGroup { label: string | null; items: NavItem[] }
 interface SidebarProps {
-  nav: any[];
+  navGroups: NavGroup[];
   location: any;
   user: any;
   isAdmin: boolean;
@@ -109,7 +128,7 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ nav, location, user, isAdmin, onLogout, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ navGroups, location, user, isAdmin, onLogout, onClose }) => {
   const initials = (user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase();
   const displayName = user?.firstName
     ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`
@@ -149,34 +168,43 @@ const Sidebar: React.FC<SidebarProps> = ({ nav, location, user, isAdmin, onLogou
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-        <p className="px-3 mb-2 font-data text-[10px] text-slate-600 tracking-[0.15em] uppercase">
-          Menú principal
-        </p>
-        {nav.map((item) => {
-          const active =
-            location.pathname === item.href ||
-            (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
-          return (
-            <Link
-              key={item.name}
-              to={item.href}
-              onClick={onClose}
-              className={[
-                'group flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-150 text-sm',
-                active
-                  ? 'bg-amber-500/10 text-amber-400'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800',
-              ].join(' ')}
-            >
-              <div className="flex items-center gap-3">
-                <item.icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-amber-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
-                <span className={active ? 'font-medium' : ''}>{item.name}</span>
-              </div>
-              {active && <ChevronRight className="w-3 h-3 text-amber-500/60" />}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-4">
+        {navGroups.map((group, gi) => (
+          <div key={gi}>
+            {group.label && (
+              <p className="px-3 mb-1.5 font-data text-[10px] text-slate-600 tracking-[0.15em] uppercase">
+                {group.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const active =
+                  location.pathname === item.href ||
+                  (item.href !== '/dashboard' && location.pathname.startsWith(item.href + '/')) ||
+                  (item.href !== '/dashboard' && location.pathname.startsWith(item.href + '?'));
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    onClick={onClose}
+                    className={[
+                      'group flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-150 text-sm',
+                      active
+                        ? 'bg-amber-500/10 text-amber-400'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800',
+                    ].join(' ')}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-amber-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                      <span className={active ? 'font-medium' : ''}>{item.name}</span>
+                    </div>
+                    {active && <ChevronRight className="w-3 h-3 text-amber-500/60" />}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Bottom */}

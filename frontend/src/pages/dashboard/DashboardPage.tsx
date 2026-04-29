@@ -6,6 +6,7 @@ import {
   ArrowRight, Layers, Activity,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { companyService } from '../../services/company.service';
 
 // ── Decorative spark line (simulated chart) ──────────────────────────────────
 const SparkLine: React.FC<{ points?: string; color?: string }> = ({
@@ -86,10 +87,15 @@ const ActionCard: React.FC<ActionCardProps> = ({ title, description, icon: Icon,
 export const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
   const [time, setTime] = useState(new Date());
+  const [stats, setStats] = useState({ companyCount: 0, reportCount: 0, analysisCount: 0 });
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    companyService.getDashboardStats().then(setStats).catch(() => {});
   }, []);
 
   const quickActions: ActionCardProps[] = [
@@ -120,21 +126,21 @@ export const DashboardPage: React.FC = () => {
     {
       key: 'empresas',
       label: 'Empresas Activas',
-      value: '0',
+      value: String(stats.companyCount),
       icon: Building2,
       sparkPoints: '0,22 14,18 26,20 38,12 50,15 62,9 74,11 80,7',
     },
     {
       key: 'informes',
       label: 'Informes Generados',
-      value: '0',
+      value: String(stats.reportCount),
       icon: FileBarChart,
       sparkPoints: '0,20 10,17 22,21 36,14 48,16 60,10 70,13 80,6',
     },
     {
       key: 'analisis',
-      label: 'Análisis Completados',
-      value: '0',
+      label: 'Años con Ratios',
+      value: String(stats.analysisCount),
       icon: TrendingUp,
       sparkPoints: '0,24 12,19 24,22 36,13 46,17 58,8 68,12 80,4',
     },

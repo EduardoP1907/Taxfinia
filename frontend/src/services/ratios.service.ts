@@ -35,6 +35,14 @@ export interface CalculatedRatios {
 
   // Risk Ratios
   altmanZScore: number | null;
+  springateScore: number | null;
+
+  // Additional
+  cashConversionCycle: number | null;
+  capitalizationRatio: number | null;
+  revenuePerEmployee: number | null;
+  ebitdaPerEmployee: number | null;
+  netIncomePerEmployee: number | null;
 
   calculatedAt: string;
   createdAt: string;

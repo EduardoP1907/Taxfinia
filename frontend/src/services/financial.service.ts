@@ -29,6 +29,16 @@ export const financialService = {
     return response.data.data;
   },
 
+  async getQuarterlyFiscalYears(companyId: string): Promise<FiscalYear[]> {
+    const all = await financialService.getFiscalYears(companyId);
+    return all.filter((fy: any) => (fy.quarter ?? 0) > 0);
+  },
+
+  async createQuarterlyFiscalYear(companyId: string, year: number, quarter: number): Promise<FiscalYear> {
+    const response = await api.post(`/financial/companies/${companyId}/fiscal-years`, { year, quarter });
+    return response.data.data;
+  },
+
   // Balance Sheet
   async getBalanceSheet(fiscalYearId: string): Promise<BalanceSheet | null> {
     try {
