@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/auth.service';
 import {
-  LayoutDashboard, FileText, Settings, LogOut, Menu, X,
+  LayoutDashboard, FileText, LogOut, Menu, X,
   Building2, FileBarChart, TrendingUp, Flame, ShieldCheck, ChevronRight, Calendar,
 } from 'lucide-react';
 

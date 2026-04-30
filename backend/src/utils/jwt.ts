@@ -15,11 +15,15 @@ export const generateAccessToken = (payload: JwtPayload): string => {
 };
 
 export const generateRefreshToken = (payload: JwtPayload): string => {
-  return jwt.sign(payload, config.jwtSecret, {
+  return jwt.sign(payload, config.jwtRefreshSecret, {
     expiresIn: '30d' as any,
   });
 };
 
 export const verifyToken = (token: string): JwtPayload => {
   return jwt.verify(token, config.jwtSecret) as JwtPayload;
+};
+
+export const verifyRefreshToken = (token: string): JwtPayload => {
+  return jwt.verify(token, config.jwtRefreshSecret) as JwtPayload;
 };

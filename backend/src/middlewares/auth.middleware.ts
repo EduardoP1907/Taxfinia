@@ -3,13 +3,16 @@ import { verifyToken } from '../utils/jwt';
 
 export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Read token from httpOnly cookie first, fallback to Authorization header
+    const cookieToken = (req as any).cookies?.accessToken;
     const authHeader = req.headers.authorization;
+    const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = cookieToken || headerToken;
+
+    if (!token) {
       return res.status(401).json({ error: 'Token no proporcionado' });
     }
-
-    const token = authHeader.substring(7);
 
     const decoded = verifyToken(token);
     req.user = decoded;
@@ -22,17 +25,19 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
 
 export const optionalAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
   try {
+    const cookieToken = (req as any).cookies?.accessToken;
     const authHeader = req.headers.authorization;
+    const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
+    const token = cookieToken || headerToken;
+
+    if (token) {
       const decoded = verifyToken(token);
       req.user = decoded;
     }
 
     next();
   } catch (error) {
-    // Si el token es inválido, simplemente continúa sin user
     next();
   }
 };

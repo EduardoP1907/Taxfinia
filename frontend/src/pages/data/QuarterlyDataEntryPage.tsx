@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Button } from '../../components/ui/Button';
 import { companyService } from '../../services/company.service';
@@ -230,7 +230,6 @@ const Cell: React.FC<{
 // ─── Page component ───────────────────────────────────────────────────────────
 export const QuarterlyDataEntryPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const setSelectedCompanyInStore = useCompanyStore((s) => s.setSelectedCompany);
 
   const companyId  = searchParams.get('companyId');

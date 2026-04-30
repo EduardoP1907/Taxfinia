@@ -11,9 +11,9 @@ export const authService = {
     const response = await api.post('/auth/verify-otp', data);
     const { user, accessToken, refreshToken } = response.data;
 
-    // Guardar en localStorage
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+    // Store tokens for Authorization header fallback (HTTP cross-origin production)
+    if (accessToken) localStorage.setItem('accessToken', accessToken);
+    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('user', JSON.stringify(user));
 
     return response.data;
@@ -23,9 +23,9 @@ export const authService = {
     const response = await api.post('/auth/login', data);
     const { user, accessToken, refreshToken } = response.data;
 
-    // Guardar en localStorage
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+    // Store tokens for Authorization header fallback (HTTP cross-origin production)
+    if (accessToken) localStorage.setItem('accessToken', accessToken);
+    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('user', JSON.stringify(user));
 
     return response.data;
@@ -53,17 +53,14 @@ export const authService = {
 
   async logout(): Promise<void> {
     const refreshToken = localStorage.getItem('refreshToken');
-    if (refreshToken) {
-      try {
-        await api.post('/auth/logout', { refreshToken });
-      } catch (error) {
-        console.error('Error al cerrar sesión:', error);
-      }
+    try {
+      await api.post('/auth/logout', refreshToken ? { refreshToken } : {});
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    } finally {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
     }
-
-    // Limpiar localStorage
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
   },
 };

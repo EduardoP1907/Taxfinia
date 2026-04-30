@@ -317,7 +317,7 @@ export const QuarterlyReportPage: React.FC = () => {
   const [companies, setCompanies]           = useState<Company[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [company, setCompany]               = useState<Company | null>(null);
-  const [fiscalYear, setFiscalYear]         = useState<any>(null);
+  const [, setFiscalYear]                   = useState<any>(null);
   const [income, setIncome]                 = useState<any>(null);
   const [balance, setBalance]               = useState<any>(null);
   const [loading, setLoading]               = useState(false);

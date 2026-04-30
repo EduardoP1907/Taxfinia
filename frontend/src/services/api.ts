@@ -4,12 +4,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const api = axios.create({
   baseURL: API_URL,
+  withCredentials: true, // Send httpOnly cookies when available (HTTPS same-origin)
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Interceptor para agregar el token a las peticiones
+// Attach JWT from localStorage as Authorization header (fallback for HTTP cross-origin production)
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
@@ -18,17 +19,14 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Interceptor para manejar errores de respuesta
+// On 401, clear local state and redirect to login
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && !error.response?.data?.requiresCode) {
-      // Token expirado o inválido (no es un error de código de descarga)
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');

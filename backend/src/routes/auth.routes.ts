@@ -12,8 +12,10 @@ const authController = new AuthController();
 const registerValidation = [
   body('email').isEmail().withMessage('Email inválido'),
   body('password')
-    .isLength({ min: 6 })
-    .withMessage('La contraseña debe tener al menos 6 caracteres'),
+    .isLength({ min: 10 })
+    .withMessage('La contraseña debe tener al menos 10 caracteres')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('La contraseña debe contener mayúsculas, minúsculas y números'),
   body('firstName').optional().isString(),
   body('lastName').optional().isString(),
 ];
@@ -39,7 +41,11 @@ const forgotPasswordValidation = [
 const resetPasswordValidation = [
   body('email').isEmail().withMessage('Email inválido'),
   body('code').isLength({ min: 6, max: 6 }).withMessage('Código debe tener 6 dígitos'),
-  body('newPassword').isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres'),
+  body('newPassword')
+    .isLength({ min: 10 })
+    .withMessage('La contraseña debe tener al menos 10 caracteres')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('La contraseña debe contener mayúsculas, minúsculas y números'),
 ];
 
 // Rutas

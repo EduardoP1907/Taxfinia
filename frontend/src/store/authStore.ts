@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { User } from '../types/auth';
+import { authService } from '../services/auth.service';
 
 interface AuthState {
   user: User | null;
@@ -7,8 +8,8 @@ interface AuthState {
   isLoading: boolean;
   setUser: (user: User | null) => void;
   setLoading: (loading: boolean) => void;
-  logout: () => void;
-  initializeAuth: () => void;
+  logout: () => Promise<void>;
+  initializeAuth: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -25,11 +26,12 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setLoading: (loading) => set({ isLoading: loading }),
 
-  logout: () => {
+  logout: async () => {
+    await authService.logout();
     set({ user: null, isAuthenticated: false });
   },
 
-  initializeAuth: () => {
+  initializeAuth: async () => {
     if (import.meta.env.VITE_DEV_BYPASS_AUTH === 'true') {
       set({
         user: {
@@ -47,18 +49,29 @@ export const useAuthStore = create<AuthState>((set) => ({
       return;
     }
 
-    const userStr = localStorage.getItem('user');
+    // Try to restore from localStorage first (instant, no network)
     const token = localStorage.getItem('accessToken');
+    const userStr = localStorage.getItem('user');
 
-    if (userStr && token) {
+    if (token && userStr) {
       try {
         const user = JSON.parse(userStr);
         set({ user, isAuthenticated: true, isLoading: false });
-      } catch (error) {
-        console.error('Error al parsear usuario:', error);
-        set({ user: null, isAuthenticated: false, isLoading: false });
+        return;
+      } catch {
+        // corrupted data — fall through to /auth/me
       }
-    } else {
+    }
+
+    // Validate session via cookie or token (handles page refresh without localStorage)
+    try {
+      const user = await authService.getCurrentUser();
+      localStorage.setItem('user', JSON.stringify(user));
+      set({ user, isAuthenticated: true, isLoading: false });
+    } catch {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },

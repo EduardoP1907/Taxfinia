@@ -13,15 +13,11 @@ interface Props {
 const fmt = (v: number, currency = 'EUR') =>
   new Intl.NumberFormat('es-ES', { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(v);
 
-const fmtPct = (v: number | null | undefined) =>
-  v != null ? `${v.toFixed(2)}%` : '-';
-
 const AMBER  = '#f59e0b';
 const BLUE   = '#3b82f6';
 const GREEN  = '#22c55e';
 const RED    = '#ef4444';
 const PURPLE = '#a855f7';
-const SLATE  = '#64748b';
 
 const CustomTooltip: React.FC<any> = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -47,10 +43,8 @@ export const AnalyticsSection: React.FC<Props> = ({ years, currency = 'EUR' }) =
     const revenue      = Number(is.revenue ?? 0);
     const costSales    = Number(is.costOfSales ?? 0) + Number(is.staffCostsSales ?? 0);
     const adminExp     = Number(is.adminExpenses ?? 0) + Number(is.staffCostsAdmin ?? 0);
-    const depreciation = Number(is.depreciation ?? 0);
     const grossMargin  = revenue - costSales;
     const ebitda       = grossMargin - adminExp;
-    const netIncome    = Number(y.ratios?.netMargin != null ? revenue * y.ratios.netMargin / 100 : 0);
 
     return {
       year:        String(y.year),

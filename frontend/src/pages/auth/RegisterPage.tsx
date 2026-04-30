@@ -4,7 +4,6 @@ import { Button } from '../../components/ui/Button';
 import { authService } from '../../services/auth.service';
 import { Mail, Lock, User, Gift } from 'lucide-react';
 import { AuthLayout } from '../../layouts/AuthLayout';
-import { Flame } from 'lucide-react';
 
 const RegisterPanelBody: React.FC = () => (
   <>
