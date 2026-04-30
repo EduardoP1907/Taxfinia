@@ -49,21 +49,27 @@ export const useAuthStore = create<AuthState>((set) => ({
       return;
     }
 
-    // Try to restore from localStorage first (instant, no network)
     const token = localStorage.getItem('accessToken');
     const userStr = localStorage.getItem('user');
 
-    if (token && userStr) {
+    // No token — mark as unauthenticated immediately, no network call needed
+    if (!token) {
+      set({ user: null, isAuthenticated: false, isLoading: false });
+      return;
+    }
+
+    // Token exists — restore from localStorage (instant)
+    if (userStr) {
       try {
         const user = JSON.parse(userStr);
         set({ user, isAuthenticated: true, isLoading: false });
         return;
       } catch {
-        // corrupted data — fall through to /auth/me
+        // corrupted user JSON — fall through to /auth/me
       }
     }
 
-    // Validate session via cookie or token (handles page refresh without localStorage)
+    // Token exists but no user data — validate with server
     try {
       const user = await authService.getCurrentUser();
       localStorage.setItem('user', JSON.stringify(user));

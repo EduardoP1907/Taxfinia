@@ -27,10 +27,14 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && !error.response?.data?.requiresCode) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      const publicRoutes = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password'];
+      const isPublicRoute = publicRoutes.some(r => window.location.pathname.startsWith(r));
+      if (!isPublicRoute) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
