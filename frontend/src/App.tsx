@@ -21,6 +21,7 @@ import { Projection43Page } from './pages/projections/Projection43Page';
 import { AdminPage } from './pages/admin/AdminPage';
 import { QuarterlyDataEntryPage } from './pages/data/QuarterlyDataEntryPage';
 import { QuarterlyReportPage } from './pages/report/QuarterlyReportPage';
+import { CompareCompaniesPage } from './pages/companies/CompareCompaniesPage';
 
 function App() {
   const { initializeAuth, isLoading } = useAuthStore();
@@ -121,6 +122,14 @@ function App() {
           element={
             <PrivateRoute>
               <QuarterlyReportPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/comparar"
+          element={
+            <PrivateRoute>
+              <CompareCompaniesPage />
             </PrivateRoute>
           }
         />

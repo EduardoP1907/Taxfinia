@@ -5,11 +5,12 @@
 
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import prisma from '../config/database';
-import { generateAIAnalysis, type FinancialDataForAI } from './ai-analysis.service';
-import { generateTablesDocx } from '../utils/docx-tables-generator';
+import { generateAIAnalysis, type FinancialDataForAI, type AIAnalysisResult } from './ai-analysis.service';
 import type { PDFReportData } from '../utils/pdf-generator';
 import { generateNarrativeDocx, type DocxReportData } from '../utils/docx-generator';
+import { generateExecutiveSummaryDocx } from '../utils/docx-executive-summary';
 import { convertDocxToPdf } from '../utils/docx-to-pdf';
 import { Decimal } from '@prisma/client/runtime/library';
 import { lockCompany } from './company.service';
@@ -47,7 +48,7 @@ async function buildFinancialData(companyId: string) {
           additionalData: true,
           calculatedRatios: true,
         },
-        orderBy: { year: 'desc' },
+        orderBy: { year: 'asc' },
       },
       projections: {
         where: { wacc: { not: null } }, // solo escenarios con DCF calculado
@@ -63,7 +64,7 @@ async function buildFinancialData(companyId: string) {
   if (validYears.length === 0) throw new Error('No hay datos financieros disponibles para esta empresa');
 
   const years = validYears.map(fy => fy.year);
-  const latestYear = years[0]; // already sorted desc
+  const latestYear = years[years.length - 1]; // last element = most recent (sorted asc)
 
   // Build income data
   const incomeData: FinancialDataForAI['incomeData'] = {};
@@ -236,32 +237,7 @@ export async function generateReport(companyId: string, userId: string, year?: n
 
     const aiAnalysis = await generateAIAnalysis(aiData);
 
-    // ── Step 2: Generate Tables DOCX (with charts) → convert to PDF ──
-    console.log('[REPORT] Generating Tables DOCX...');
-    const tablesDocxFilename = `report_${report.id}_${reportYear}_tablas.docx`;
-    const tablesDocxPath = path.join(REPORTS_DIR, tablesDocxFilename);
-    const pdfFilename = `report_${report.id}_${reportYear}_tablas.pdf`;
-    const pdfPath = path.join(REPORTS_DIR, pdfFilename);
-
-    const pdfData: PDFReportData = {
-      company: {
-        name: financialData.company.name,
-        taxId: financialData.company.taxId,
-        industry: financialData.company.industry,
-        businessActivity: financialData.company.businessActivity,
-        country: financialData.company.country,
-        currency: financialData.company.currency,
-      },
-      years: financialData.years,
-      incomeData: financialData.incomeData,
-      balanceData: financialData.balanceData,
-      ratiosData: financialData.ratiosData,
-    };
-    await generateTablesDocx(pdfData, tablesDocxPath);
-    console.log('[REPORT] Converting Tables DOCX → PDF...');
-    await convertDocxToPdf(tablesDocxPath, pdfPath);
-
-    // ── Step 3: Generate DOCX ──
+    // ── Step 2: Generate DOCX ──
     console.log('[REPORT] Generating DOCX...');
     const docxFilename = `report_${report.id}_${reportYear}.docx`;
     const docxPath = path.join(REPORTS_DIR, docxFilename);
@@ -282,33 +258,23 @@ export async function generateReport(companyId: string, userId: string, year?: n
     };
     await generateNarrativeDocx(docxData, docxPath);
 
-    // ── Step 4: Upload to S3 if configured, otherwise keep local ──
-    let storedPdfPath = pdfFilename;
+    // ── Step 3: Upload to S3 if configured, otherwise keep local ──
     let storedDocxPath = docxFilename;
 
     if (isS3Enabled()) {
       console.log('[REPORT] Uploading files to S3...');
       const s3Prefix = `reports/${report.id}`;
-
-      // Upload tables PDF
-      storedPdfPath = await uploadToS3(pdfPath, `${s3Prefix}/${pdfFilename}`, 'application/pdf');
-
-      // Upload narrative DOCX
       storedDocxPath = await uploadToS3(docxPath, `${s3Prefix}/${docxFilename}`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-
-      // Clean up tables DOCX temp file (not stored)
-      fs.unlink(tablesDocxPath, () => {});
-
       console.log('[REPORT] Files uploaded to S3 successfully');
     }
 
-    // ── Step 5: Update report record ──
+    // ── Step 4: Update report record ──
     await prisma.report.update({
       where: { id: report.id },
       data: {
         status: 'COMPLETED',
         aiAnalysis: aiAnalysis as any,
-        pdfPath: storedPdfPath,
+        pdfPath: null,
         docxPath: storedDocxPath,
         generatedAt: new Date(),
         // TRIAL users get free reports (no download code required)
@@ -383,4 +349,52 @@ export async function getReport(reportId: string) {
 // ─── Get file path for download ───────────────────────────────────────────────
 export function getReportFilePath(filename: string): string {
   return path.join(REPORTS_DIR, filename);
+}
+
+// ─── Generate executive summary PDF on-demand ─────────────────────────────────
+export async function generateExecutiveSummaryPdf(reportId: string): Promise<{
+  pdfPath: string;
+  companyName: string;
+  year: number;
+  cleanup: () => void;
+}> {
+  const report = await prisma.report.findUnique({
+    where: { id: reportId },
+    include: { company: { select: { name: true } } },
+  });
+  if (!report) throw new Error('Informe no encontrado');
+  if (report.status !== 'COMPLETED') throw new Error('El informe aún no está completado');
+  if (!report.aiAnalysis) throw new Error('Análisis IA no disponible para este informe');
+
+  const aiAnalysis = report.aiAnalysis as unknown as AIAnalysisResult;
+  const financialData = await buildFinancialData(report.companyId);
+
+  const pdfData: PDFReportData = {
+    company: {
+      name: financialData.company.name,
+      taxId: financialData.company.taxId,
+      industry: financialData.company.industry,
+      businessActivity: financialData.company.businessActivity,
+      country: financialData.company.country,
+      currency: financialData.company.currency,
+    },
+    years: financialData.years,
+    incomeData: financialData.incomeData,
+    balanceData: financialData.balanceData,
+    ratiosData: financialData.ratiosData,
+  };
+
+  const tmpDocx = path.join(os.tmpdir(), `exec_summary_${reportId}.docx`);
+  const tmpPdf  = path.join(os.tmpdir(), `exec_summary_${reportId}.pdf`);
+
+  await generateExecutiveSummaryDocx(pdfData, aiAnalysis, tmpDocx);
+  await convertDocxToPdf(tmpDocx, tmpPdf);
+  try { fs.unlinkSync(tmpDocx); } catch {}
+
+  return {
+    pdfPath: tmpPdf,
+    companyName: financialData.company.name,
+    year: report.year,
+    cleanup: () => { try { fs.unlinkSync(tmpPdf); } catch {} },
+  };
 }

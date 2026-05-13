@@ -23,8 +23,8 @@ export const IncomeStatementSection: React.FC<Props> = ({ years }) => {
     return (value * 100).toFixed(2) + '%';
   };
 
-  // Ordenar años de más reciente a más antiguo
-  const sortedYears = [...years].sort((a, b) => b.year - a.year);
+  // Ordenar años de más antiguo a más reciente (coherente con gráficos)
+  const sortedYears = [...years].sort((a, b) => a.year - b.year);
 
   // Calcular valores intermedios para cada año
   const getIntermediateValues = (yearData: CompanyAnalysisYear) => {

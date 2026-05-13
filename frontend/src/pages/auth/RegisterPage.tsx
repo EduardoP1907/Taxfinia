@@ -61,7 +61,9 @@ export const RegisterPage: React.FC = () => {
     if (!formData.email) newErrors.email = 'El email es requerido';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email inválido';
     if (!formData.password) newErrors.password = 'La contraseña es requerida';
-    else if (formData.password.length < 6) newErrors.password = 'Mínimo 6 caracteres';
+    else if (formData.password.length < 10) newErrors.password = 'Mínimo 10 caracteres';
+    else if (!/(?=.*[A-Z])/.test(formData.password)) newErrors.password = 'Debe contener al menos una letra mayúscula';
+    else if (!/(?=.*\d)/.test(formData.password)) newErrors.password = 'Debe contener al menos un número';
     if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Las contraseñas no coinciden';
     if (!acceptedTerms) newErrors.terms = 'Debes aceptar los términos para continuar';
     setErrors(newErrors);
@@ -149,7 +151,7 @@ export const RegisterPage: React.FC = () => {
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Contraseña</label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Mínimo 6 caracteres" autoComplete="new-password" required className={errors.password ? inputErrCls : inputCls} />
+              <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Mín. 10 caract., alfanumérica y 1 mayúscula" autoComplete="new-password" required className={errors.password ? inputErrCls : inputCls} />
             </div>
             {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password}</p>}
           </div>

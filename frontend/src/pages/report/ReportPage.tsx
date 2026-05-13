@@ -12,7 +12,6 @@ import {
   TrendingUp,
   Activity,
   Sparkles,
-  FileDown,
   RefreshCw,
   CheckCircle2,
   XCircle,
@@ -23,6 +22,7 @@ import {
   ShieldCheck,
   X,
   Gift,
+  Star,
 } from 'lucide-react';
 import { companyService } from '../../services/company.service';
 import { ratiosService, type CompanyAnalysis } from '../../services/ratios.service';
@@ -224,6 +224,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
   const [reports, setReports] = useState<Report[]>([]);
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
+  const [downloadingExec, setDownloadingExec] = useState<Record<string, boolean>>({});
   const [generatingCode, setGeneratingCode] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -296,12 +297,18 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
     }
   };
 
+  const reportCodeKey = (reportId: string) => `report_code_${reportId}`;
+
   const handleDownloadClick = (reportId: string, format: 'pdf' | 'docx') => {
     const report = reports.find(r => r.id === reportId);
-    // Both formats require code if one has been set
     if (report?.hasDownloadCode) {
-      setCodeError(undefined);
-      setCodeModal({ reportId, format });
+      const savedCode = localStorage.getItem(reportCodeKey(reportId));
+      if (savedCode) {
+        doDownload(reportId, format, savedCode);
+      } else {
+        setCodeError(undefined);
+        setCodeModal({ reportId, format });
+      }
     } else {
       doDownload(reportId, format);
     }
@@ -312,11 +319,20 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
     setDownloading(prev => ({ ...prev, [key]: true }));
     try {
       await reportService.downloadReport(reportId, format, companyName, selectedYear, code);
+      if (code) localStorage.setItem(reportCodeKey(reportId), code);
       setCodeModal(null);
     } catch (err: any) {
-      if (err?.response?.data?.requiresCode) {
+      // responseType:'blob' means error bodies arrive as Blobs, not JSON — parse manually
+      let requiresCode = false;
+      if (err?.response?.data instanceof Blob) {
+        try { const json = JSON.parse(await err.response.data.text()); requiresCode = !!json.requiresCode; } catch {}
+      } else {
+        requiresCode = !!err?.response?.data?.requiresCode;
+      }
+      if (requiresCode) {
+        localStorage.removeItem(reportCodeKey(reportId));
+        setCodeError(undefined);
         setCodeModal({ reportId, format });
-        setCodeError('Código incorrecto. Inténtalo de nuevo.');
       } else {
         alert('Error al descargar el archivo');
       }
@@ -330,8 +346,13 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
     setCodeLoading(true);
     setCodeError(undefined);
     try {
-      await reportService.downloadReport(codeModal.reportId, codeModal.format, companyName, selectedYear, code);
-      setCodeModal(null);
+      if ((codeModal.format as string) === 'executive') {
+        await doDownloadExecutive(codeModal.reportId, code);
+      } else {
+        await reportService.downloadReport(codeModal.reportId, codeModal.format, companyName, selectedYear, code);
+        localStorage.setItem(reportCodeKey(codeModal.reportId), code);
+        setCodeModal(null);
+      }
     } catch (err: any) {
       if (err?.response?.data?.requiresCode || err?.response?.status === 403) {
         setCodeError('Código incorrecto. Verifica e inténtalo de nuevo.');
@@ -347,12 +368,49 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
     setGeneratingCode(prev => ({ ...prev, [reportId]: true }));
     try {
       await reportService.generateDownloadCode(reportId);
+      // Clear any cached code for this report so the user must enter the new one
+      localStorage.removeItem(reportCodeKey(reportId));
       await loadReports(); // refresh to show hasDownloadCode = true
       alert('Código generado. El administrador recibirá un correo con el código de descarga.');
     } catch {
       alert('Error al generar el código. Inténtalo de nuevo.');
     } finally {
       setGeneratingCode(prev => ({ ...prev, [reportId]: false }));
+    }
+  };
+
+  const handleDownloadExecutive = (reportId: string) => {
+    const savedCode = localStorage.getItem(reportCodeKey(reportId));
+    if (savedCode) {
+      doDownloadExecutive(reportId, savedCode);
+    } else {
+      setCodeError(undefined);
+      setCodeModal({ reportId, format: 'executive' as any });
+    }
+  };
+
+  const doDownloadExecutive = async (reportId: string, code?: string) => {
+    setDownloadingExec(prev => ({ ...prev, [reportId]: true }));
+    try {
+      await reportService.downloadExecutiveSummary(reportId, companyName, selectedYear, code);
+      if (code) localStorage.setItem(reportCodeKey(reportId), code);
+      setCodeModal(null);
+    } catch (err: any) {
+      let requiresCode = false;
+      if (err?.response?.data instanceof Blob) {
+        try { const json = JSON.parse(await err.response.data.text()); requiresCode = !!json.requiresCode; } catch {}
+      } else {
+        requiresCode = !!err?.response?.data?.requiresCode;
+      }
+      if (requiresCode) {
+        localStorage.removeItem(reportCodeKey(reportId));
+        setCodeError(undefined);
+        setCodeModal({ reportId, format: 'executive' as any });
+      } else {
+        alert('Error al generar el resumen ejecutivo');
+      }
+    } finally {
+      setDownloadingExec(prev => ({ ...prev, [reportId]: false }));
     }
   };
 
@@ -388,7 +446,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">Informe Profesional con IA</h3>
-              <p className="text-xs text-amber-600">Reporte PDF con tablas + Análisis redactado por IA</p>
+              <p className="text-xs text-amber-600">Análisis narrativo redactado por IA + Resumen ejecutivo para directorio</p>
             </div>
             {isTrial && (
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
@@ -425,17 +483,17 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
         {/* What you get */}
         <div className="grid grid-cols-2 gap-3 mb-5">
           <div className="bg-white rounded-lg p-3 border border-amber-100 flex items-start gap-2">
-            <FileDown className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-gray-800">Reporte PDF con Tablas</p>
-              <p className="text-xs text-gray-500">Tablas de ratios, balance y resultados para {selectedYear}.</p>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg p-3 border border-amber-100 flex items-start gap-2">
             <Eye className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-gray-800">Análisis Narrativo (Vista previa 5 min)</p>
-              <p className="text-xs text-gray-500">Análisis IA con interpretaciones financieras y valoración DCF. Descarga protegida con código.</p>
+              <p className="text-sm font-semibold text-gray-800">Análisis Narrativo</p>
+              <p className="text-xs text-gray-500">Interpretaciones IA y DCF. Vista previa 15 min, descarga con código.</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-3 border border-violet-100 flex items-start gap-2">
+            <Star className="w-5 h-5 text-violet-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-gray-800">INFORME EJECUTIVO RESUMEN</p>
+              <p className="text-xs text-gray-500">2-3 páginas para directorio: KPIs, gráficos y alertas estratégicas.</p>
             </div>
           </div>
         </div>
@@ -491,20 +549,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
 
                     {report.status === 'COMPLETED' && (
                       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                        {/* Tables PDF — always free */}
-                        <button
-                          onClick={() => handleDownloadClick(report.id, 'pdf')}
-                          disabled={downloading[`${report.id}-pdf`]}
-                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
-                          title="Descargar PDF con tablas"
-                        >
-                          {downloading[`${report.id}-pdf`]
-                            ? <RefreshCw className="w-3 h-3 animate-spin" />
-                            : <FileDown className="w-3 h-3" />}
-                          PDF
-                        </button>
-
-                        {/* Analysis PDF — preview button */}
+                        {/* Analysis — preview button */}
                         {report.docxPath && (
                           <button
                             onClick={() => handlePreview(report.id)}
@@ -535,7 +580,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
                               onClick={() => handleGenerateCode(report.id)}
                               disabled={generatingCode[report.id]}
                               className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition-colors"
-                              title="Generar código de descarga y notificar al administrador"
+                              title="Solicitar código al administrador — desbloquea el análisis completo y el resumen ejecutivo"
                             >
                               {generatingCode[report.id]
                                 ? <RefreshCw className="w-3 h-3 animate-spin" />
@@ -543,6 +588,21 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
                               Solicitar
                             </button>
                           )
+                        )}
+
+                        {/* Executive summary — only available once a download code has been generated */}
+                        {report.docxPath && report.hasDownloadCode && (
+                          <button
+                            onClick={() => handleDownloadExecutive(report.id)}
+                            disabled={downloadingExec[report.id]}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 disabled:opacity-50 transition-colors"
+                            title="Descargar resumen ejecutivo para directorio (2-3 páginas)"
+                          >
+                            {downloadingExec[report.id]
+                              ? <RefreshCw className="w-3 h-3 animate-spin" />
+                              : <Star className="w-3 h-3" />}
+                            Ejecutivo
+                          </button>
                         )}
                       </div>
                     )}
@@ -885,9 +945,9 @@ export const ReportPage: React.FC = () => {
             <div>
               <h4 className="text-sm font-semibold text-slate-900 mb-1">Nota Importante</h4>
               <p className="text-sm text-slate-800">
-                El informe generado con IA incluye un <strong>Análisis Redactado</strong> (interpretaciones narrativas y valoración DCF)
-                disponible en vista previa de 15 minutos, y un <strong>Reporte PDF con Tablas</strong> descargable.
-                La descarga del análisis completo requiere un <strong>código de acceso</strong> obtenido tras confirmar el pago con el administrador.
+                El informe generado con IA incluye un <strong>Análisis Narrativo</strong> (interpretaciones redactadas por IA, valoración DCF y análisis de tendencias)
+                disponible en vista previa de 15 minutos, y un <strong>Informe Ejecutivo Resumen</strong> condensado para directorio.
+                La descarga completa requiere un <strong>código de acceso</strong> obtenido tras confirmar el pago con el administrador.
               </p>
             </div>
           </div>

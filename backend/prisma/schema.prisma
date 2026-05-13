@@ -31,13 +31,14 @@ model User {
 }
 
 model InviteToken {
-  id          String    @id @default(uuid())
-  token       String    @unique
-  createdById String    @map("created_by_id")
-  usedById    String?   @map("used_by_id")
-  usedAt      DateTime? @map("used_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  createdBy   User      @relation("creator", fields: [createdById], references: [id], onDelete: Cascade)
+  id            String    @id @default(uuid())
+  token         String    @unique
+  recipientNote String?   @map("recipient_note")
+  createdById   String    @map("created_by_id")
+  usedById      String?   @map("used_by_id")
+  usedAt        DateTime? @map("used_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  createdBy     User      @relation("creator", fields: [createdById], references: [id], onDelete: Cascade)
 
   @@map("invite_tokens")
 }

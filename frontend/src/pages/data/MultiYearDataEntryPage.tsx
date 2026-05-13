@@ -3,7 +3,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Save, Building2, Plus, Trash2, Lock } from 'lucide-react';
+import { Save, Building2, Plus, Trash2, Lock, Upload, Download, X } from 'lucide-react';
+import api from '../../services/api';
 import { companyService } from '../../services/company.service';
 import { financialService } from '../../services/financial.service';
 import { useCompanyStore } from '../../store/companyStore';
@@ -103,6 +104,13 @@ export const MultiYearDataEntryPage: React.FC = () => {
   const [showRemoveYearModal, setShowRemoveYearModal] = useState(false);
   const [yearToRemove, setYearToRemove] = useState<number | null>(null);
   const [newYearInput, setNewYearInput] = useState('');
+
+  // Estados para importación CSV/Excel
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ years: number[]; message: string } | null>(null);
+  const [importError, setImportError] = useState('');
 
   useEffect(() => {
     loadAvailableCompanies();
@@ -365,6 +373,41 @@ export const MultiYearDataEntryPage: React.FC = () => {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await api.get('/financial/import-template', { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'plantilla_importacion_prometheia.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Error al descargar la plantilla');
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile || !companyId) return;
+    setImporting(true);
+    setImportError('');
+    setImportResult(null);
+    try {
+      const form = new FormData();
+      form.append('file', importFile);
+      const res = await api.post(`/financial/import/${companyId}`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setImportResult({ years: res.data.years, message: res.data.message });
+      // Reload company data to reflect imported values
+      await loadCompanyData();
+    } catch (e: any) {
+      setImportError(e.response?.data?.error || 'Error al importar el archivo');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (!companyId) {
     return (
       <CompanySelector
@@ -435,6 +478,10 @@ export const MultiYearDataEntryPage: React.FC = () => {
               <p className="text-gray-600">{company?.name}</p>
             </div>
             <div className="flex gap-3">
+              <Button onClick={() => { setImportFile(null); setImportResult(null); setImportError(''); setShowImportModal(true); }} variant="outline" disabled={saving}>
+                <Upload className="w-4 h-4 mr-2" />
+                Importar
+              </Button>
               <Button onClick={handleAddYear} variant="outline" disabled={saving}>
                 <Plus className="w-4 h-4 mr-2" />
                 Agregar Año
@@ -658,6 +705,108 @@ export const MultiYearDataEntryPage: React.FC = () => {
                   Eliminar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para importar CSV/Excel */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 text-amber-500" />
+                <h3 className="text-base font-bold text-slate-900">Importar datos financieros</h3>
+              </div>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Paso 1: descargar plantilla */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                <p className="text-sm font-semibold text-slate-700 mb-1">Paso 1 — Descarga la plantilla</p>
+                <p className="text-xs text-slate-500 mb-3">
+                  Rellena la plantilla CSV con los datos de la empresa y luego súbela aquí. Acepta también archivos Excel (.xlsx).
+                </p>
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="flex items-center gap-2 px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-white hover:border-amber-400 hover:text-amber-700 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Descargar plantilla CSV
+                </button>
+              </div>
+
+              {/* Paso 2: subir archivo */}
+              <div>
+                <p className="text-sm font-semibold text-slate-700 mb-2">Paso 2 — Sube el archivo completado</p>
+                <label className="block w-full border-2 border-dashed border-slate-200 rounded-lg p-6 text-center cursor-pointer hover:border-amber-400 transition-colors group">
+                  <input
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    className="hidden"
+                    onChange={e => {
+                      setImportFile(e.target.files?.[0] || null);
+                      setImportResult(null);
+                      setImportError('');
+                    }}
+                  />
+                  {importFile ? (
+                    <div className="flex items-center justify-center gap-2 text-sm text-slate-700">
+                      <Upload className="w-4 h-4 text-amber-500" />
+                      <span className="font-medium truncate max-w-[220px]">{importFile.name}</span>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-slate-400 group-hover:text-amber-600 transition-colors">
+                      <Upload className="w-5 h-5 mx-auto mb-1" />
+                      Haz clic para seleccionar un archivo (.csv, .xlsx)
+                    </div>
+                  )}
+                </label>
+              </div>
+
+              {/* Resultados */}
+              {importResult && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+                  <p className="text-sm font-semibold text-emerald-700">{importResult.message}</p>
+                  <p className="text-xs text-emerald-600 mt-0.5">
+                    Ejercicios importados: {importResult.years.join(', ')}
+                  </p>
+                </div>
+              )}
+              {importError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600">
+                  {importError}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 pb-5 flex justify-end gap-3">
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                {importResult ? 'Cerrar' : 'Cancelar'}
+              </button>
+              {!importResult && (
+                <button
+                  onClick={handleImport}
+                  disabled={!importFile || importing}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {importing ? (
+                    <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Importando…</>
+                  ) : (
+                    <><Upload className="w-4 h-4" />Importar</>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

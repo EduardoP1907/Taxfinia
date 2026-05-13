@@ -29,6 +29,9 @@ router.post('/:id/generate-code', reportController.generateCode.bind(reportContr
 // Validate download code (used to unlock chat without downloading)
 router.post('/:id/validate-code', reportController.validateCode.bind(reportController));
 
+// Download executive summary PDF (generated on-demand, same code check as docx)
+router.get('/:id/download/executive', reportController.downloadExecutive.bind(reportController));
+
 // Download PDF or DOCX (validates download code if set)
 router.get('/:id/download/:format', reportController.download.bind(reportController));
 

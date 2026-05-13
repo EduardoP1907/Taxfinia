@@ -20,4 +20,7 @@ router.post('/calculate-company/:companyId', controller.calculateCompanyRatios);
 // Get complete financial analysis for a company
 router.get('/company-analysis/:companyId', controller.getCompanyAnalysis);
 
+// Compare up to 3 companies side-by-side
+router.get('/compare', controller.compareCompanies);
+
 export default router;

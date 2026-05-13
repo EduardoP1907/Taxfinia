@@ -1,7 +1,10 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { financialController } from '../controllers/financial.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { companyLockMiddleware } from '../middlewares/company-lock.middleware';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -29,7 +32,10 @@ router.get('/fiscal-years/:fiscalYearId/additional-data', financialController.ge
 router.post('/fiscal-years/:fiscalYearId/additional-data', companyLockMiddleware, financialController.upsertAdditionalData);
 
 // ============= SUMMARY =============
-// GET /api/financial/fiscal-years/:fiscalYearId/summary
 router.get('/fiscal-years/:fiscalYearId/summary', financialController.getFiscalYearSummary);
+
+// ============= IMPORT / TEMPLATE =============
+router.get('/import-template', financialController.downloadTemplate);
+router.post('/import/:companyId', companyLockMiddleware, upload.single('file'), financialController.importData);
 
 export default router;

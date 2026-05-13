@@ -94,4 +94,32 @@ export const reportService = {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   },
+
+  /**
+   * Download executive summary PDF (generated on-demand, requires code if set)
+   */
+  async downloadExecutiveSummary(
+    reportId: string,
+    companyName: string,
+    year: number,
+    downloadCode?: string
+  ): Promise<void> {
+    const params: Record<string, string> = {};
+    if (downloadCode) params.code = downloadCode;
+
+    const response = await api.get(`/reports/${reportId}/download/executive`, {
+      responseType: 'blob',
+      params,
+    });
+
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TAXFIN_${companyName.replace(/\s+/g, '_')}_${year}_resumen_ejecutivo.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
 };

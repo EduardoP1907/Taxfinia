@@ -113,11 +113,13 @@ const updateCompanyValidation = [
 
 // Rutas
 router.get('/stats', companyController.getDashboardStats.bind(companyController));
+router.get('/admin/all', companyController.getAllCompaniesAdmin.bind(companyController));
 router.post('/', createCompanyValidation, companyController.createCompany);
 router.get('/', companyController.getCompanies);
 router.get('/:id', companyController.getCompanyById);
 router.put('/:id', updateCompanyValidation, companyController.updateCompany);
 router.delete('/:id', companyController.deleteCompany);
 router.get('/:id/summary', companyController.getCompanySummary);
+router.post('/:id/unlock', companyController.unlockCompany.bind(companyController));
 
 export default router;

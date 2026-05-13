@@ -314,43 +314,46 @@ ${data.dcfData ? `
 INSTRUCCIONES PARA EL INFORME — PROMETHEIA SISTEMA ANALÍTICO DINÁMICO
 ═══════════════════════════════════════════════════════════════════
 
-Genera un informe económico-financiero DINÁMICO Y COMPARATIVO. Cada sección debe:
-1. Analizar el año base (${latest}) Y comparar con años anteriores disponibles (${sortedYears.filter(y => y !== latest).join(', ') || 'ninguno adicional'})
-2. Identificar tendencias, quiebres estructurales y desviaciones
-3. Explicar CAUSAS e IMPACTOS de cada variación, no solo describir cifras
-4. Conectar hallazgos con consecuencias estratégicas para el directorio
-5. Usar EXCLUSIVAMENTE la moneda ${cur} con el formato indicado arriba
+AUDIENCIA: Directorio de empresa. Perfil: toma de decisiones estratégicas, no análisis técnico detallado.
 
-El informe debe ser en español, texto plano (sin markdown, asteriscos ni #), profesional y con párrafos separados por salto de línea. Mínimo 3 párrafos por sección analítica.
+REGLAS DE FORMATO OBLIGATORIAS:
+1. Cada sección: máximo 2 párrafos introductorios breves (2-3 oraciones cada uno)
+2. Luego 3-5 bullets con los hallazgos clave (formato: "- Hallazgo: implicación")
+3. Cerrar SIEMPRE con: "Conclusion: [una oración con el veredicto]" y "Accion recomendada: [una accion concreta]"
+4. Texto plano, sin markdown, sin asteriscos, sin hashtags
+5. Párrafos separados por salto de línea
+6. Priorizar el IMPACTO sobre la descripción de cifras
+7. Comparar con años anteriores (${sortedYears.filter(y => y !== latest).join(', ') || 'ninguno'}) SOLO cuando añada valor
+8. Moneda EXCLUSIVAMENTE: ${cur} con el formato indicado
 
 Responde ÚNICAMENTE con este JSON válido (13 claves exactas):
 
 {
-  "executiveSummary": "Resumen ejecutivo dinámico: situación actual + trayectoria histórica + posición estratégica. Mencionar los hallazgos más relevantes de tendencia. 3-4 párrafos.",
+  "executiveSummary": "Párrafo 1: situación financiera actual en 2-3 oraciones. Párrafo 2: trayectoria y tendencia principal en 2-3 oraciones.\n- Fortaleza clave: [dato]\n- Principal riesgo: [dato]\n- Tendencia dominante: [dato]\nConclusion: [veredicto ejecutivo en una oración]\nAccion recomendada: [acción concreta para el directorio]",
 
-  "incomeAnalysis": "Análisis comparativo del estado de resultados para todos los años disponibles. Evolución de ventas (CAGR si aplica), márgenes en cada período, EBITDA, resultado neto. Identificar en qué año hubo quiebres o cambios de tendencia y sus causas.",
+  "incomeAnalysis": "Párrafo breve sobre evolución de ventas y márgenes. Párrafo breve sobre EBITDA y resultado neto.\n- Ventas: [evolución y CAGR si aplica]\n- Margen bruto: [tendencia]\n- EBITDA: [valor y margen]\n- Resultado neto: [valor y margen]\nConclusion: [veredicto]\nAccion recomendada: [acción concreta]",
 
-  "balanceAnalysis": "Análisis comparativo de balance. Cómo evolucionó la estructura del activo y pasivo. Cambios en fondo de maniobra a lo largo del tiempo. Identificar si la estructura se deterioró o mejoró y por qué.",
+  "balanceAnalysis": "Párrafo breve sobre estructura del activo. Párrafo breve sobre estructura financiera.\n- Activo total: [evolución]\n- Fondo de maniobra: [estado]\n- Patrimonio neto: [tendencia]\n- Endeudamiento: [nivel]\nConclusion: [veredicto]\nAccion recomendada: [acción concreta]",
 
-  "financingAnalysis": "Análisis de estructura financiera y capitalización comparativa. Evolución de la autonomía financiera, nivel de endeudamiento por año, capacidad de autofinanciación histórica.",
+  "financingAnalysis": "Párrafo breve sobre autonomía financiera y capitalización.\n- Ratio de autonomía: [valor e interpretación]\n- Calidad de la deuda: [CP vs LP]\n- Capacidad de autofinanciación: [estado]\nConclusion: [veredicto]\nAccion recomendada: [acción concreta]",
 
-  "investmentAnalysis": "Análisis de política de inversión a lo largo del tiempo. Evolución del activo no corriente, política de capex, tendencia de depreciaciones sobre inmovilizado.",
+  "investmentAnalysis": "Párrafo breve sobre política de inversión y activos.\n- Activo no corriente: [evolución]\n- Política de CAPEX: [tendencia]\n- Depreciaciones: [nivel relativo]\nConclusion: [veredicto]\nAccion recomendada: [acción concreta]",
 
-  "liquidityAnalysis": "Análisis de liquidez comparativo por año. Cómo evolucionaron los ratios de liquidez, si hay tendencia de mejora o deterioro, y qué implica para la operación.",
+  "liquidityAnalysis": "Párrafo breve sobre posición de liquidez actual y tendencia.\n- Liquidez general: [valor vs umbral 1.0]\n- Acid test: [valor]\n- Disponibilidad: [valor]\nConclusion: [veredicto]\nAccion recomendada: [acción concreta]",
 
-  "rotationAnalysis": "Análisis de rotación y eficiencia comparativo. Evolución de días de cobro, días de pago, ciclo de caja y rotación de activo en los años disponibles.",
+  "rotationAnalysis": "Párrafo breve sobre eficiencia operativa.\n- Días de cobro (DSO): [valor y tendencia]\n- Días de pago (DPO): [valor y tendencia]\n- Ciclo de caja: [valor e implicación]\nConclusion: [veredicto]\nAccion recomendada: [acción concreta]",
 
-  "solvencyAnalysis": "Análisis de solvencia y endeudamiento comparativo. Evolución del apalancamiento, Deuda/EBITDA por año, capacidad de devolución histórica. Contextualizar con el Altman Z-Score.",
+  "solvencyAnalysis": "Párrafo breve sobre capacidad de pago y apalancamiento.\n- Deuda/EBITDA: [valor vs umbral 4x]\n- Cobertura de intereses: [valor]\n- Altman Z-Score: [valor e interpretación de zona]\nConclusion: [veredicto]\nAccion recomendada: [acción concreta]",
 
-  "valuationAnalysis": "Análisis de valoración y prospección. Si hay WACC disponible, usar el valor calculado (${waccStr}). Si el valor equity es ${equityStr}, referenciarlo explícitamente. Metodología DCF, supuestos y perspectivas. Si no hay DCF, analizar el valor intrínseco por múltiplos o book value según los datos disponibles.",
+  "valuationAnalysis": "Párrafo breve sobre valoración. Si hay WACC (${waccStr}) y equity value (${equityStr}), referenciarlos explícitamente.\n- Metodología: [DCF u otra]\n- WACC utilizado: [valor o N/D]\n- Valor estimado: [valor o N/D]\nConclusion: [veredicto]\nAccion recomendada: [acción concreta]",
 
-  "trendAnalysis": "MOTOR DE TENDENCIAS: Análisis profundo de las tendencias identificadas en los ${sortedYears.length} año(s) disponibles. Calcular y comentar CAGR de ventas, dirección de márgenes (expansión/contracción), tendencia de endeudamiento, tendencia de liquidez. Identificar si la empresa está en fase de crecimiento, estabilización, deterioro o recuperación. Destacar quiebres estructurales: años donde cambió significativamente la dirección de un indicador clave.",
+  "trendAnalysis": "Párrafo breve sobre la fase de ciclo en que se encuentra la empresa.\n- CAGR ventas: [valor si aplica]\n- Dirección de márgenes: [expansión/contracción/estable]\n- Tendencia de liquidez: [mejora/deterioro/estable]\n- Tendencia de endeudamiento: [mejora/deterioro/estable]\n- Fase empresarial: [crecimiento/estabilización/deterioro/recuperación]\nConclusion: [veredicto de tendencia]\nAccion recomendada: [acción concreta]",
 
-  "consistencyAlerts": "MOTOR DE CONSISTENCIA: Verificar la coherencia de los datos financieros. Detectar: (1) inconsistencias entre balance y resultados (ej: deuda sube pero intereses bajan), (2) variaciones atípicas que requieren explicación (ej: margen bruto cambia más de 10pp sin justificación aparente), (3) métricas que se contradicen entre sí. Si los datos son consistentes, confirmarlo con análisis técnico. Si hay anomalías, describirlas con precisión.",
+  "consistencyAlerts": "Párrafo breve sobre coherencia de los estados financieros.\n- [Consistencia o anomalía 1]: [descripción]\n- [Consistencia o anomalía 2]: [descripción]\nConclusion: [veredicto de confiabilidad de los datos]",
 
-  "strategicAlerts": "MOTOR DE ALERTAS PROMETHEIA: Identificar y priorizar MÍNIMO 4 alertas estratégicas basadas en el análisis completo. Formato obligatorio: cada alerta en párrafo separado iniciando con [NIVEL: CRITICA/ALTA/MEDIA/BAJA] seguido del área afectada. Evaluar OBLIGATORIAMENTE: liquidez general vs 1.0, Deuda/EBITDA vs 4x, tendencia de márgenes, fondo de maniobra, Altman Z-Score, evolución del ROE, calidad del endeudamiento. Para cada alerta: describir el indicador específico, su valor actual, el umbral de referencia, y el riesgo que representa para la empresa.",
+  "strategicAlerts": "MINIMO 4 alertas. Cada una en párrafo separado con formato exacto:\n[NIVEL: CRITICA/ALTA/MEDIA/BAJA] AREA: descripción del indicador, valor actual vs umbral, riesgo concreto para la empresa.",
 
-  "prioritizedRecommendations": "MOTOR DE RECOMENDACIONES PROMETHEIA: Generar MÍNIMO 5 recomendaciones accionables priorizadas para el directorio. Formato obligatorio: cada recomendación en párrafo separado iniciando con [PRIORIDAD: ALTA/MEDIA/BAJA] seguido del área en mayúsculas (ej: [PRIORIDAD: ALTA] LIQUIDEZ, [PRIORIDAD: MEDIA] FINANCIAMIENTO). Cada recomendación DEBE incluir: (1) qué acción concreta realizar, (2) por qué es necesaria basándose en los datos específicos del análisis, (3) el impacto financiero esperado, y (4) el horizonte temporal sugerido (corto/mediano/largo plazo)."
+  "prioritizedRecommendations": "MINIMO 5 recomendaciones. Cada una en párrafo separado con formato exacto:\n[PRIORIDAD: ALTA/MEDIA/BAJA] AREA EN MAYUSCULAS: accion concreta. Por que: [dato especifico que la justifica]. Impacto esperado: [resultado financiero]. Plazo: [corto/mediano/largo]."
 }`;
 }
 
@@ -363,19 +366,19 @@ const analysisTools: Anthropic.Tool[] = [
     input_schema: {
       type: 'object' as const,
       properties: {
-        executiveSummary:             { type: 'string', description: 'Resumen ejecutivo dinámico: situación actual + trayectoria histórica + posición estratégica. 3-4 párrafos.' },
-        incomeAnalysis:               { type: 'string', description: 'Análisis comparativo del estado de resultados para todos los años disponibles. Mínimo 3 párrafos.' },
-        balanceAnalysis:              { type: 'string', description: 'Análisis comparativo de balance. Mínimo 3 párrafos.' },
-        financingAnalysis:            { type: 'string', description: 'Análisis de estructura financiera y capitalización comparativa. Mínimo 3 párrafos.' },
-        investmentAnalysis:           { type: 'string', description: 'Análisis de política de inversión a lo largo del tiempo. Mínimo 3 párrafos.' },
-        liquidityAnalysis:            { type: 'string', description: 'Análisis de liquidez comparativo por año. Mínimo 3 párrafos.' },
-        rotationAnalysis:             { type: 'string', description: 'Análisis de rotación y eficiencia comparativo. Mínimo 3 párrafos.' },
-        solvencyAnalysis:             { type: 'string', description: 'Análisis de solvencia y endeudamiento comparativo. Mínimo 3 párrafos.' },
-        valuationAnalysis:            { type: 'string', description: 'Análisis de valoración y prospección. Si hay WACC, usarlo. Mínimo 3 párrafos.' },
-        trendAnalysis:                { type: 'string', description: 'Motor de tendencias: CAGR, dirección de márgenes, quiebres estructurales, fase de la empresa. Mínimo 3 párrafos.' },
-        consistencyAlerts:            { type: 'string', description: 'Motor de consistencia: coherencia interna de los estados financieros, anomalías o variaciones atípicas. Mínimo 2 párrafos.' },
-        strategicAlerts:              { type: 'string', description: 'Motor de alertas PROMETHEIA: cada alerta en párrafo separado con [NIVEL: CRITICA/ALTA/MEDIA/BAJA] + área + descripción del indicador, valor actual, umbral y riesgo. MÍNIMO 4 alertas OBLIGATORIAS.' },
-        prioritizedRecommendations:   { type: 'string', description: 'Motor de recomendaciones PROMETHEIA: cada recomendación en párrafo separado con [PRIORIDAD: ALTA/MEDIA/BAJA] + área + qué hacer + por qué (datos específicos) + impacto esperado + horizonte temporal. MÍNIMO 5 recomendaciones OBLIGATORIAS.' },
+        executiveSummary:             { type: 'string', description: '2 párrafos breves + 3 bullets + Conclusion + Accion recomendada. Orientado a directorio.' },
+        incomeAnalysis:               { type: 'string', description: '2 párrafos breves + bullets de hallazgos clave + Conclusion + Accion recomendada.' },
+        balanceAnalysis:              { type: 'string', description: '2 párrafos breves + bullets + Conclusion + Accion recomendada.' },
+        financingAnalysis:            { type: 'string', description: '1-2 párrafos breves + bullets + Conclusion + Accion recomendada.' },
+        investmentAnalysis:           { type: 'string', description: '1-2 párrafos breves + bullets + Conclusion + Accion recomendada.' },
+        liquidityAnalysis:            { type: 'string', description: '1-2 párrafos breves + bullets + Conclusion + Accion recomendada.' },
+        rotationAnalysis:             { type: 'string', description: '1-2 párrafos breves + bullets + Conclusion + Accion recomendada.' },
+        solvencyAnalysis:             { type: 'string', description: '1-2 párrafos breves + bullets + Conclusion + Accion recomendada.' },
+        valuationAnalysis:            { type: 'string', description: '1-2 párrafos breves + bullets + Conclusion + Accion recomendada. Referenciar WACC y equity value si disponibles.' },
+        trendAnalysis:                { type: 'string', description: '1 párrafo + bullets de tendencias + fase empresarial + Conclusion + Accion recomendada.' },
+        consistencyAlerts:            { type: 'string', description: '1 párrafo + bullets de consistencias/anomalías + Conclusion.' },
+        strategicAlerts:              { type: 'string', description: 'MINIMO 4 alertas. Formato: [NIVEL: CRITICA/ALTA/MEDIA/BAJA] AREA: indicador, valor actual, umbral, riesgo. Una por párrafo.' },
+        prioritizedRecommendations:   { type: 'string', description: 'MINIMO 5 recomendaciones. Formato: [PRIORIDAD: ALTA/MEDIA/BAJA] AREA: accion. Por que: dato. Impacto: resultado. Plazo: horizonte.' },
       },
       required: [
         'executiveSummary', 'incomeAnalysis', 'balanceAnalysis', 'financingAnalysis',
@@ -473,7 +476,7 @@ export async function generateAIAnalysis(data: FinancialDataForAI): Promise<AIAn
     max_tokens: 16000,
     tools: analysisTools,
     tool_choice: { type: 'any' },
-    system: 'Eres PROMETHEIA, un sistema experto de gestión y control financiero. Usa la herramienta generate_financial_report para entregar el análisis. Todos los textos deben ser en español, sin markdown ni asteriscos, usando saltos de párrafo con \\n.',
+    system: 'Eres PROMETHEIA, sistema experto de control de gestión para directorios. Usa generate_financial_report. Textos en español, sin markdown ni asteriscos. Formato: párrafos breves + bullets + Conclusion + Accion recomendada. Prioriza impacto estratégico sobre descripción de cifras. Saltos de párrafo con \\n.',
     messages: [
       { role: 'user', content: prompt },
     ],

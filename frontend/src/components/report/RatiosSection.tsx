@@ -22,8 +22,8 @@ export const RatiosSection: React.FC<Props> = ({ years }) => {
     return value.toFixed(0) + ' días';
   };
 
-  // Ordenar años de más reciente a más antiguo
-  const sortedYears = [...years].sort((a, b) => b.year - a.year);
+  // Ordenar años de más antiguo a más reciente (coherente con gráficos)
+  const sortedYears = [...years].sort((a, b) => a.year - b.year);
 
   const ratioGroups = [
     {

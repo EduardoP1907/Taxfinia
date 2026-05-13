@@ -8,11 +8,13 @@ import {
   getReport,
   getReportFilePath,
   setReportDownloadCode,
+  generateExecutiveSummaryPdf,
 } from '../services/report.service';
 import { convertDocxToPdf } from '../utils/docx-to-pdf';
 import { generatePreviewToken, verifyPreviewToken, PREVIEW_TTL } from '../utils/preview-token';
 import { sendAdminReportCodeEmail } from '../utils/email';
 import { isS3Enabled, getS3SignedUrl, streamS3ToResponse } from '../utils/s3';
+import prisma from '../config/database';
 
 /** Generate random code like PROMETHEIA-A4K9-M2P7 */
 function generateDownloadCode(): string {
@@ -315,11 +317,15 @@ export class ReportController {
         return;
       }
 
-      // Check download code if one has been generated
+      // Check download code — must match this specific report's code exactly
       const storedCode = (report as any).downloadCode as string | null;
       if (storedCode) {
         const providedCode = (req.query.code as string || '').trim().toUpperCase();
-        if (!providedCode || providedCode !== storedCode.toUpperCase()) {
+        if (!providedCode) {
+          res.status(403).json({ error: 'Código de descarga requerido', requiresCode: true });
+          return;
+        }
+        if (providedCode !== storedCode.toUpperCase()) {
           res.status(403).json({ error: 'Código de descarga incorrecto', requiresCode: true });
           return;
         }
@@ -384,6 +390,47 @@ export class ReportController {
     } catch (error) {
       console.error('[REPORT] Download error:', error);
       res.status(500).json({ error: 'Error al descargar el archivo' });
+    }
+  }
+  /**
+   * GET /api/reports/:id/download/executive
+   * Generate and download executive summary PDF (on-demand, validated same as docx)
+   */
+  async downloadExecutive(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const report = await getReport(id);
+      if (!report) { res.status(404).json({ error: 'Informe no encontrado' }); return; }
+      if (report.status !== 'COMPLETED') {
+        res.status(400).json({ error: 'El informe aún no está listo', status: report.status });
+        return;
+      }
+
+      // Same code guard as narrative DOCX — must match this specific report's code exactly
+      const storedCode = (report as any).downloadCode as string | null;
+      if (storedCode) {
+        const providedCode = (req.query.code as string || '').trim().toUpperCase();
+        if (!providedCode) {
+          res.status(403).json({ error: 'Código de descarga requerido', requiresCode: true });
+          return;
+        }
+        if (providedCode !== storedCode.toUpperCase()) {
+          res.status(403).json({ error: 'Código de descarga incorrecto', requiresCode: true });
+          return;
+        }
+      }
+
+      const { pdfPath, companyName, year, cleanup } = await generateExecutiveSummaryPdf(id);
+      const sanitized = companyName.replace(/[^a-zA-Z0-9_\- ]/g, '').trim().replace(/ /g, '_');
+      const downloadName = `TAXFIN_${sanitized}_${year}_resumen_ejecutivo.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+      res.sendFile(pdfPath, () => cleanup());
+    } catch (error) {
+      console.error('[REPORT] Download executive error:', error);
+      const msg = error instanceof Error ? error.message : 'Error al generar el resumen ejecutivo';
+      res.status(500).json({ error: msg });
     }
   }
 }

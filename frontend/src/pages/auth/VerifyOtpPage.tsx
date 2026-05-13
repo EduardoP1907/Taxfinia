@@ -96,6 +96,9 @@ export const VerifyOtpPage: React.FC = () => {
           Hemos enviado un código de 6 dígitos a<br />
           <span className="font-medium text-slate-200">{email}</span>
         </p>
+        <p className="mt-2 text-xs text-amber-500/70">
+          El código es válido por <span className="font-semibold text-amber-400">5 minutos</span>
+        </p>
       </div>
 
       {error && (

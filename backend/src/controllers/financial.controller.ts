@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { financialService } from '../services/financial.service';
 import { convertBigIntToString } from '../utils/bigint';
+import { parseImportFile, generateTemplateBuffer } from '../utils/excel-import';
 
 export const financialController = {
   // ============= FISCAL YEARS =============
@@ -246,6 +247,40 @@ export const financialController = {
         success: false,
         error: error.message || 'Error al obtener resumen del año fiscal',
       });
+    }
+  },
+
+  // ============= IMPORT =============
+
+  async downloadTemplate(_req: Request, res: Response) {
+    const buf = generateTemplateBuffer();
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="plantilla_importacion_prometheia.csv"');
+    res.send(buf);
+  },
+
+  async importData(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      const { companyId } = req.params;
+      const file = (req as any).file as { buffer: Buffer; mimetype: string } | undefined;
+
+      if (!file) {
+        res.status(400).json({ success: false, error: 'No se recibió ningún archivo' });
+        return;
+      }
+
+      const parsed = parseImportFile(file.buffer);
+      const results = await financialService.importFinancialData(companyId, userId, parsed);
+
+      res.json({
+        success: true,
+        message: `Importación completada: ${results.length} ejercicio(s) procesado(s)`,
+        years: results.map(r => r.year),
+      });
+    } catch (error: any) {
+      console.error('Error importing financial data:', error);
+      res.status(400).json({ success: false, error: error.message || 'Error al importar el archivo' });
     }
   },
 };

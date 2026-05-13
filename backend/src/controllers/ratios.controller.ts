@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { RatiosService } from '../services/ratios.service';
 import { bigIntToJSON } from '../utils/bigint';
+import prisma from '../config/database';
 
 export class RatiosController {
   private service = new RatiosService();
@@ -138,12 +139,96 @@ export class RatiosController {
       });
     } catch (error: any) {
       console.error('[CONTROLLER ERROR] Error fetching company analysis:', error);
-      console.error('[CONTROLLER ERROR] Stack:', error.stack);
       res.status(500).json({
         error: 'Error fetching company analysis',
         message: error.message,
-        stack: error.stack,
       });
+    }
+  };
+
+  /**
+   * GET /api/ratios/compare?companies=id1,id2,id3&year=2024
+   * Returns key ratios for up to 3 companies side-by-side
+   */
+  compareCompanies = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user?.userId;
+      const companyIds = ((req.query.companies as string) || '').split(',').filter(Boolean).slice(0, 3);
+      const year = parseInt((req.query.year as string) || String(new Date().getFullYear()));
+
+      if (companyIds.length < 2) {
+        res.status(400).json({ error: 'Se requieren al menos 2 empresas para comparar' });
+        return;
+      }
+
+      const results = await Promise.all(companyIds.map(async (companyId) => {
+        const company = await prisma.company.findFirst({
+          where: { id: companyId, userId, deletedAt: null },
+          select: { id: true, name: true, currency: true, industry: true },
+        });
+        if (!company) return null;
+
+        const fy = await prisma.fiscalYear.findFirst({
+          where: { companyId, year, quarter: 0 },
+          include: { calculatedRatios: true, incomeStatement: true, balanceSheet: true },
+        });
+
+        const ratios = fy?.calculatedRatios;
+        const is = fy?.incomeStatement;
+        const bs = fy?.balanceSheet;
+
+        const toN = (v: any) => v == null ? null : parseFloat(v.toString());
+
+        return {
+          company,
+          year,
+          hasData: !!fy,
+          income: is ? {
+            revenue: toN(is.revenue),
+            ebitda: is ? (() => {
+              const rev = toN(is.revenue)! + toN(is.otherOperatingIncome)!;
+              const cogs = toN(is.costOfSales)! + toN(is.staffCostsSales)!;
+              const admin = toN(is.adminExpenses)! + toN(is.staffCostsAdmin)!;
+              return rev - cogs - admin;
+            })() : null,
+            netIncome: is ? (() => {
+              const rev = toN(is.revenue)! + toN(is.otherOperatingIncome)!;
+              const cogs = toN(is.costOfSales)! + toN(is.staffCostsSales)!;
+              const admin = toN(is.adminExpenses)! + toN(is.staffCostsAdmin)!;
+              const ebitda = rev - cogs - admin;
+              const ebit = ebitda - toN(is.depreciation)!;
+              const excep = toN(is.exceptionalIncome)! - toN(is.exceptionalExpenses)!;
+              const fin = toN(is.financialIncome)! - toN(is.financialExpenses)!;
+              const ebt = ebit + excep + fin;
+              return ebt - toN(is.incomeTax)!;
+            })() : null,
+          } : null,
+          balance: bs ? {
+            totalAssets: toN(bs.tangibleAssets)! + toN(bs.intangibleAssets)! + toN(bs.financialInvestmentsLp)! + toN(bs.otherNoncurrentAssets)! + toN(bs.inventory)! + toN(bs.accountsReceivable)! + toN(bs.otherReceivables)! + toN(bs.taxReceivables)! + toN(bs.cashEquivalents)!,
+            equity: toN(bs.shareCapital)! + toN(bs.reserves)! + toN(bs.retainedEarnings)! - toN(bs.treasuryStock)!,
+          } : null,
+          ratios: ratios ? {
+            currentRatio:     toN(ratios.currentRatio),
+            quickRatio:       toN(ratios.quickRatio),
+            debtToEquity:     toN(ratios.debtToEquity),
+            debtToEbitda:     toN(ratios.debtToEbitda),
+            roe:              toN(ratios.roe),
+            roa:              toN(ratios.roa),
+            grossMargin:      toN(ratios.grossMargin),
+            ebitdaMargin:     toN(ratios.ebitdaMargin),
+            netMargin:        toN(ratios.netMargin),
+            assetTurnover:    toN(ratios.assetTurnover),
+            altmanZScore:     toN(ratios.altmanZScore),
+            daysSalesOutstanding:  toN(ratios.daysSalesOutstanding),
+            daysPayableOutstanding: toN(ratios.daysPayableOutstanding),
+          } : null,
+        };
+      }));
+
+      res.json({ data: results.filter(Boolean) });
+    } catch (error: any) {
+      console.error('[COMPARE] Error:', error);
+      res.status(500).json({ error: 'Error al comparar empresas', message: error.message });
     }
   };
 }

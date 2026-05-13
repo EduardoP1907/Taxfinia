@@ -14,14 +14,26 @@ import {
   CheckCircle2,
   Plus,
   Users,
+  Building2,
+  Lock,
+  LockOpen,
 } from 'lucide-react';
 
 interface InviteToken {
   id: string;
   token: string;
   url: string;
+  recipientNote: string | null;
   usedById: string | null;
   usedAt: string | null;
+  createdAt: string;
+}
+
+interface AdminCompany {
+  id: string;
+  name: string;
+  taxId: string | null;
+  isLocked: boolean;
   createdAt: string;
 }
 
@@ -32,6 +44,11 @@ export const AdminPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [recipientNote, setRecipientNote] = useState('');
+
+  const [allCompanies, setAllCompanies] = useState<AdminCompany[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(true);
+  const [unlocking, setUnlocking] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.role !== 'ADMIN') {
@@ -52,11 +69,38 @@ export const AdminPage: React.FC = () => {
 
   useEffect(() => { loadTokens(); }, [loadTokens]);
 
+  const loadAllCompanies = useCallback(async () => {
+    setCompaniesLoading(true);
+    try {
+      const res = await api.get('/companies/admin/all');
+      setAllCompanies(res.data.data);
+    } catch {
+      // silently fail
+    } finally {
+      setCompaniesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadAllCompanies(); }, [loadAllCompanies]);
+
+  const handleUnlock = async (companyId: string) => {
+    setUnlocking(companyId);
+    try {
+      await api.post(`/companies/${companyId}/unlock`);
+      setAllCompanies(prev => prev.map(c => c.id === companyId ? { ...c, isLocked: false } : c));
+    } catch {
+      alert('Error al desbloquear la empresa');
+    } finally {
+      setUnlocking(null);
+    }
+  };
+
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const res = await api.post('/auth/admin/invite-tokens');
+      const res = await api.post('/auth/admin/invite-tokens', { recipientNote: recipientNote.trim() || undefined });
       setTokens(prev => [{ ...res.data, usedById: null, usedAt: null, createdAt: new Date().toISOString() }, ...prev]);
+      setRecipientNote('');
     } catch {
       alert('Error al generar el token');
     } finally {
@@ -132,20 +176,89 @@ export const AdminPage: React.FC = () => {
 
         {/* Generate button */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 mb-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-800">Nuevo link de invitación</p>
-              <p className="text-xs text-slate-500 mt-0.5">El usuario registrado obtendrá plan TRIAL con 2 informes gratuitos</p>
+          <div className="mb-3">
+            <p className="text-sm font-semibold text-slate-800">Nuevo link de invitación</p>
+            <p className="text-xs text-slate-500 mt-0.5">El usuario registrado obtendrá plan TRIAL con 2 informes gratuitos</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Para (destinatario)</label>
+              <input
+                type="text"
+                value={recipientNote}
+                onChange={e => setRecipientNote(e.target.value)}
+                placeholder="Nombre o email del destinatario"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+              />
             </div>
             <button
               onClick={handleGenerate}
               disabled={generating}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-700 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-700 disabled:opacity-50 transition-colors mt-4 flex-shrink-0"
             >
               {generating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Generar link
             </button>
           </div>
+        </div>
+
+        {/* Companies lock management */}
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-5">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-slate-500" />
+              <p className="text-sm font-semibold text-slate-800">Gestión de Empresas</p>
+            </div>
+            <button onClick={loadAllCompanies} className="text-xs text-amber-500 hover:text-amber-700 flex items-center gap-1">
+              <RefreshCw className="w-3 h-3" /> Actualizar
+            </button>
+          </div>
+
+          {companiesLoading ? (
+            <div className="p-8 flex justify-center">
+              <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
+            </div>
+          ) : allCompanies.length === 0 ? (
+            <div className="p-8 text-center">
+              <Building2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-slate-500">No hay empresas registradas</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {allCompanies.map(company => (
+                <div key={company.id} className="px-5 py-3 flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${company.isLocked ? 'bg-red-400' : 'bg-emerald-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{company.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {company.taxId && <span className="text-xs text-slate-400 font-mono">{company.taxId}</span>}
+                      <span className="text-xs text-slate-400">{new Date(company.createdAt).toLocaleDateString('es-CL')}</span>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {company.isLocked ? (
+                      <button
+                        onClick={() => handleUnlock(company.id)}
+                        disabled={unlocking === company.id}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors text-red-600 border-red-200 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                      >
+                        {unlocking === company.id
+                          ? <RefreshCw className="w-3 h-3 animate-spin" />
+                          : <LockOpen className="w-3 h-3" />
+                        }
+                        {unlocking === company.id ? 'Desbloqueando…' : 'Desbloquear'}
+                      </button>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-emerald-600">
+                        <Lock className="w-3 h-3 opacity-30" />
+                        Libre
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Tokens list */}
@@ -175,6 +288,9 @@ export const AdminPage: React.FC = () => {
 
                   {/* URL */}
                   <div className="flex-1 min-w-0">
+                    {token.recipientNote && (
+                      <p className="text-xs font-semibold text-slate-700 truncate mb-0.5">→ {token.recipientNote}</p>
+                    )}
                     <p className="text-xs font-mono text-slate-600 truncate">{token.url}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       {token.usedById ? (

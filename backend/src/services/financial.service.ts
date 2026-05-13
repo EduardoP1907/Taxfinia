@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { Prisma } from '@prisma/client';
+import type { ParsedImportData } from '../utils/excel-import';
 
 // Helper para convertir objetos Prisma Decimal a números
 function convertDecimalsToNumbers(data: any): any {
@@ -348,5 +349,64 @@ export const financialService = {
     }
 
     return fiscalYear;
+  },
+
+  // ============= IMPORT =============
+
+  async importFinancialData(companyId: string, userId: string, parsed: ParsedImportData) {
+    const company = await prisma.company.findFirst({
+      where: { id: companyId, userId, deletedAt: null },
+    });
+    if (!company) throw new Error('Empresa no encontrada');
+
+    const results: { year: number; created: boolean }[] = [];
+
+    for (const year of parsed.years) {
+      const yearData = parsed.byYear[year];
+
+      // Upsert annual FiscalYear (quarter = 0)
+      let fy = await prisma.fiscalYear.findFirst({ where: { companyId, year, quarter: 0 } });
+      if (!fy) {
+        fy = await prisma.fiscalYear.create({ data: { companyId, year, quarter: 0 } });
+      }
+      const fyId = fy.id;
+      const created = !fy.createdAt || fy.createdAt > new Date(Date.now() - 2000);
+
+      if (Object.keys(yearData.balance).length > 0) {
+        await prisma.balanceSheet.upsert({
+          where: { fiscalYearId: fyId },
+          create: { ...yearData.balance, fiscalYearId: fyId },
+          update: yearData.balance,
+        });
+      }
+
+      if (Object.keys(yearData.income).length > 0) {
+        await prisma.incomeStatement.upsert({
+          where: { fiscalYearId: fyId },
+          create: { ...yearData.income, fiscalYearId: fyId },
+          update: yearData.income,
+        });
+      }
+
+      if (Object.keys(yearData.cashflow).length > 0) {
+        await prisma.cashFlow.upsert({
+          where: { fiscalYearId: fyId },
+          create: { ...yearData.cashflow, fiscalYearId: fyId },
+          update: yearData.cashflow,
+        });
+      }
+
+      if (Object.keys(yearData.additional).length > 0) {
+        await prisma.additionalData.upsert({
+          where: { fiscalYearId: fyId },
+          create: { ...yearData.additional, fiscalYearId: fyId },
+          update: yearData.additional,
+        });
+      }
+
+      results.push({ year, created });
+    }
+
+    return results;
   },
 };

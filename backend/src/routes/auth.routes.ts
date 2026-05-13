@@ -86,12 +86,13 @@ function requireAdmin(req: any, res: any, next: any) {
 /** POST /api/auth/admin/invite-tokens — generate a new invite token */
 router.post('/admin/invite-tokens', authMiddleware, requireAdmin, async (req: any, res: any) => {
   try {
+    const { recipientNote } = req.body;
     const token = crypto.randomBytes(12).toString('hex');
     const record = await (prisma as any).inviteToken.create({
-      data: { token, createdById: req.user.userId },
+      data: { token, createdById: req.user.userId, ...(recipientNote ? { recipientNote } : {}) },
     });
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    res.json({ token: record.token, url: `${baseUrl}/register?invite=${record.token}` });
+    res.json({ token: record.token, url: `${baseUrl}/register?invite=${record.token}`, recipientNote: record.recipientNote ?? null });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -102,7 +103,7 @@ router.get('/admin/invite-tokens', authMiddleware, requireAdmin, async (req: any
   try {
     const tokens = await (prisma as any).inviteToken.findMany({
       orderBy: { createdAt: 'desc' },
-      select: { id: true, token: true, usedById: true, usedAt: true, createdAt: true },
+      select: { id: true, token: true, recipientNote: true, usedById: true, usedAt: true, createdAt: true },
     });
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     res.json({ tokens: tokens.map((t: any) => ({ ...t, url: `${baseUrl}/register?invite=${t.token}` })) });

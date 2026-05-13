@@ -222,3 +222,23 @@ export async function lockCompany(companyId: string): Promise<void> {
     data: { isLocked: true },
   });
 }
+
+/** Unlock a company so its financial data can be edited again (admin only) */
+export async function unlockCompany(companyId: string): Promise<void> {
+  await prisma.company.update({
+    where: { id: companyId },
+    data: { isLocked: false },
+  });
+}
+
+/** Get all companies (admin view — across all users) */
+export async function getAllCompaniesAdmin(): Promise<{
+  id: string; name: string; taxId: string | null; isLocked: boolean;
+  userId: string; createdAt: Date; currency: string;
+}[]> {
+  return prisma.company.findMany({
+    where: { deletedAt: null },
+    select: { id: true, name: true, taxId: true, isLocked: true, userId: true, createdAt: true, currency: true },
+    orderBy: { createdAt: 'desc' },
+  });
+}

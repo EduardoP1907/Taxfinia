@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { companyService } from '../services/company.service';
+import { companyService, unlockCompany, getAllCompaniesAdmin } from '../services/company.service';
 import { validationResult } from 'express-validator';
 
 export class CompanyController {
@@ -152,6 +152,34 @@ export class CompanyController {
         success: false,
         message: error.message || 'Error al obtener el resumen de la empresa',
       });
+    }
+  }
+
+  // Admin: unlock company
+  async unlockCompany(req: Request, res: Response): Promise<void> {
+    try {
+      if (req.user!.role !== 'ADMIN') {
+        res.status(403).json({ success: false, message: 'Acceso denegado' });
+        return;
+      }
+      await unlockCompany(req.params.id);
+      res.json({ success: true, message: 'Empresa desbloqueada' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message || 'Error al desbloquear la empresa' });
+    }
+  }
+
+  // Admin: list all companies
+  async getAllCompaniesAdmin(req: Request, res: Response): Promise<void> {
+    try {
+      if (req.user!.role !== 'ADMIN') {
+        res.status(403).json({ success: false, message: 'Acceso denegado' });
+        return;
+      }
+      const companies = await getAllCompaniesAdmin();
+      res.json({ success: true, data: companies });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message || 'Error al obtener empresas' });
     }
   }
 }
