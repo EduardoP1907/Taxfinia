@@ -103,7 +103,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ previewUrl, companyName, ye
         <div className="flex items-center gap-3">
           <ShieldCheck className="w-5 h-5 text-amber-400" />
           <div>
-            <p className="text-sm font-semibold text-white">Vista Previa Protegida</p>
+            <p className="text-sm font-semibold text-white">Informe Prometheia</p>
             <p className="text-xs text-slate-400">{companyName} · Informe {year} · Solo visualización</p>
           </div>
         </div>
@@ -300,18 +300,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
   const reportCodeKey = (reportId: string) => `report_code_${reportId}`;
 
   const handleDownloadClick = (reportId: string, format: 'pdf' | 'docx') => {
-    const report = reports.find(r => r.id === reportId);
-    if (report?.hasDownloadCode) {
-      const savedCode = localStorage.getItem(reportCodeKey(reportId));
-      if (savedCode) {
-        doDownload(reportId, format, savedCode);
-      } else {
-        setCodeError(undefined);
-        setCodeModal({ reportId, format });
-      }
-    } else {
-      doDownload(reportId, format);
-    }
+    doDownload(reportId, format);
   };
 
   const doDownload = async (reportId: string, format: 'pdf' | 'docx', code?: string) => {
@@ -380,13 +369,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
   };
 
   const handleDownloadExecutive = (reportId: string) => {
-    const savedCode = localStorage.getItem(reportCodeKey(reportId));
-    if (savedCode) {
-      doDownloadExecutive(reportId, savedCode);
-    } else {
-      setCodeError(undefined);
-      setCodeModal({ reportId, format: 'executive' as any });
-    }
+    doDownloadExecutive(reportId);
   };
 
   const doDownloadExecutive = async (reportId: string, code?: string) => {
@@ -481,22 +464,6 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
         </div>
 
         {/* What you get */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          <div className="bg-white rounded-lg p-3 border border-amber-100 flex items-start gap-2">
-            <Eye className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-gray-800">Análisis Narrativo</p>
-              <p className="text-xs text-gray-500">Interpretaciones IA y DCF. Vista previa 15 min, descarga con código.</p>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg p-3 border border-violet-100 flex items-start gap-2">
-            <Star className="w-5 h-5 text-violet-500 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-gray-800">INFORME EJECUTIVO RESUMEN</p>
-              <p className="text-xs text-gray-500">2-3 páginas para directorio: KPIs, gráficos y alertas estratégicas.</p>
-            </div>
-          </div>
-        </div>
 
         {/* Error */}
         {error && (
@@ -508,16 +475,8 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
 
         {/* Generating state */}
         {generating && (
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center gap-3 mb-2">
-              <RefreshCw className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
-              <p className="text-sm font-semibold text-blue-800">Claude AI está analizando la empresa…</p>
-            </div>
-            <div className="space-y-1 pl-7">
-              <p className="text-xs text-blue-600">✓ Calculando ratios financieros</p>
-              <p className="text-xs text-blue-600 animate-pulse">⟳ Generando análisis narrativo con IA</p>
-              <p className="text-xs text-blue-400">○ Creando PDF analítico y Word profesional</p>
-            </div>
+          <div className="mb-4 flex justify-center py-4">
+            <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" />
           </div>
         )}
 
@@ -554,10 +513,10 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
                           <button
                             onClick={() => handlePreview(report.id)}
                             className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                            title="Vista previa del análisis (15 min)"
+                            title="Ver Informe Prometheia (15 min)"
                           >
                             <Eye className="w-3 h-3" />
-                            Vista Previa
+                            Informe Prometheia
                           </button>
                         )}
 
@@ -590,8 +549,8 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
                           )
                         )}
 
-                        {/* Executive summary — only available once a download code has been generated */}
-                        {report.docxPath && report.hasDownloadCode && (
+                        {/* Executive summary */}
+                        {report.docxPath && (
                           <button
                             onClick={() => handleDownloadExecutive(report.id)}
                             disabled={downloadingExec[report.id]}
@@ -893,7 +852,7 @@ export const ReportPage: React.FC = () => {
         <CompanyChat
           companyId={companyId}
           companyName={company.name}
-          isLocked={!chatUnlocked && chatShouldLock}
+          isLocked={false}
           onUnlock={() => { setChatCodeError(undefined); setChatCodeModal(true); }}
         />
 
