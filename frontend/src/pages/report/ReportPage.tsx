@@ -603,17 +603,6 @@ export const ReportPage: React.FC = () => {
   const [analysis, setAnalysis] = useState<CompanyAnalysis | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>(tabParam || 'resultados');
 
-  // Chat lock state — persisted per company in localStorage
-  const chatStorageKey = companyId ? `chat_unlocked_${companyId}` : null;
-  const [chatUnlocked, setChatUnlocked] = useState(() => {
-    if (!companyId) return true;
-    return localStorage.getItem(`chat_unlocked_${companyId}`) === 'true';
-  });
-
-  // Chat unlock modal state (reuses DownloadCodeModal)
-  const [chatCodeModal, setChatCodeModal] = useState(false);
-  const [chatCodeError, setChatCodeError] = useState<string | undefined>();
-  const [chatCodeLoading, setChatCodeLoading] = useState(false);
 
   useEffect(() => {
     if (companyId) {
@@ -680,45 +669,7 @@ export const ReportPage: React.FC = () => {
     });
   };
 
-  const handleChatUnlock = async (code: string) => {
-    if (!companyId) return;
-    setChatCodeLoading(true);
-    setChatCodeError(undefined);
-    try {
-      // Find any report with a download code to validate against
-      const reports = await reportService.getCompanyReports(companyId);
-      const reportWithCode = reports.find(r => r.hasDownloadCode);
-      if (!reportWithCode) {
-        // No code set — unlock freely
-        setChatUnlocked(true);
-        if (chatStorageKey) localStorage.setItem(chatStorageKey, 'true');
-        setChatCodeModal(false);
-        return;
-      }
-      const valid = await reportService.validateCode(reportWithCode.id, code);
-      if (valid) {
-        setChatUnlocked(true);
-        if (chatStorageKey) localStorage.setItem(chatStorageKey, 'true');
-        setChatCodeModal(false);
-      } else {
-        setChatCodeError('Código incorrecto. Verifica e inténtalo de nuevo.');
-      }
-    } catch {
-      setChatCodeError('Error al validar el código. Inténtalo de nuevo.');
-    } finally {
-      setChatCodeLoading(false);
-    }
-  };
 
-  // Determine if chat should be locked: locked only if any report has a download code
-  // and the user hasn't unlocked yet
-  const [chatShouldLock, setChatShouldLock] = useState(false);
-  useEffect(() => {
-    if (!companyId || chatUnlocked) return;
-    reportService.getCompanyReports(companyId).then(reports => {
-      setChatShouldLock(reports.some(r => r.hasDownloadCode));
-    }).catch(() => {});
-  }, [companyId, chatUnlocked]);
 
   if (loading) {
     return (
@@ -838,22 +789,11 @@ export const ReportPage: React.FC = () => {
           selectedYear={selectedYear}
         />
 
-        {/* Chat unlock modal */}
-        {chatCodeModal && (
-          <DownloadCodeModal
-            onConfirm={handleChatUnlock}
-            onCancel={() => { setChatCodeModal(false); setChatCodeError(undefined); }}
-            loading={chatCodeLoading}
-            error={chatCodeError}
-          />
-        )}
-
         {/* Company Chat */}
         <CompanyChat
           companyId={companyId}
           companyName={company.name}
           isLocked={false}
-          onUnlock={() => { setChatCodeError(undefined); setChatCodeModal(true); }}
         />
 
         {/* Financial Tabs */}
