@@ -27,8 +27,6 @@ const GREEN   = '059669';
 const GREEN_L = 'd1fae5';
 const RED     = 'dc2626';
 const RED_L   = 'fee2e2';
-const ORANGE  = 'd97706';
-const ORANGE_L = 'fef3c7';
 
 const chartCanvas = new ChartJSNodeCanvas({ width: 680, height: 260, backgroundColour: 'white' });
 
@@ -139,8 +137,8 @@ type Status = 'SALUDABLE' | 'ALERTA' | 'CRITICO';
 
 function semaphore(value: number | null | undefined, indicator: string): { status: Status; bg: string; fg: string } {
   const saludable = { status: 'SALUDABLE' as Status, bg: GREEN_L, fg: GREEN };
-  const alerta    = { status: 'ALERTA'    as Status, bg: ORANGE_L, fg: ORANGE };
-  const critico   = { status: 'CRITICO'   as Status, bg: RED_L,    fg: RED };
+  const alerta    = { status: 'ALERTA'    as Status, bg: RED_L,   fg: RED };
+  const critico   = { status: 'CRITICO'   as Status, bg: RED_L,   fg: RED };
   if (value == null || isNaN(value)) return critico;
 
   switch (indicator) {
@@ -268,13 +266,13 @@ function renderAIText(text: string, type: 'alerts' | 'recommendations' | 'plain'
     let color = TEXT;
     if (type === 'alerts' && isHeader) {
       if (/CRITICA/i.test(line)) color = RED;
-      else if (/ALTA/i.test(line)) color = 'c2410c';
-      else if (/MEDIA/i.test(line)) color = ORANGE;
+      else if (/ALTA/i.test(line)) color = RED;
+      else if (/MEDIA/i.test(line)) color = RED;
       else color = GREEN;
     }
     if (type === 'recommendations' && isHeader) {
       if (/ALTA/i.test(line)) color = RED;
-      else if (/MEDIA/i.test(line)) color = ORANGE;
+      else if (/MEDIA/i.test(line)) color = RED;
       else color = GREEN;
     }
 
@@ -321,9 +319,9 @@ function parseAlerts(text: string): AlertBlock[] {
 
 function alertStyle(nivel: AlertBlock['nivel']): { bg: string; fg: string; label: string } {
   switch (nivel) {
-    case 'CRITICA': return { bg: '7f1d1d', fg: WHITE, label: 'CRITICO' };  // dark red-900
-    case 'ALTA':    return { bg: 'dc2626', fg: WHITE, label: 'ALTA' };     // red-600 — clearly red
-    case 'MEDIA':   return { bg: 'd97706', fg: WHITE, label: 'MEDIA' };
+    case 'CRITICA': return { bg: '7f1d1d', fg: WHITE, label: 'CRITICO' };
+    case 'ALTA':    return { bg: 'dc2626', fg: WHITE, label: 'ALTA' };
+    case 'MEDIA':   return { bg: 'dc2626', fg: WHITE, label: 'MEDIA' };
     case 'BAJA':    return { bg: '15803d', fg: WHITE, label: 'BAJA' };
   }
 }
@@ -413,9 +411,9 @@ function recStyle(priority: RecommendationBlock['priority']): {
   headerBg: string; headerFg: string; titleBg: string; label: string;
 } {
   switch (priority) {
-    case 'ALTA':  return { headerBg: 'dc2626', headerFg: WHITE,    titleBg: 'fee2e2', label: 'PRIORIDAD: ALTA' };
-    case 'MEDIA': return { headerBg: 'd97706', headerFg: '1e293b', titleBg: 'fefce8', label: 'PRIORIDAD: MEDIA' };
-    case 'BAJA':  return { headerBg: '16a34a', headerFg: WHITE,    titleBg: 'dcfce7', label: 'PRIORIDAD: BAJA' };
+    case 'ALTA':  return { headerBg: 'dc2626', headerFg: WHITE, titleBg: 'fee2e2', label: 'PRIORIDAD: ALTA' };
+    case 'MEDIA': return { headerBg: 'dc2626', headerFg: WHITE, titleBg: 'fee2e2', label: 'PRIORIDAD: MEDIA' };
+    case 'BAJA':  return { headerBg: '16a34a', headerFg: WHITE, titleBg: 'dcfce7', label: 'PRIORIDAD: BAJA' };
   }
 }
 
@@ -799,81 +797,6 @@ function buildSemaforoTable(data: PDFReportData, years: number[]): Table {
   });
 }
 
-// ─── Annexo: Balance table ────────────────────────────────────────────────────
-function buildBalanceAnnex(data: PDFReportData, years: number[], cur: string): Table {
-  const rows = [
-    { label: 'Activo No Corriente', getValue: (y: number) => fmt(data.balanceData[y]?.nonCurrentAssets, cur), bold: false },
-    { label: 'Activo Corriente',    getValue: (y: number) => fmt(data.balanceData[y]?.currentAssets, cur),    bold: false },
-    { label: 'Total Activo',        getValue: (y: number) => fmt(data.balanceData[y]?.totalAssets, cur),      bold: true  },
-    { label: 'Pasivo No Corriente', getValue: (y: number) => fmt(data.balanceData[y]?.nonCurrentLiabilities, cur), bold: false },
-    { label: 'Pasivo Corriente',    getValue: (y: number) => fmt(data.balanceData[y]?.currentLiabilities, cur), bold: false },
-    { label: 'Patrimonio Neto',     getValue: (y: number) => fmt(data.balanceData[y]?.equity, cur),           bold: true  },
-  ];
-
-  const headerRow = new TableRow({
-    tableHeader: true,
-    children: [hCell('Concepto', AlignmentType.LEFT), ...years.map(y => hCell(String(y)))],
-  });
-
-  const dataRows = rows.map((row, i) => {
-    const bg = row.bold ? GRAY2 : (i % 2 === 0 ? WHITE : GRAY);
-    return new TableRow({
-      children: [
-        makeCell(row.label, { bold: row.bold, bg, align: AlignmentType.LEFT }),
-        ...years.map(y => makeCell(row.getValue(y), { bold: row.bold, bg })),
-      ],
-    });
-  });
-
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [headerRow, ...dataRows],
-  });
-}
-
-// ─── Annexo: Ratios table with colored cells ──────────────────────────────────
-function buildRatiosAnnex(data: PDFReportData, years: number[]): Table {
-  type RatioRow = {
-    label: string;
-    semKey: string;
-    getValue: (y: number) => string;
-    getRaw: (y: number) => number | null | undefined;
-  };
-
-  const ratioRows: RatioRow[] = [
-    { label: 'Liquidez General', semKey: 'currentRatio', getValue: y => data.ratiosData[y]?.currentRatio != null ? `${data.ratiosData[y]!.currentRatio!.toFixed(2)}` : 'n/d', getRaw: y => data.ratiosData[y]?.currentRatio },
-    { label: 'Acid Test',        semKey: 'quickRatio',   getValue: y => data.ratiosData[y]?.quickRatio != null ? `${data.ratiosData[y]!.quickRatio!.toFixed(2)}` : 'n/d', getRaw: y => data.ratiosData[y]?.quickRatio },
-    { label: 'Deuda / Activo',   semKey: 'debtToAssets', getValue: y => data.ratiosData[y]?.debtToAssets != null ? `${(data.ratiosData[y]!.debtToAssets! * 100).toFixed(1)}%` : 'n/d', getRaw: y => data.ratiosData[y]?.debtToAssets },
-    { label: 'ROE (%)',          semKey: 'roe',          getValue: y => data.ratiosData[y]?.roe != null ? `${data.ratiosData[y]!.roe!.toFixed(1)}%` : 'n/d', getRaw: y => data.ratiosData[y]?.roe },
-    { label: 'ROA (%)',          semKey: 'roa',          getValue: y => data.ratiosData[y]?.roa != null ? `${data.ratiosData[y]!.roa!.toFixed(1)}%` : 'n/d', getRaw: y => data.ratiosData[y]?.roa },
-    { label: 'Margen EBITDA (%)',semKey: 'ebitdaMargin', getValue: y => data.ratiosData[y]?.ebitdaMargin != null ? `${data.ratiosData[y]!.ebitdaMargin!.toFixed(1)}%` : 'n/d', getRaw: y => data.ratiosData[y]?.ebitdaMargin },
-  ];
-
-  const headerRow = new TableRow({
-    tableHeader: true,
-    children: [hCell('Ratio', AlignmentType.LEFT), ...years.map(y => hCell(String(y)))],
-  });
-
-  const dataRows = ratioRows.map((row, i) => {
-    const rowBg = i % 2 === 0 ? WHITE : GRAY;
-    return new TableRow({
-      children: [
-        makeCell(row.label, { align: AlignmentType.LEFT, bg: rowBg }),
-        ...years.map(y => {
-          const raw = row.getRaw(y);
-          const sem = semaphore(raw ?? undefined, row.semKey);
-          return makeCell(row.getValue(y), { bg: sem.bg, color: sem.fg, bold: true, size: 17 });
-        }),
-      ],
-    });
-  });
-
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [headerRow, ...dataRows],
-  });
-}
-
 // ─── Main export ──────────────────────────────────────────────────────────────
 export async function generateExecutiveSummaryDocx(
   data: PDFReportData,
@@ -908,8 +831,6 @@ export async function generateExecutiveSummaryDocx(
 
   const kpiTables = buildKpiDashboard(data, years, cur);
   const semaforoTable = buildSemaforoTable(data, years);
-  const balanceTable = buildBalanceAnnex(data, years, cur);
-  const ratiosTable = buildRatiosAnnex(data, years);
 
   const doc = new Document({
     sections: [
@@ -975,7 +896,7 @@ export async function generateExecutiveSummaryDocx(
           // ── SECTION 1: DASHBOARD EJECUTIVO ─────────────────────────────────
           sectionTitle(1, `DASHBOARD EJECUTIVO — AÑO BASE ${latestYear}`),
           spacer(80),
-          para(`Resumen de los indicadores financieros clave del ejercicio ${latestYear}. El semáforo superior de cada tarjeta indica el estado del indicador: rojo = zona crítica, naranja = zona de alerta, verde = saludable.`),
+          para(`Resumen de los indicadores financieros clave del ejercicio ${latestYear}. El semáforo superior de cada tarjeta indica el estado del indicador: rojo = zona crítica o de alerta, verde = saludable.`),
           spacer(80),
           ...kpiTables.map(t => t as any),
           spacer(80),
@@ -986,14 +907,8 @@ export async function generateExecutiveSummaryDocx(
           semaforoTable,
           spacer(80),
 
-          // ── SECTION 3: VISIÓN GENERAL ───────────────────────────────────────
-          sectionTitle(3, 'VISIÓN GENERAL'),
-          spacer(80),
-          ...renderAIText(aiAnalysis.executiveSummary, 'plain'),
-          spacer(80),
-
-          // ── SECTION 4: EVOLUCIÓN GRÁFICA ────────────────────────────────────
-          sectionTitle(4, 'EVOLUCIÓN GRÁFICA'),
+          // ── SECTION 3: EVOLUCIÓN GRÁFICA ────────────────────────────────────
+          sectionTitle(3, 'EVOLUCIÓN GRÁFICA'),
           spacer(60),
           subTitle('Estado de Resultados'),
           imgPar(revenueChart, 510, 200),
@@ -1001,43 +916,22 @@ export async function generateExecutiveSummaryDocx(
           imgPar(rentabilityChart, 510, 200),
           spacer(80),
 
-          // ── SECTION 5: ALERTAS ESTRATÉGICAS ────────────────────────────────
-          sectionTitle(5, 'ALERTAS ESTRATÉGICAS'),
+          // ── SECTION 4: ALERTAS ESTRATÉGICAS ────────────────────────────────
+          sectionTitle(4, 'ALERTAS ESTRATÉGICAS'),
           spacer(80),
           para('Las siguientes alertas han sido identificadas a partir del análisis comparativo y evolutivo de los estados financieros, ordenadas por criticidad. Cada alerta requiere pronunciamiento expreso del directorio.'),
           spacer(60),
           ...buildAlertCards(parseAlerts(aiAnalysis.strategicAlerts)),
           spacer(80),
 
-          // ── SECTION 6: RECOMENDACIONES ──────────────────────────────────────
-          sectionTitle(6, 'RECOMENDACIONES PRIORIZADAS PARA EL DIRECTORIO'),
+          // ── SECTION 5: RECOMENDACIONES ──────────────────────────────────────
+          sectionTitle(5, 'RECOMENDACIONES PRIORIZADAS PARA EL DIRECTORIO'),
           spacer(80),
           para('Las siguientes recomendaciones están ordenadas por prioridad estratégica y basadas en el análisis integral de la posición y tendencia financiera de la empresa. Incluyen horizonte temporal orientativo para cada acción.'),
           spacer(60),
           ...buildRecommendationCards(parseRecommendations(aiAnalysis.prioritizedRecommendations)),
           spacer(80),
 
-          // ── SECTION 7: TENDENCIAS ────────────────────────────────────────────
-          sectionTitle(7, 'ANÁLISIS DE TENDENCIAS'),
-          spacer(80),
-          ...renderAIText(aiAnalysis.trendAnalysis, 'plain'),
-          spacer(160),
-
-          // ── ANNEXO ───────────────────────────────────────────────────────────
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 200, after: 160 },
-            children: [new TextRun({ text: 'ANEXO – INFORMACIÓN FINANCIERA', bold: true, size: 28, color: NAVY, font: 'Calibri' })],
-          }),
-
-          subTitle('1. Balance de Situación Simplificado'),
-          spacer(60),
-          balanceTable,
-          spacer(160),
-
-          subTitle('2. Indicadores Financieros Relevantes'),
-          spacer(60),
-          ratiosTable,
           spacer(80),
         ],
       },
