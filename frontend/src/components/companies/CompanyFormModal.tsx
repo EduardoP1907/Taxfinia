@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import type { Company, CreateCompanyData, UpdateCompanyData } from '../../types/company';
+import { INDUSTRY_LIST } from '../../constants/industries';
 
 interface CompanyFormModalProps {
   isOpen: boolean;
@@ -151,13 +152,22 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Sector/Industria"
-            name="industry"
-            value={formData.industry}
-            onChange={handleChange}
-            placeholder="Ej: Tecnología, Retail, Manufactura"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sector / Industria
+            </label>
+            <select
+              name="industry"
+              value={formData.industry}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            >
+              <option value="">— Seleccionar industria —</option>
+              {INDUSTRY_LIST.map((ind) => (
+                <option key={ind} value={ind}>{ind}</option>
+              ))}
+            </select>
+          </div>
 
           <Input
             label="Giro / Actividad"

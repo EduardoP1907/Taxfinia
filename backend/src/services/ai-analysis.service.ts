@@ -392,6 +392,8 @@ const analysisTools: Anthropic.Tool[] = [
 
 // ─── WACC estimation ──────────────────────────────────────────────────────────
 
+import { lookupIndustryWACC, IndustryWACC } from '../constants/wacc-industries';
+
 export interface WACCEstimateResult {
   wacc: number;           // decimal (e.g. 0.085 = 8.5%)
   costOfEquity: number;   // decimal
@@ -402,20 +404,32 @@ export interface WACCEstimateResult {
   explanation: string;
 }
 
+export interface WACCFinancialContext {
+  revenue: number;              // ventas del último año (moneda local)
+  totalDebt: number;            // deuda financiera total (LP + CP)
+  totalEquity: number;          // patrimonio neto contable
+  financialExpenses: number;    // gastos financieros del P&G
+  ebt: number;                  // resultado antes de impuestos
+  incomeTax: number;            // impuesto sobre beneficios
+  ebitdaMargin: number | null;  // margen EBITDA en decimal
+  debtToEquity: number | null;  // ratio D/E calculado
+  employees: number | null;     // número de empleados (tamaño)
+}
+
 const waccTools: Anthropic.Tool[] = [
   {
     name: 'estimate_wacc',
-    description: 'Estima el WACC de mercado para una empresa según su sector y país.',
+    description: 'Estima el WACC para una empresa específica según su sector, país y perfil financiero real.',
     input_schema: {
       type: 'object' as const,
       properties: {
         wacc:               { type: 'number', description: 'WACC en decimal (ej: 0.085 para 8.5%)' },
-        costOfEquity:       { type: 'number', description: 'Ke en decimal' },
-        costOfDebt:         { type: 'number', description: 'Kd (antes de impuestos) en decimal' },
-        debtPercentage:     { type: 'number', description: 'Proporción de deuda sobre capital total (D/V) en decimal' },
-        taxRate:            { type: 'number', description: 'Tasa impositiva corporativa efectiva en decimal' },
-        terminalGrowthRate: { type: 'number', description: 'Tasa de crecimiento perpetuo (g) en decimal' },
-        explanation:        { type: 'string', description: 'Justificación en español del WACC estimado (3-5 oraciones): tasa libre de riesgo usada, prima de riesgo de mercado del país, beta sectorial, coste de deuda de mercado y razonamiento de la estructura de capital.' },
+        costOfEquity:       { type: 'number', description: 'Ke en decimal, calculado por CAPM con beta reapalancada según la estructura de capital real de esta empresa' },
+        costOfDebt:         { type: 'number', description: 'Kd (antes de impuestos) en decimal, calibrado con el coste efectivo observado en los datos reales si está disponible' },
+        debtPercentage:     { type: 'number', description: 'Proporción de deuda sobre capital total (D/V) en decimal, basada en la estructura real de la empresa' },
+        taxRate:            { type: 'number', description: 'Tasa impositiva corporativa efectiva en decimal, derivada de los datos reales cuando sea posible' },
+        terminalGrowthRate: { type: 'number', description: 'Tasa de crecimiento perpetuo (g) en decimal, ajustada al sector, país y tamaño de la empresa' },
+        explanation:        { type: 'string', description: 'Justificación detallada en español (5-7 oraciones): tasa libre de riesgo del país, prima de riesgo de mercado (ERP Damodaran), beta sectorial desapalancada y reapalancada con el D/E real, coste de deuda efectivo vs. mercado, prima por tamaño si aplica, y cómo los datos financieros específicos diferencian este WACC del promedio sectorial.' },
       },
       required: ['wacc', 'costOfEquity', 'costOfDebt', 'debtPercentage', 'taxRate', 'terminalGrowthRate', 'explanation'],
     },
@@ -427,34 +441,86 @@ export async function estimateWACC(
   country: string,
   currency: string,
   businessActivity?: string,
+  financialContext?: WACCFinancialContext,
 ): Promise<WACCEstimateResult> {
-  const prompt = `Eres un experto en finanzas corporativas y valoración de empresas.
-Necesito que estimes el WACC (Coste Promedio Ponderado de Capital) de mercado para una empresa con las siguientes características:
 
-- Sector / Industria: ${industry || 'No especificado'}
-- Actividad comercial: ${businessActivity || 'No especificado'}
-- País de origen: ${country || 'No especificado'}
+  // Obtener WACC de referencia desde la tabla de industrias
+  const tableWACC: IndustryWACC | null = lookupIndustryWACC(industry);
+
+  // Sección de referencia de la tabla
+  const tableSection = tableWACC
+    ? `WACC DE REFERENCIA (mercado chileno como base):
+- Empresa grande (ventas > UF 100.000):  ${(tableWACC.large * 100).toFixed(2)}%
+- Empresa mediana (ventas UF 25.000-100.000): ${(tableWACC.medium * 100).toFixed(2)}%
+- Empresa pequeña (ventas < UF 25.000):  ${(tableWACC.small * 100).toFixed(2)}%
+
+Estos valores son el punto de partida para el mercado chileno. DEBES ajustar según:
+- Si el país es MENOS riesgoso que Chile (ej. EE.UU., Alemania, UK): resta 0.5%-2.0% al WACC de referencia
+- Si el país es MÁS riesgoso que Chile (ej. Argentina, Venezuela, países con alta inflación o riesgo político): suma 1.5%-4.0%
+- Si el país es similar en riesgo a Chile (ej. Colombia, Perú, México): ajuste menor o nulo (±0.5%)`
+    : `NOTA: Industria no encontrada en la tabla de referencia. Estima el WACC basándote exclusivamente en datos de mercado del país y sector indicados.`;
+
+  // Construir sección de datos financieros reales si están disponibles
+  let financialSection = '';
+  if (financialContext) {
+    const { revenue, totalDebt, totalEquity, financialExpenses, ebt, incomeTax, ebitdaMargin, debtToEquity, employees } = financialContext;
+
+    const totalCapital = totalDebt + totalEquity;
+    const actualDebtPct = totalCapital > 0 ? totalDebt / totalCapital : null;
+    const effectiveCostOfDebt = totalDebt > 0 && financialExpenses > 0 ? financialExpenses / totalDebt : null;
+    const effectiveTaxRate = ebt > 0 && incomeTax > 0 ? incomeTax / ebt : null;
+
+    financialSection = `
+DATOS FINANCIEROS REALES DE LA EMPRESA (último año disponible):
+- Ingresos por ventas: ${currency} ${revenue.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+- Deuda financiera total (LP + CP): ${currency} ${totalDebt.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+- Patrimonio neto contable: ${currency} ${totalEquity.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+- Estructura de capital real: D/V = ${actualDebtPct !== null ? (actualDebtPct * 100).toFixed(1) + '%' : 'n/d'}, E/V = ${actualDebtPct !== null ? ((1 - actualDebtPct) * 100).toFixed(1) + '%' : 'n/d'}
+- Gastos financieros (P&G): ${currency} ${financialExpenses.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+- Coste de deuda efectivo implícito: ${effectiveCostOfDebt !== null ? (effectiveCostOfDebt * 100).toFixed(2) + '%' : 'n/d'}
+- D/E (ratio deuda/patrimonio): ${debtToEquity !== null ? debtToEquity.toFixed(2) + 'x' : 'n/d'}
+- Margen EBITDA: ${ebitdaMargin !== null ? (ebitdaMargin * 100).toFixed(1) + '%' : 'n/d'}
+- Tasa impositiva efectiva: ${effectiveTaxRate !== null ? (effectiveTaxRate * 100).toFixed(1) + '%' : 'n/d'}
+- Número de empleados: ${employees !== null && employees !== undefined ? employees : 'no disponible'}
+
+USO DE LOS DATOS FINANCIEROS:
+1. Usa la estructura de capital real (D/V y E/V) para reapalancar la beta sectorial.
+2. Usa el coste de deuda efectivo si es razonable (1%-20%); si es 0% o >20%, usa el coste de mercado.
+3. Usa la tasa impositiva efectiva si está entre 5%-45%; si no, usa la tasa corporativa legal del país.
+4. Determina el tamaño de la empresa (grande/mediana/pequeña) según los ingresos y el contexto del país, y aplica el WACC de referencia correspondiente de la tabla.
+5. Aplica prima por tamaño si la empresa es pequeña (primas típicas adicionales: mediana +0%, pequeña +0.5%-1%, microempresa +1.5%-2.5%).`;
+  } else {
+    financialSection = '\nNOTA: No se dispone de datos financieros reales. Usa el WACC de referencia de la tabla y ajusta exclusivamente por país.';
+  }
+
+  const prompt = `Eres un experto en finanzas corporativas y valoración de empresas. Estima el WACC para esta empresa específica.
+
+DATOS DE LA EMPRESA:
+- Industria: ${industry || 'No especificado'}
+- Actividad: ${businessActivity || 'No especificado'}
+- País: ${country || 'No especificado'}
 - Moneda: ${currency || 'No especificado'}
 
-Para calcular el WACC debes considerar datos actuales de mercado:
-1. Tasa libre de riesgo del país (bono soberano a 10 años o equivalente)
-2. Prima de riesgo de mercado del país (ERP - Equity Risk Premium de Damodaran u otras fuentes)
-3. Beta desapalancada del sector (fuente: Damodaran u otras)
-4. Coste de deuda típico del sector en ese país
-5. Estructura de capital típica del sector (D/V y E/V)
-6. Tasa impositiva corporativa efectiva del país
-7. Tasa de crecimiento perpetuo (g) razonable para el sector y país
+${tableSection}
+${financialSection}
 
-Usa tu conocimiento actualizado de parámetros de mercado para ${country || 'el país'} y el sector ${industry || 'indicado'}.
+PROCESO DE CÁLCULO:
+1. Parte del WACC de referencia de la tabla para el tamaño correcto (calculado desde los ingresos reales)
+2. Ajusta por diferencia de riesgo-país respecto a Chile (bono soberano + spread)
+3. Reapalanca la beta con el D/E real de la empresa
+4. Recalcula Ke = Rf_país + β_reapalancada × ERP_país + prima_tamaño
+5. Calibra Kd con el coste efectivo observado o con tasas de mercado del país para el sector
+6. Aplica la estructura de capital real para ponderar
+7. WACC final = Ke × (E/V) + Kd × (1-T) × (D/V)
 
-Responde usando la herramienta estimate_wacc con valores numéricos precisos y en decimal.`;
+Responde usando la herramienta estimate_wacc. Todos los valores en decimal.`;
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 2000,
+    max_tokens: 3000,
     tools: waccTools,
     tool_choice: { type: 'any' },
-    system: 'Eres un experto en finanzas corporativas con conocimiento actualizado de tasas de mercado globales. Usa la herramienta estimate_wacc para entregar tu estimación. Todos los valores numéricos deben estar en formato decimal.',
+    system: `Eres un experto senior en finanzas corporativas. Estimas el WACC de empresas específicas usando una tabla de referencia sectorial chilena como ancla, ajustando por país y perfil financiero real. El resultado debe variar según industria, país y tamaño. Usa siempre la herramienta estimate_wacc. Valores en decimal.`,
     messages: [{ role: 'user', content: prompt }],
   });
 

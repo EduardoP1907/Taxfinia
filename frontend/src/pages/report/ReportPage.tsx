@@ -532,7 +532,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
                               {downloading[`${report.id}-docx`]
                                 ? <RefreshCw className="w-3 h-3 animate-spin" />
                                 : <Lock className="w-3 h-3" />}
-                              Descargar
+                              Descargar Prometheia
                             </button>
                           ) : (
                             <button
