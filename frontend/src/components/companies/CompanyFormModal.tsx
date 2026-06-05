@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import type { Company, CreateCompanyData, UpdateCompanyData } from '../../types/company';
+import type { Company, CompanySize, CreateCompanyData, UpdateCompanyData } from '../../types/company';
 import { INDUSTRY_LIST } from '../../constants/industries';
 
 interface CompanyFormModalProps {
@@ -33,6 +33,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
     taxId: '',
     industry: '',
     businessActivity: '',
+    companySize: '' as CompanySize | '',
     country: 'CL',
     description: '',
     website: '',
@@ -52,6 +53,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
         taxId: company.taxId || '',
         industry: company.industry || '',
         businessActivity: (company as any).businessActivity || '',
+        companySize: (company.companySize as CompanySize | undefined) || '',
         country: company.country || 'CL',
         description: company.description || '',
         website: company.website || '',
@@ -67,6 +69,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
         taxId: '',
         industry: '',
         businessActivity: '',
+        companySize: '',
         country: 'CL',
         description: '',
         website: '',
@@ -104,6 +107,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
         taxId: formData.taxId || undefined,
         industry: formData.industry || undefined,
         businessActivity: formData.businessActivity || undefined,
+        companySize: formData.companySize || undefined,
         country: formData.country || undefined,
         description: formData.description || undefined,
         website: formData.website || undefined,
@@ -169,13 +173,22 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
             </select>
           </div>
 
-          <Input
-            label="Giro / Actividad"
-            name="businessActivity"
-            value={formData.businessActivity}
-            onChange={handleChange}
-            placeholder="Ej: Venta al por mayor de alimentos"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tamaño de empresa
+            </label>
+            <select
+              name="companySize"
+              value={formData.companySize}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            >
+              <option value="">— Seleccionar tamaño —</option>
+              <option value="LARGE">Grande</option>
+              <option value="MEDIUM">Mediana</option>
+              <option value="SMALL">Pequeña</option>
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { companyService, unlockCompany, getAllCompaniesAdmin } from '../services/company.service';
 import { validationResult } from 'express-validator';
+import prisma from '../config/database';
+import { refreshWaccForScenario } from './projections.controller';
 
 export class CompanyController {
   async createCompany(req: Request, res: Response): Promise<void> {
@@ -89,12 +91,37 @@ export class CompanyController {
       const { id } = req.params;
       const updateData = req.body;
 
+      // Leer valores actuales para detectar cambios relevantes para el WACC
+      const before = await prisma.company.findFirst({
+        where: { id, userId, deletedAt: null },
+        select: { industry: true, companySize: true },
+      });
+
       const company = await companyService.updateCompany(id, userId, updateData);
+
+      // Re-estimar WACC si cambió industria o tamaño (sincrónico — antes de responder)
+      const industryChanged = before?.industry !== (updateData.industry ?? before?.industry);
+      const sizeChanged = before?.companySize !== (updateData.companySize ?? before?.companySize);
+
+      if (industryChanged || sizeChanged) {
+        const scenarios = await prisma.projectionScenario.findMany({
+          where: { companyId: id },
+          select: { id: true },
+        });
+
+        if (scenarios.length > 0) {
+          console.log(`[WACC-AUTO] Industria/tamaño cambiados en empresa ${id} — re-estimando WACC para ${scenarios.length} escenario(s)`);
+          const results = await Promise.allSettled(scenarios.map((s) => refreshWaccForScenario(s.id)));
+          const failed = results.filter((r) => r.status === 'rejected');
+          if (failed.length > 0) console.error('[WACC-AUTO] Errores en re-estimación:', failed);
+        }
+      }
 
       res.status(200).json({
         success: true,
         message: 'Empresa actualizada exitosamente',
         data: company,
+        waccRefreshed: (industryChanged || sizeChanged),
       });
     } catch (error: any) {
       console.error('Error updating company:', error);

@@ -87,6 +87,7 @@ model Company {
   deletedAt        DateTime?            @map("deleted_at")
   baseYear         Int?                 @map("base_year")
   businessActivity String?              @map("business_activity")
+  companySize      String?              @map("company_size")
   isLocked         Boolean              @default(false) @map("is_locked")
   user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   fiscalYears      FiscalYear[]

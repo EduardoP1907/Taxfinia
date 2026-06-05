@@ -6,6 +6,7 @@ interface CreateCompanyData {
   taxId?: string;
   industry?: string;
   businessActivity?: string;
+  companySize?: string;
   country?: string;
   description?: string;
   website?: string;
@@ -20,6 +21,7 @@ interface UpdateCompanyData {
   taxId?: string;
   industry?: string;
   businessActivity?: string;
+  companySize?: string;
   country?: string;
   description?: string;
   website?: string;
@@ -38,6 +40,7 @@ export class CompanyService {
         taxId: data.taxId,
         industry: data.industry,
         businessActivity: data.businessActivity,
+        companySize: data.companySize,
         country: data.country || 'ES',
         description: data.description,
         website: data.website,
@@ -109,6 +112,7 @@ export class CompanyService {
         taxId: data.taxId,
         industry: data.industry,
         businessActivity: data.businessActivity,
+        companySize: data.companySize,
         country: data.country,
         description: data.description,
         website: data.website,

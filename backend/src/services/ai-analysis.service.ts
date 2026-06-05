@@ -442,14 +442,38 @@ export async function estimateWACC(
   currency: string,
   businessActivity?: string,
   financialContext?: WACCFinancialContext,
+  companySize?: string | null,
 ): Promise<WACCEstimateResult> {
 
   // Obtener WACC de referencia desde la tabla de industrias
   const tableWACC: IndustryWACC | null = lookupIndustryWACC(industry);
 
+  // Mapear companySize al campo de la tabla
+  const sizeKey: 'large' | 'medium' | 'small' | null =
+    companySize === 'LARGE' ? 'large'
+    : companySize === 'MEDIUM' ? 'medium'
+    : companySize === 'SMALL' ? 'small'
+    : null;
+
+  const sizeLabel =
+    sizeKey === 'large' ? 'Grande'
+    : sizeKey === 'medium' ? 'Mediana'
+    : sizeKey === 'small' ? 'Pequeña'
+    : null;
+
   // Sección de referencia de la tabla
-  const tableSection = tableWACC
-    ? `WACC DE REFERENCIA (mercado chileno como base):
+  let tableSection: string;
+  if (tableWACC) {
+    if (sizeKey) {
+      tableSection = `WACC DE REFERENCIA (mercado chileno como base):
+- Tamaño de empresa: ${sizeLabel} → WACC de referencia: ${(tableWACC[sizeKey] * 100).toFixed(2)}%
+
+Este valor es el punto de partida fijado por el analista para el mercado chileno. DEBES ajustar según:
+- Si el país es MENOS riesgoso que Chile (ej. EE.UU., Alemania, UK): resta 0.5%-2.0% al WACC de referencia
+- Si el país es MÁS riesgoso que Chile (ej. Argentina, Venezuela, países con alta inflación o riesgo político): suma 1.5%-4.0%
+- Si el país es similar en riesgo a Chile (ej. Colombia, Perú, México): ajuste menor o nulo (±0.5%)`;
+    } else {
+      tableSection = `WACC DE REFERENCIA (mercado chileno como base):
 - Empresa grande (ventas > UF 100.000):  ${(tableWACC.large * 100).toFixed(2)}%
 - Empresa mediana (ventas UF 25.000-100.000): ${(tableWACC.medium * 100).toFixed(2)}%
 - Empresa pequeña (ventas < UF 25.000):  ${(tableWACC.small * 100).toFixed(2)}%
@@ -457,8 +481,11 @@ export async function estimateWACC(
 Estos valores son el punto de partida para el mercado chileno. DEBES ajustar según:
 - Si el país es MENOS riesgoso que Chile (ej. EE.UU., Alemania, UK): resta 0.5%-2.0% al WACC de referencia
 - Si el país es MÁS riesgoso que Chile (ej. Argentina, Venezuela, países con alta inflación o riesgo político): suma 1.5%-4.0%
-- Si el país es similar en riesgo a Chile (ej. Colombia, Perú, México): ajuste menor o nulo (±0.5%)`
-    : `NOTA: Industria no encontrada en la tabla de referencia. Estima el WACC basándote exclusivamente en datos de mercado del país y sector indicados.`;
+- Si el país es similar en riesgo a Chile (ej. Colombia, Perú, México): ajuste menor o nulo (±0.5%)`;
+    }
+  } else {
+    tableSection = 'NOTA: Industria no encontrada en la tabla de referencia. Estima el WACC basándote exclusivamente en datos de mercado del país y sector indicados.';
+  }
 
   // Construir sección de datos financieros reales si están disponibles
   let financialSection = '';
@@ -493,6 +520,10 @@ USO DE LOS DATOS FINANCIEROS:
     financialSection = '\nNOTA: No se dispone de datos financieros reales. Usa el WACC de referencia de la tabla y ajusta exclusivamente por país.';
   }
 
+  const sizeInstruction = sizeKey
+    ? `- Tamaño de empresa (definido por el analista): ${sizeLabel} → usa el WACC de referencia de esta fila directamente como ancla.`
+    : `- Tamaño de empresa: no especificado → determínalo a partir de los ingresos y el contexto del país.`;
+
   const prompt = `Eres un experto en finanzas corporativas y valoración de empresas. Estima el WACC para esta empresa específica.
 
 DATOS DE LA EMPRESA:
@@ -500,12 +531,13 @@ DATOS DE LA EMPRESA:
 - Actividad: ${businessActivity || 'No especificado'}
 - País: ${country || 'No especificado'}
 - Moneda: ${currency || 'No especificado'}
+${sizeInstruction}
 
 ${tableSection}
 ${financialSection}
 
 PROCESO DE CÁLCULO:
-1. Parte del WACC de referencia de la tabla para el tamaño correcto (calculado desde los ingresos reales)
+1. Parte del WACC de referencia de la tabla para el tamaño indicado (${sizeLabel ?? 'inferir desde ingresos reales'})
 2. Ajusta por diferencia de riesgo-país respecto a Chile (bono soberano + spread)
 3. Reapalanca la beta con el D/E real de la empresa
 4. Recalcula Ke = Rf_país + β_reapalancada × ERP_país + prima_tamaño

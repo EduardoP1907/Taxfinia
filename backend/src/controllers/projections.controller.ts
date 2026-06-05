@@ -290,11 +290,89 @@ export const getDCFResults = async (req: Request, res: Response) => {
  * Consulta a Claude para obtener un WACC de mercado ajustado al rubro y país,
  * lo guarda en el escenario y lo devuelve al cliente.
  */
+/**
+ * Shared helper: re-estima y guarda el WACC para un escenario dado.
+ * Se puede llamar desde el HTTP handler o desde background tasks.
+ * Devuelve el resultado completo de estimación.
+ */
+export async function refreshWaccForScenario(scenarioId: string): Promise<ReturnType<typeof estimateWACC>> {
+  const scenario = await prisma.projectionScenario.findUnique({
+    where: { id: scenarioId },
+    include: { company: true },
+  });
+
+  if (!scenario) throw new Error('Escenario no encontrado');
+
+  const { industry, country, currency, businessActivity, companySize } = scenario.company as any;
+  if (!industry && !country) throw new Error('La empresa no tiene industria ni país configurados');
+
+  const toNum = (v: any) => (v ? parseFloat(v.toString()) : 0);
+
+  let financialContext: WACCFinancialContext | undefined;
+  try {
+    const latestFiscalYear = await prisma.fiscalYear.findFirst({
+      where: { companyId: scenario.company.id, quarter: 0 },
+      orderBy: { year: 'desc' },
+      include: {
+        balanceSheet: true,
+        incomeStatement: true,
+        calculatedRatios: true,
+        additionalData: true,
+      },
+    });
+
+    if (latestFiscalYear?.balanceSheet && latestFiscalYear?.incomeStatement) {
+      const bs = latestFiscalYear.balanceSheet;
+      const is = latestFiscalYear.incomeStatement;
+      const ratios = latestFiscalYear.calculatedRatios;
+      const ad = latestFiscalYear.additionalData;
+
+      const revenue = toNum(is.revenue);
+      const financialExpenses = toNum(is.financialExpenses);
+      const totalDebt = toNum(bs.bankDebtLp) + toNum(bs.bankDebtSp);
+      const totalEquity = toNum(bs.shareCapital) + toNum(bs.reserves) + toNum(bs.retainedEarnings) - toNum(bs.treasuryStock);
+      const grossMargin = revenue - toNum(is.costOfSales) - toNum(is.staffCostsSales);
+      const ebitda = grossMargin - toNum(is.adminExpenses) - toNum(is.staffCostsAdmin);
+      const ebit = ebitda - toNum(is.depreciation) + toNum(is.exceptionalIncome) - toNum(is.exceptionalExpenses);
+      const ebt = ebit + toNum(is.financialIncome) - financialExpenses;
+
+      financialContext = {
+        revenue,
+        totalDebt,
+        totalEquity,
+        financialExpenses,
+        ebt,
+        incomeTax: toNum(is.incomeTax),
+        ebitdaMargin: ratios?.ebitdaMargin ? parseFloat(ratios.ebitdaMargin.toString()) : null,
+        debtToEquity: ratios?.debtToEquity ? parseFloat(ratios.debtToEquity.toString()) : null,
+        employees: ad?.averageEmployees ?? (scenario.company as any).employees ?? null,
+      };
+    }
+  } catch (ctxErr) {
+    console.warn('[WACC-AI] No se pudieron obtener datos financieros reales:', ctxErr);
+  }
+
+  console.log(`[WACC-AI] Estimando WACC para sector="${industry}" país="${country}" tamaño="${companySize ?? 'no especificado'}" con datos financieros: ${financialContext ? 'sí' : 'no'}`);
+
+  const estimate = await estimateWACC(industry, country, currency, businessActivity, financialContext, companySize);
+
+  await prisma.projectionScenario.update({
+    where: { id: scenarioId },
+    data: {
+      wacc: estimate.wacc,
+      terminalGrowthRate: estimate.terminalGrowthRate,
+    },
+  });
+
+  console.log(`[WACC-AI] WACC estimado: ${(estimate.wacc * 100).toFixed(2)}% — guardado en escenario ${scenarioId}`);
+
+  return estimate;
+}
+
 export const estimateWACCWithAI = async (req: Request, res: Response) => {
   try {
     const { scenarioId } = req.params;
 
-    // Obtener el escenario y su empresa asociada
     const scenario = await prisma.projectionScenario.findUnique({
       where: { id: scenarioId },
       include: { company: true },
@@ -304,7 +382,7 @@ export const estimateWACCWithAI = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Escenario no encontrado' });
     }
 
-    const { industry, country, currency, businessActivity } = scenario.company as any;
+    const { industry, country } = scenario.company as any;
 
     if (!industry && !country) {
       return res.status(400).json({
@@ -312,67 +390,7 @@ export const estimateWACCWithAI = async (req: Request, res: Response) => {
       });
     }
 
-    // Obtener datos financieros del último año anual para calibrar el WACC
-    let financialContext: WACCFinancialContext | undefined;
-    try {
-      const latestFiscalYear = await prisma.fiscalYear.findFirst({
-        where: { companyId: scenario.company.id, quarter: 0 },
-        orderBy: { year: 'desc' },
-        include: {
-          balanceSheet: true,
-          incomeStatement: true,
-          calculatedRatios: true,
-          additionalData: true,
-        },
-      });
-
-      if (latestFiscalYear?.balanceSheet && latestFiscalYear?.incomeStatement) {
-        const bs = latestFiscalYear.balanceSheet;
-        const is = latestFiscalYear.incomeStatement;
-        const ratios = latestFiscalYear.calculatedRatios;
-        const ad = latestFiscalYear.additionalData;
-        const toNum = (v: any) => (v ? parseFloat(v.toString()) : 0);
-
-        const revenue = toNum(is.revenue);
-        const financialExpenses = toNum(is.financialExpenses);
-        const totalDebt = toNum(bs.bankDebtLp) + toNum(bs.bankDebtSp);
-        const totalEquity = toNum(bs.shareCapital) + toNum(bs.reserves) + toNum(bs.retainedEarnings) - toNum(bs.treasuryStock);
-        // EBT derivado desde los componentes del P&G
-        const grossMargin = revenue - toNum(is.costOfSales) - toNum(is.staffCostsSales);
-        const ebitda = grossMargin - toNum(is.adminExpenses) - toNum(is.staffCostsAdmin);
-        const ebit = ebitda - toNum(is.depreciation) + toNum(is.exceptionalIncome) - toNum(is.exceptionalExpenses);
-        const ebt = ebit + toNum(is.financialIncome) - financialExpenses;
-
-        financialContext = {
-          revenue,
-          totalDebt,
-          totalEquity,
-          financialExpenses,
-          ebt,
-          incomeTax: toNum(is.incomeTax),
-          ebitdaMargin: ratios?.ebitdaMargin ? parseFloat(ratios.ebitdaMargin.toString()) : null,
-          debtToEquity: ratios?.debtToEquity ? parseFloat(ratios.debtToEquity.toString()) : null,
-          employees: ad?.averageEmployees ?? (scenario.company as any).employees ?? null,
-        };
-      }
-    } catch (ctxErr) {
-      console.warn('[WACC-AI] No se pudieron obtener datos financieros reales:', ctxErr);
-    }
-
-    console.log(`[WACC-AI] Estimando WACC para sector="${industry}" país="${country}" con datos financieros: ${financialContext ? 'sí' : 'no'}`);
-
-    const estimate = await estimateWACC(industry, country, currency, businessActivity, financialContext);
-
-    // Guardar automáticamente el WACC estimado en el escenario
-    await prisma.projectionScenario.update({
-      where: { id: scenarioId },
-      data: {
-        wacc: estimate.wacc,
-        terminalGrowthRate: estimate.terminalGrowthRate,
-      },
-    });
-
-    console.log(`[WACC-AI] WACC estimado: ${(estimate.wacc * 100).toFixed(2)}% — guardado en escenario`);
+    const estimate = await refreshWaccForScenario(scenarioId);
 
     res.json({ ...estimate, savedToScenario: true });
   } catch (error: any) {
