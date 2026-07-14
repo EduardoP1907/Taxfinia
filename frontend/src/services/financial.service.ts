@@ -29,13 +29,18 @@ export const financialService = {
     return response.data.data;
   },
 
-  async getQuarterlyFiscalYears(companyId: string): Promise<FiscalYear[]> {
+  async getAnnualFiscalYears(companyId: string): Promise<FiscalYear[]> {
     const all = await financialService.getFiscalYears(companyId);
-    return all.filter((fy: any) => (fy.quarter ?? 0) > 0);
+    return all.filter((fy: any) => (fy.quarter ?? 0) === 0 && (fy.month ?? 0) === 0);
   },
 
-  async createQuarterlyFiscalYear(companyId: string, year: number, quarter: number): Promise<FiscalYear> {
-    const response = await api.post(`/financial/companies/${companyId}/fiscal-years`, { year, quarter });
+  async getMonthlyFiscalYears(companyId: string, year: number): Promise<FiscalYear[]> {
+    const all = await financialService.getFiscalYears(companyId);
+    return all.filter((fy: any) => (fy.month ?? 0) > 0 && fy.year === year);
+  },
+
+  async createMonthlyFiscalYear(companyId: string, year: number, month: number): Promise<FiscalYear> {
+    const response = await api.post(`/financial/companies/${companyId}/fiscal-years`, { year, quarter: 0, month });
     return response.data.data;
   },
 

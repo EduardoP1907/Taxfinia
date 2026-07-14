@@ -142,8 +142,8 @@ export const MultiYearDataEntryPage: React.FC = () => {
       setCompany(companyData);
       setSelectedCompanyInStore(companyData);
 
-      // Obtener años fiscales existentes
-      const fiscalYears = await financialService.getFiscalYears(companyId);
+      // Obtener solo años fiscales anuales (excluye registros mensuales)
+      const fiscalYears = await financialService.getAnnualFiscalYears(companyId);
 
       // Si no hay años, crear uno usando el año base de la empresa
       if (fiscalYears.length === 0) {

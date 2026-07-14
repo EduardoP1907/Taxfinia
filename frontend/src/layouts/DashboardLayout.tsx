@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/auth.service';
 import {
   LayoutDashboard, FileText, LogOut, Menu, X,
-  Building2, FileBarChart, TrendingUp, Flame, ShieldCheck, ChevronRight, ArrowLeftRight,
+  Building2, FileBarChart, TrendingUp, Flame, ShieldCheck, ChevronRight, ArrowLeftRight, CalendarDays,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -40,6 +40,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
         { name: 'Proyecciones',   href: '/proyecciones', icon: TrendingUp },
         { name: 'Informe Anual',  href: '/informe',      icon: FileBarChart },
         { name: 'Comparar',       href: '/comparar',     icon: ArrowLeftRight },
+      ],
+    },
+    {
+      label: 'Análisis Mensual',
+      items: [
+        { name: 'Forecast Mensual',   href: '/forecast-mensual',    icon: TrendingUp },
+        { name: 'Datos Mensuales',    href: '/datos-trimestrales',  icon: CalendarDays },
+        { name: 'Informe Mensual',    href: '/informe-trimestral',  icon: FileBarChart },
       ],
     },
     ...(isAdmin ? [{

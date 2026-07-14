@@ -1,196 +1,191 @@
 /**
- * QuarterlyDataEntryPage
- * Ingreso de datos financieros por trimestre (T1, T2, T3).
+ * MonthlyDataEntryPage (ruta: /datos-trimestrales)
  *
- * Flujo:
- * 1. Seleccionar empresa (CompanySelector)
- * 2. Seleccionar trimestre y año (QuarterSelector modal)
- * 3. Ingresar datos con columnas = meses del trimestre elegido
- *    - P&G: se suma por mes → total acumulado
- *    - Balance: se usa el valor del último mes del trimestre
+ * Ingreso de datos financieros mes a mes (enero–diciembre).
+ * Cada mes tiene exactamente los mismos campos que el formulario anual.
+ * Los datos se guardan como FiscalYear con month=1..12.
  */
 
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Button } from '../../components/ui/Button';
+import { Save, CalendarDays, Building2, Wand2 } from 'lucide-react';
 import { companyService } from '../../services/company.service';
 import { financialService } from '../../services/financial.service';
+import { monthlyForecastService } from '../../services/monthly-forecast.service';
 import { useCompanyStore } from '../../store/companyStore';
 import { CompanySelector } from '../../components/companies/CompanySelector';
 import type { Company } from '../../types/company';
-import { Save, Calendar, AlertCircle, CheckCircle } from 'lucide-react';
+import type {
+  CreateBalanceSheetData,
+  CreateIncomeStatementData,
+  CreateAdditionalDataData,
+} from '../../types/financial';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-const QUARTER_MONTHS: Record<number, { label: string; months: string[]; short: string }> = {
-  1: { label: 'T1 — Enero a Marzo',     months: ['Enero',    'Febrero',   'Marzo'],     short: 'Ene-Mar' },
-  2: { label: 'T2 — Abril a Junio',     months: ['Abril',    'Mayo',      'Junio'],     short: 'Abr-Jun' },
-  3: { label: 'T3 — Julio a Septiembre', months: ['Julio',   'Agosto',    'Septiembre'], short: 'Jul-Sep' },
-};
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const formatNum = (v: number | string | undefined): string => {
+const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const MONTHS_FULL  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+const TABS = [
+  { id: 'balance',    name: 'Balance de Situación' },
+  { id: 'income',     name: 'Pérdidas y Ganancias' },
+  { id: 'additional', name: 'Datos Adicionales' },
+] as const;
+type TabId = typeof TABS[number]['id'];
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface MonthRecord {
+  fiscalYearId: string | null;
+  balance:    CreateBalanceSheetData;
+  income:     CreateIncomeStatementData;
+  additional: CreateAdditionalDataData;
+}
+
+const emptyRecord = (): MonthRecord => ({
+  fiscalYearId: null,
+  balance:      {},
+  income:       {},
+  additional:   {},
+});
+
+// ─── Number helpers ───────────────────────────────────────────────────────────
+
+const fmt = (v: number | string | undefined): string => {
   if (v === undefined || v === null || v === '') return '';
   const n = typeof v === 'string' ? parseFloat(v.replace(/\./g, '')) : v;
-  if (isNaN(n)) return '';
+  if (isNaN(n) || n === 0) return '';
   return n.toLocaleString('es-ES', { maximumFractionDigits: 0 });
 };
 
-const parseNum = (v: string): number => {
-  if (!v) return 0;
-  const n = parseInt(v.replace(/\./g, ''));
-  return isNaN(n) ? 0 : n;
+const evaluateExpression = (raw: string): number => {
+  if (!raw || raw.trim() === '') return 0;
+  const s = raw.trim().replace(/\s/g, '');
+  if (!/\d[+\-]/.test(s)) {
+    const cleaned = s.replace(/\./g, '');
+    const n = parseInt(cleaned);
+    return isNaN(n) ? 0 : n;
+  }
+  const tokens: string[] = [];
+  let current = '';
+  for (let i = 0; i < s.length; i++) {
+    if ((s[i] === '+' || s[i] === '-') && current.length > 0 && /\d$/.test(current)) {
+      tokens.push(current);
+      current = s[i];
+    } else {
+      current += s[i];
+    }
+  }
+  if (current) tokens.push(current);
+  let sum = 0;
+  for (const token of tokens) {
+    let sign = 1;
+    let numStr = token;
+    if (token.startsWith('-')) { sign = -1; numStr = token.slice(1); }
+    else if (token.startsWith('+')) { numStr = token.slice(1); }
+    const cleaned = numStr.replace(/\./g, '');
+    sum += sign * (parseInt(cleaned) || 0);
+  }
+  return Math.round(sum);
 };
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type MonthlyIncome = { revenue: number; costOfSales: number; staffCostsSales: number; adminExpenses: number; staffCostsAdmin: number; depreciation: number; exceptionalIncome: number; exceptionalExpenses: number; financialIncome: number; financialExpenses: number; incomeTax: number };
-type BalanceSnap   = { tangibleAssets: number; intangibleAssets: number; financialInvestmentsLp: number; otherNoncurrentAssets: number; inventory: number; accountsReceivable: number; otherReceivables: number; taxReceivables: number; cashEquivalents: number; shareCapital: number; reserves: number; retainedEarnings: number; treasuryStock: number; provisionsLp: number; bankDebtLp: number; otherLiabilitiesLp: number; provisionsSp: number; bankDebtSp: number; accountsPayable: number; taxLiabilities: number; otherLiabilitiesSp: number };
+// ─── ExpressionInput ─────────────────────────────────────────────────────────
 
-const emptyIncome  = (): MonthlyIncome  => ({ revenue: 0, costOfSales: 0, staffCostsSales: 0, adminExpenses: 0, staffCostsAdmin: 0, depreciation: 0, exceptionalIncome: 0, exceptionalExpenses: 0, financialIncome: 0, financialExpenses: 0, incomeTax: 0 });
-const emptyBalance = (): BalanceSnap   => ({ tangibleAssets: 0, intangibleAssets: 0, financialInvestmentsLp: 0, otherNoncurrentAssets: 0, inventory: 0, accountsReceivable: 0, otherReceivables: 0, taxReceivables: 0, cashEquivalents: 0, shareCapital: 0, reserves: 0, retainedEarnings: 0, treasuryStock: 0, provisionsLp: 0, bankDebtLp: 0, otherLiabilitiesLp: 0, provisionsSp: 0, bankDebtSp: 0, accountsPayable: 0, taxLiabilities: 0, otherLiabilitiesSp: 0 });
+const ExpressionInput: React.FC<{
+  value: number | string | undefined;
+  onChange: (val: string) => void;
+}> = ({ value, onChange }) => {
+  const [raw, setRaw] = React.useState<string | null>(null);
+  const isExpr = raw !== null && /\d[+\-]/.test(raw);
+  const display = raw !== null ? raw : fmt(value);
+  const computed = isExpr ? evaluateExpression(raw!) : null;
 
-// ─── Income field config ──────────────────────────────────────────────────────
-const INCOME_FIELDS: { label: string; key: keyof MonthlyIncome; isCost?: boolean }[] = [
-  { label: 'Ingresos por Ventas',       key: 'revenue' },
-  { label: 'Coste de las ventas',       key: 'costOfSales',        isCost: true },
-  { label: 'Costes personal ventas',    key: 'staffCostsSales',    isCost: true },
-  { label: 'Gastos de administración',  key: 'adminExpenses',      isCost: true },
-  { label: 'Costes personal admin',     key: 'staffCostsAdmin',    isCost: true },
-  { label: 'Amortizaciones',            key: 'depreciation',       isCost: true },
-  { label: 'Ingresos excepcionales',    key: 'exceptionalIncome' },
-  { label: 'Gastos excepcionales',      key: 'exceptionalExpenses', isCost: true },
-  { label: 'Ingresos financieros',      key: 'financialIncome' },
-  { label: 'Gastos financieros',        key: 'financialExpenses',  isCost: true },
-  { label: 'Impuesto sobre Sociedades', key: 'incomeTax',          isCost: true },
-];
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={display}
+        onFocus={() => {
+          const n = value !== undefined && value !== null && value !== '' ? Number(value) : null;
+          setRaw(n !== null && !isNaN(n) ? String(n) : '');
+        }}
+        onChange={(e) => {
+          const val = e.target.value;
+          setRaw(val);
+          if (!/\d[+\-]/.test(val)) onChange(val);
+        }}
+        onBlur={(e) => {
+          const val = e.target.value;
+          onChange(val === '' ? '' : String(evaluateExpression(val)));
+          setRaw(null);
+        }}
+        title={computed !== null ? `= ${computed.toLocaleString('es-ES')}` : undefined}
+        className={`w-full px-1.5 py-1 border rounded text-xs text-right focus:ring-1 focus:outline-none transition-colors ${
+          isExpr
+            ? 'border-blue-400 focus:ring-blue-400 bg-blue-50 text-blue-700'
+            : 'border-slate-200 focus:ring-amber-400 focus:border-amber-400'
+        }`}
+        placeholder="0"
+      />
+      {isExpr && computed !== null && (
+        <span className="absolute right-0 -bottom-3.5 text-[9px] text-blue-500 leading-none pointer-events-none whitespace-nowrap">
+          = {computed.toLocaleString('es-ES')}
+        </span>
+      )}
+    </div>
+  );
+};
 
-// ─── Balance field config ─────────────────────────────────────────────────────
-const BALANCE_SECTIONS = [
-  {
-    title: 'ACTIVO NO CORRIENTE',
-    fields: [
-      { label: 'Inmovilizado material',        key: 'tangibleAssets' },
-      { label: 'Inmovilizado inmaterial',       key: 'intangibleAssets' },
-      { label: 'Inversiones financieras LP',    key: 'financialInvestmentsLp' },
-      { label: 'Otro activo LP',                key: 'otherNoncurrentAssets' },
-    ],
-  },
-  {
-    title: 'ACTIVO CORRIENTE',
-    fields: [
-      { label: 'Existencias',                   key: 'inventory' },
-      { label: 'Clientes',                      key: 'accountsReceivable' },
-      { label: 'Otros deudores',                key: 'otherReceivables' },
-      { label: 'Activos fiscales CP',            key: 'taxReceivables' },
-      { label: 'Efectivo y equivalentes',        key: 'cashEquivalents' },
-    ],
-  },
-  {
-    title: 'PATRIMONIO NETO',
-    fields: [
-      { label: 'Capital social',                key: 'shareCapital' },
-      { label: 'Reservas',                      key: 'reserves' },
-      { label: 'Resultado del ejercicio',        key: 'retainedEarnings' },
-      { label: 'Acciones propias (–)',           key: 'treasuryStock' },
-    ],
-  },
-  {
-    title: 'PASIVO NO CORRIENTE',
-    fields: [
-      { label: 'Provisiones LP',                key: 'provisionsLp' },
-      { label: 'Deudas LP',                     key: 'bankDebtLp' },
-      { label: 'Otros pasivos LP',              key: 'otherLiabilitiesLp' },
-    ],
-  },
-  {
-    title: 'PASIVO CORRIENTE',
-    fields: [
-      { label: 'Provisiones CP',                key: 'provisionsSp' },
-      { label: 'Deudas CP',                     key: 'bankDebtSp' },
-      { label: 'Proveedores',                   key: 'accountsPayable' },
-      { label: 'Pasivos fiscales CP',           key: 'taxLiabilities' },
-      { label: 'Otros pasivos CP',              key: 'otherLiabilitiesSp' },
-    ],
-  },
-] as const;
+// ─── YearSelector ─────────────────────────────────────────────────────────────
 
-// ─── QuarterSelector modal ────────────────────────────────────────────────────
-interface QuarterSelectorProps {
-  onConfirm: (year: number, quarter: number) => void;
-  onBack: () => void;
+const YearSelector: React.FC<{
   companyName: string;
-}
-const QuarterSelector: React.FC<QuarterSelectorProps> = ({ onConfirm, onBack, companyName }) => {
-  const currentYear = new Date().getFullYear();
-  const [year, setYear]       = useState(currentYear);
-  const [quarter, setQuarter] = useState<number | null>(null);
+  onConfirm: (year: number) => void;
+  onBack: () => void;
+}> = ({ companyName, onConfirm, onBack }) => {
+  const current = new Date().getFullYear();
+  const [year, setYear] = useState(current);
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        {/* Header */}
+      <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Calendar className="w-5 h-5 text-slate-900" />
+          <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center">
+            <CalendarDays className="w-5 h-5 text-slate-900" />
           </div>
           <div>
-            <p className="font-data text-[10px] text-amber-500/60 tracking-[0.2em] uppercase">/ Datos Trimestrales</p>
+            <p className="font-data text-[10px] text-amber-500/60 tracking-[0.2em] uppercase">/ Datos Mensuales</p>
             <h2 className="text-lg font-bold text-white leading-tight">{companyName}</h2>
           </div>
         </div>
-
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-
           <div className="p-5 space-y-5">
-            {/* Year */}
             <div>
               <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em] mb-2">Año fiscal</label>
               <select
                 value={year}
                 onChange={(e) => setYear(parseInt(e.target.value))}
-                className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+                className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"
               >
-                {[currentYear + 1, currentYear, currentYear - 1].map((y) => (
+                {[current + 1, current, current - 1, current - 2].map((y) => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
             </div>
-
-            {/* Quarter */}
-            <div>
-              <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em] mb-2">Trimestre</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[1, 2, 3].map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => setQuarter(q)}
-                    className={`py-4 rounded-lg border-2 text-sm font-semibold transition-all focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none ${
-                      quarter === q
-                        ? 'border-amber-500 bg-amber-500/10 text-amber-400'
-                        : 'border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200'
-                    }`}
-                  >
-                    <div className="text-lg font-bold mb-1">T{q}</div>
-                    <div className="text-[10px] font-normal text-slate-500">{QUARTER_MONTHS[q].short}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
+            <p className="text-xs text-slate-500">
+              Podrás ingresar datos para cada mes de enero a diciembre del año seleccionado.
+            </p>
             <div className="flex gap-3 pt-1">
               <button
                 onClick={onBack}
-                className="flex-1 py-2.5 border border-slate-700 hover:border-slate-600 text-slate-400 hover:text-slate-200 text-sm rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
+                className="flex-1 py-2.5 border border-slate-700 hover:border-slate-600 text-slate-400 text-sm rounded-lg transition-all"
               >
                 Volver
               </button>
-              <Button
-                onClick={() => quarter && onConfirm(year, quarter)}
-                disabled={!quarter}
-                className="flex-1"
-              >
-                Continuar
-              </Button>
+              <Button onClick={() => onConfirm(year)} className="flex-1">Continuar</Button>
             </div>
           </div>
         </div>
@@ -199,57 +194,142 @@ const QuarterSelector: React.FC<QuarterSelectorProps> = ({ onConfirm, onBack, co
   );
 };
 
-// ─── Editable cell ────────────────────────────────────────────────────────────
-const Cell: React.FC<{
-  value: number;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-}> = ({ value, onChange, disabled }) => {
-  const [raw, setRaw] = useState(value === 0 ? '' : formatNum(value));
-  const [focused, setFocused] = useState(false);
+// ─── Balance field config (same as annual) ────────────────────────────────────
 
-  useEffect(() => {
-    if (!focused) setRaw(value === 0 ? '' : formatNum(value));
-  }, [value, focused]);
+const BALANCE_ROWS = [
+  { type: 'section', label: 'ACTIVO',                   bg: 'bg-slate-200' },
+  { type: 'section', label: 'A) ACTIVO FIJO',           bg: 'bg-blue-100' },
+  { type: 'field',   label: 'Activo Fijo (neto)',        field: 'tangibleAssets',          indent: 1 },
+  { type: 'field',   label: 'Otros Activos',             field: 'intangibleAssets',         indent: 1 },
+  { type: 'field',   label: 'Inversiones financieras LP',field: 'financialInvestmentsLp',   indent: 1 },
+  { type: 'section', label: 'B) ACTIVO CIRCULANTE',     bg: 'bg-green-100' },
+  { type: 'field',   label: 'Existencias',              field: 'inventory',                indent: 1 },
+  { type: 'field',   label: 'Clientes - Realizable CP', field: 'accountsReceivable',       indent: 2 },
+  { type: 'field',   label: 'Otros - Realizable CP',    field: 'otherReceivables',         indent: 2 },
+  { type: 'field',   label: 'Impuestos - Realizable CP',field: 'taxReceivables',           indent: 2 },
+  { type: 'field',   label: 'Disponible',               field: 'cashEquivalents',          indent: 1 },
+  { type: 'total',   label: 'TOTAL ACTIVO (A+B)',       bg: 'bg-blue-200', key: 'totalActivo' },
+  { type: 'section', label: 'PATRIMONIO NETO Y PASIVO', bg: 'bg-slate-200' },
+  { type: 'field',   label: 'A) PATRIMONIO NETO',       field: 'shareCapital',             indent: 0, bold: true },
+  { type: 'field',   label: 'Reservas',                 field: 'reserves',                 indent: 1 },
+  { type: 'field',   label: 'Resultado del ejercicio',  field: 'retainedEarnings',         indent: 1 },
+  { type: 'field',   label: 'Acciones propias (–)',     field: 'treasuryStock',            indent: 1 },
+  { type: 'section', label: 'B) PASIVO NO CIRCULANTE',  bg: 'bg-orange-100' },
+  { type: 'field',   label: 'Provisiones LP',           field: 'provisionsLp',             indent: 1 },
+  { type: 'field',   label: 'Deudas Largo Plazo',       field: 'bankDebtLp',               indent: 1 },
+  { type: 'field',   label: 'Otras Largo Plazo',        field: 'otherLiabilitiesLp',       indent: 1 },
+  { type: 'section', label: 'C) PASIVO CIRCULANTE',     bg: 'bg-red-100' },
+  { type: 'field',   label: 'Provisiones CP',           field: 'provisionsSp',             indent: 1 },
+  { type: 'field',   label: 'Deudas Corto Plazo',       field: 'bankDebtSp',               indent: 1 },
+  { type: 'field',   label: 'Proveedores CP',           field: 'accountsPayable',          indent: 1 },
+  { type: 'field',   label: 'Impuestos Pasivo CP',      field: 'taxLiabilities',           indent: 1 },
+  { type: 'field',   label: 'Otras a Pagar CP',         field: 'otherLiabilitiesSp',       indent: 1 },
+  { type: 'total',   label: 'TOTAL PASIVO + PN (A+B+C)',bg: 'bg-blue-200', key: 'totalPasivo' },
+  { type: 'cuadratura' },
+] as const;
 
-  return (
-    <input
-      type="text"
-      inputMode="numeric"
-      disabled={disabled}
-      value={focused ? raw : (value === 0 ? '' : formatNum(value))}
-      onChange={(e) => setRaw(e.target.value)}
-      onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)); }}
-      onBlur={() => { setFocused(false); onChange(parseNum(raw)); }}
-      className="w-full text-right text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-amber-400 rounded px-2 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
-      placeholder="0"
-    />
-  );
+type BalanceRowField = Extract<typeof BALANCE_ROWS[number], { type: 'field' }>;
+
+const calcTotalActivo = (b: CreateBalanceSheetData): number =>
+  Number(b.tangibleAssets||0) + Number(b.intangibleAssets||0) + Number(b.financialInvestmentsLp||0) +
+  Number(b.otherNoncurrentAssets||0) + Number(b.inventory||0) + Number(b.accountsReceivable||0) +
+  Number(b.otherReceivables||0) + Number(b.taxReceivables||0) + Number(b.cashEquivalents||0);
+
+const calcTotalPasivo = (b: CreateBalanceSheetData): number =>
+  Number(b.shareCapital||0) + Number(b.reserves||0) + Number(b.retainedEarnings||0) - Number(b.treasuryStock||0) +
+  Number(b.provisionsLp||0) + Number(b.bankDebtLp||0) + Number(b.otherLiabilitiesLp||0) +
+  Number(b.provisionsSp||0) + Number(b.bankDebtSp||0) + Number(b.accountsPayable||0) +
+  Number(b.taxLiabilities||0) + Number(b.otherLiabilitiesSp||0);
+
+// ─── Income field config (same as annual) ────────────────────────────────────
+
+const INCOME_ROWS = [
+  { type: 'section', label: 'CUENTA DE PÉRDIDAS Y GANANCIAS', bg: 'bg-slate-200' },
+  { type: 'subsection', label: 'Ingresos por Ventas',          bg: 'bg-green-50' },
+  { type: 'field',   label: 'Ingresos por ventas (+)',         field: 'revenue',             indent: 1 },
+  { type: 'subsection', label: 'Coste de las ventas',          bg: 'bg-red-50' },
+  { type: 'field',   label: 'Coste de las ventas (–)',         field: 'costOfSales',         indent: 1 },
+  { type: 'field',   label: 'Remuneraciones ventas (–)',       field: 'staffCostsSales',     indent: 1 },
+  { type: 'subsection', label: 'Gastos de administración',     bg: 'bg-orange-50' },
+  { type: 'field',   label: 'Gastos administración (–)',       field: 'adminExpenses',       indent: 1 },
+  { type: 'field',   label: 'Remuneraciones admin (–)',        field: 'staffCostsAdmin',     indent: 1 },
+  { type: 'field',   label: 'Depreciaciones (–)',              field: 'depreciation',        indent: 1 },
+  { type: 'calc',    label: 'Resultado de explotación',        bg: 'bg-green-200', key: 'ebit' },
+  { type: 'field',   label: 'Ingresos excepcionales (+)',      field: 'exceptionalIncome',   indent: 1 },
+  { type: 'field',   label: 'Gastos excepcionales (–)',        field: 'exceptionalExpenses', indent: 1 },
+  { type: 'calc',    label: 'Resultado excepcional',           bg: 'bg-yellow-200', key: 'excep' },
+  { type: 'field',   label: 'Ingresos financieros (+)',        field: 'financialIncome',     indent: 1 },
+  { type: 'field',   label: 'Gastos financieros (–)',          field: 'financialExpenses',   indent: 1 },
+  { type: 'calc',    label: 'Resultado Financiero',            bg: 'bg-blue-200',  key: 'fin' },
+  { type: 'calc',    label: 'Resultado antes de impuestos',    bg: 'bg-amber-100', key: 'ebt' },
+  { type: 'field',   label: 'Impuestos s/beneficios (–)',      field: 'incomeTax',           indent: 1 },
+  { type: 'calc',    label: 'Resultado del Ejercicio',         bg: 'bg-green-300', key: 'net' },
+] as const;
+
+type IncomeRowField = Extract<typeof INCOME_ROWS[number], { type: 'field' }>;
+
+const calcIncome = (inc: CreateIncomeStatementData) => {
+  const rev  = Number(inc.revenue||0);
+  const cv   = Number(inc.costOfSales||0) + Number(inc.staffCostsSales||0);
+  const ga   = Number(inc.adminExpenses||0) + Number(inc.staffCostsAdmin||0) + Number(inc.depreciation||0);
+  const ebit = rev - cv - ga;
+  const excep = Number(inc.exceptionalIncome||0) - Number(inc.exceptionalExpenses||0);
+  const fin   = Number(inc.financialIncome||0) - Number(inc.financialExpenses||0);
+  const ebt   = ebit + excep + fin;
+  const net   = ebt - Number(inc.incomeTax||0);
+  return { ebit, excep, fin, ebt, net };
 };
 
-// ─── Page component ───────────────────────────────────────────────────────────
+// ─── Additional field config ──────────────────────────────────────────────────
+
+const ADDITIONAL_ROWS = [
+  { type: 'section', label: 'ACCIONES Y MERCADO',          bg: 'bg-blue-100' },
+  { type: 'field',   label: 'Número de acciones',           field: 'sharesOutstanding', indent: 1 },
+  { type: 'field',   label: 'Precio por acción',            field: 'sharePrice',        indent: 1 },
+  { type: 'field',   label: 'Dividendos por acción',        field: 'dividendsPerShare', indent: 1 },
+  { type: 'section', label: 'PERSONAL',                     bg: 'bg-green-100' },
+  { type: 'field',   label: 'Personal asalariado (media)',  field: 'averageEmployees',  indent: 1 },
+  { type: 'section', label: 'INVENTARIO Y COMPRAS',         bg: 'bg-orange-100' },
+  { type: 'field',   label: 'Existencias PROMEDIO',         field: 'averageInventory',  indent: 1 },
+  { type: 'field',   label: 'Consumo / coste material',     field: 'materialCost',      indent: 1 },
+  { type: 'field',   label: 'Compras',                      field: 'purchases',         indent: 1 },
+  { type: 'section', label: 'FINANCIACIÓN',                 bg: 'bg-pink-100' },
+  { type: 'field',   label: 'Amortizaciones préstamos',     field: 'loanAmortization',  indent: 1 },
+] as const;
+
+type AdditionalRowField = Extract<typeof ADDITIONAL_ROWS[number], { type: 'field' }>;
+
+// ─── Table header ─────────────────────────────────────────────────────────────
+
+const thBase = 'px-1.5 py-2 text-center text-[10px] font-semibold uppercase tracking-wide bg-slate-50 border-b border-r border-slate-200 min-w-[88px]';
+const tdLabel = (indent: number, bold?: boolean, bg?: string) =>
+  `px-2 py-1.5 text-xs border-b border-r border-slate-100 sticky left-0 z-10 ${bg || 'bg-white'} ${bold ? 'font-semibold' : ''} ${indent === 1 ? 'pl-6' : indent === 2 ? 'pl-10' : ''}`;
+const tdCell = 'px-1 py-1 border-b border-r border-slate-100 bg-white';
+const tdCalc = (bg: string) => `px-2 py-1.5 text-xs text-right font-semibold border-b border-r border-slate-100 ${bg}`;
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export const QuarterlyDataEntryPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const setSelectedCompanyInStore = useCompanyStore((s) => s.setSelectedCompany);
+  const navigate = useNavigate();
+  const setStoreCompany = useCompanyStore((s) => s.setSelectedCompany);
 
-  const companyId  = searchParams.get('companyId');
-  const yearParam  = searchParams.get('year');
-  const qParam     = searchParams.get('quarter');
+  const companyId = searchParams.get('companyId');
+  const yearParam = searchParams.get('year');
 
-  const [company, setCompany]           = useState<Company | null>(null);
-  const [companies, setCompanies]           = useState<Company[]>([]);
+  const [company,          setCompany]          = useState<Company | null>(null);
+  const [companies,        setCompanies]        = useState<Company[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const [loading, setLoading]               = useState(false);
-  const [saving, setSaving]             = useState(false);
-  const [saved, setSaved]               = useState(false);
-  const [activeTab, setActiveTab]       = useState<'income' | 'balance'>('income');
-  const [fiscalYearId, setFiscalYearId] = useState<string | null>(null);
+  const [loading,          setLoading]          = useState(false);
+  const [saving,           setSaving]           = useState(false);
+  const [autofilling,      setAutofilling]      = useState(false);
+  const [savedAt,          setSavedAt]          = useState<Date | null>(null);
+  const [activeTab,        setActiveTab]        = useState<TabId>('balance');
 
-  // 3 months of P&G data
-  const [incomeMonths, setIncomeMonths] = useState<[MonthlyIncome, MonthlyIncome, MonthlyIncome]>([emptyIncome(), emptyIncome(), emptyIncome()]);
-  // Balance = snapshot at last month of quarter
-  const [balance, setBalance] = useState<BalanceSnap>(emptyBalance());
+  // 12 month records (index 0 = January, 11 = December)
+  const [records, setRecords] = useState<MonthRecord[]>(Array.from({length:12}, emptyRecord));
 
+  // ── Load companies ──────────────────────────────────────────────────────────
   useEffect(() => {
     companyService.getCompanies()
       .then(setCompanies)
@@ -257,115 +337,93 @@ export const QuarterlyDataEntryPage: React.FC = () => {
       .finally(() => setLoadingCompanies(false));
   }, []);
 
+  // ── Load company when companyId changes ────────────────────────────────────
   useEffect(() => {
-    if (companyId) {
-      companyService.getCompany(companyId).then((c) => {
-        setCompany(c);
-        setSelectedCompanyInStore(c);
-      }).catch(console.error);
-    }
+    if (!companyId) return;
+    companyService.getCompany(companyId).then((c) => {
+      setCompany(c);
+      setStoreCompany(c);
+    }).catch(console.error);
   }, [companyId]);
 
-  // Load existing data when all params present
-  useEffect(() => {
-    if (!companyId || !yearParam || !qParam) return;
+  // ── Load existing monthly data ─────────────────────────────────────────────
+  const loadMonthlyData = useCallback(async () => {
+    if (!companyId || !yearParam) return;
     const year = parseInt(yearParam);
-    const quarter = parseInt(qParam);
-    (async () => {
-      setLoading(true);
-      try {
-        // Get or create the fiscal year record for this quarter
-        const fy = await financialService.createQuarterlyFiscalYear(companyId, year, quarter);
-        setFiscalYearId(fy.id);
+    setLoading(true);
+    try {
+      const monthlyFYs = await financialService.getMonthlyFiscalYears(companyId, year);
 
-        const [existIncome, existBalance] = await Promise.all([
-          financialService.getIncomeStatement(fy.id).catch(() => null),
+      const newRecords = Array.from({length:12}, emptyRecord);
+
+      await Promise.all(monthlyFYs.map(async (fy) => {
+        const mIdx = (fy.month ?? 0) - 1;
+        if (mIdx < 0 || mIdx > 11) return;
+
+        const [bal, inc, add] = await Promise.all([
           financialService.getBalanceSheet(fy.id).catch(() => null),
+          financialService.getIncomeStatement(fy.id).catch(() => null),
+          financialService.getAdditionalData(fy.id).catch(() => null),
         ]);
 
-        // If we have existing P&G, put it in month 1 (rest empty — monthly breakdown not stored)
-        if (existIncome) {
-          setIncomeMonths([
-            {
-              revenue: Number(existIncome.revenue ?? 0),
-              costOfSales: Number(existIncome.costOfSales ?? 0),
-              staffCostsSales: Number(existIncome.staffCostsSales ?? 0),
-              adminExpenses: Number(existIncome.adminExpenses ?? 0),
-              staffCostsAdmin: Number(existIncome.staffCostsAdmin ?? 0),
-              depreciation: Number(existIncome.depreciation ?? 0),
-              exceptionalIncome: Number(existIncome.exceptionalIncome ?? 0),
-              exceptionalExpenses: Number(existIncome.exceptionalExpenses ?? 0),
-              financialIncome: Number(existIncome.financialIncome ?? 0),
-              financialExpenses: Number(existIncome.financialExpenses ?? 0),
-              incomeTax: Number(existIncome.incomeTax ?? 0),
-            },
-            emptyIncome(),
-            emptyIncome(),
-          ]);
-        }
+        newRecords[mIdx] = {
+          fiscalYearId: fy.id,
+          balance:    bal    ? { ...bal }    : {},
+          income:     inc    ? { ...inc }    : {},
+          additional: add    ? { ...add }    : {},
+        };
+      }));
 
-        if (existBalance) {
-          setBalance({
-            tangibleAssets: Number(existBalance.tangibleAssets ?? 0),
-            intangibleAssets: Number(existBalance.intangibleAssets ?? 0),
-            financialInvestmentsLp: Number(existBalance.financialInvestmentsLp ?? 0),
-            otherNoncurrentAssets: Number(existBalance.otherNoncurrentAssets ?? 0),
-            inventory: Number(existBalance.inventory ?? 0),
-            accountsReceivable: Number(existBalance.accountsReceivable ?? 0),
-            otherReceivables: Number(existBalance.otherReceivables ?? 0),
-            taxReceivables: Number(existBalance.taxReceivables ?? 0),
-            cashEquivalents: Number(existBalance.cashEquivalents ?? 0),
-            shareCapital: Number(existBalance.shareCapital ?? 0),
-            reserves: Number(existBalance.reserves ?? 0),
-            retainedEarnings: Number(existBalance.retainedEarnings ?? 0),
-            treasuryStock: Number(existBalance.treasuryStock ?? 0),
-            provisionsLp: Number(existBalance.provisionsLp ?? 0),
-            bankDebtLp: Number(existBalance.bankDebtLp ?? 0),
-            otherLiabilitiesLp: Number(existBalance.otherLiabilitiesLp ?? 0),
-            provisionsSp: Number(existBalance.provisionsSp ?? 0),
-            bankDebtSp: Number(existBalance.bankDebtSp ?? 0),
-            accountsPayable: Number(existBalance.accountsPayable ?? 0),
-            taxLiabilities: Number(existBalance.taxLiabilities ?? 0),
-            otherLiabilitiesSp: Number(existBalance.otherLiabilitiesSp ?? 0),
-          });
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [companyId, yearParam, qParam]);
+      setRecords(newRecords);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId, yearParam]);
 
-  const updateIncome = (monthIdx: number, field: keyof MonthlyIncome, value: number) => {
-    setIncomeMonths((prev) => {
-      const next: [MonthlyIncome, MonthlyIncome, MonthlyIncome] = [{ ...prev[0] }, { ...prev[1] }, { ...prev[2] }];
-      next[monthIdx] = { ...next[monthIdx], [field]: value };
+  useEffect(() => { loadMonthlyData(); }, [loadMonthlyData]);
+
+  // ── Update a field ──────────────────────────────────────────────────────────
+  const updateField = (
+    mIdx: number,
+    section: 'balance' | 'income' | 'additional',
+    field: string,
+    val: string,
+  ) => {
+    setRecords((prev) => {
+      const next = [...prev];
+      const rec  = { ...next[mIdx], [section]: { ...next[mIdx][section] } };
+      (rec[section] as any)[field] = val === '' ? undefined : evaluateExpression(val) || undefined;
+      next[mIdx] = rec;
       return next;
     });
   };
 
-  const sumIncome = (): Record<keyof MonthlyIncome, number> => {
-    const result = { ...emptyIncome() };
-    for (const m of incomeMonths) {
-      for (const k of Object.keys(result) as (keyof MonthlyIncome)[]) {
-        result[k] += m[k];
-      }
-    }
-    return result;
-  };
-
+  // ── Save all ────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!fiscalYearId) return;
+    if (!companyId || !yearParam) return;
+    const year = parseInt(yearParam);
     setSaving(true);
     try {
-      const totalIncome = sumIncome();
-      await Promise.all([
-        financialService.createOrUpdateIncomeStatement(fiscalYearId, totalIncome),
-        financialService.createOrUpdateBalanceSheet(fiscalYearId, balance),
-      ]);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      const updated = [...records];
+      await Promise.all(
+        updated.map(async (rec, mIdx) => {
+          // Create FiscalYear record on demand for months that don't have one yet
+          if (!rec.fiscalYearId) {
+            const fy = await financialService.createMonthlyFiscalYear(companyId, year, mIdx + 1);
+            updated[mIdx] = { ...rec, fiscalYearId: fy.id };
+            rec = updated[mIdx];
+          }
+          await Promise.all([
+            financialService.createOrUpdateBalanceSheet(rec.fiscalYearId!, rec.balance),
+            financialService.createOrUpdateIncomeStatement(rec.fiscalYearId!, rec.income),
+            financialService.createOrUpdateAdditionalData(rec.fiscalYearId!, rec.additional),
+          ]);
+        })
+      );
+      setRecords(updated);
+      setSavedAt(new Date());
     } catch (err) {
       console.error(err);
       alert('Error al guardar los datos');
@@ -374,194 +432,392 @@ export const QuarterlyDataEntryPage: React.FC = () => {
     }
   };
 
-  // ── Step 1: no company selected ──────────────────────────────────────────
+  // ── Autocompletar desde Forecast Mensual (hoja FCASTBCE2026) ──────────────────
+  // Trae los 12 meses calculados (cerrados con dato real + proyectados) del
+  // Forecast Mensual y los vuelca en el grid. Se apoya en /monthly-forecast/calculate,
+  // que ya replica la fórmula de la hoja FCASTBCE2026 (drivers de ventas/costes +
+  // patrimonio neto acumulando el resultado + cuadratura vía Activo Fijo).
+  const handleAutofillFromForecast = async () => {
+    if (!companyId || !yearParam) return;
+    const year = parseInt(yearParam);
+
+    const hasExistingData = records.some(
+      (r) => Object.keys(r.balance).length > 0 || Object.keys(r.income).length > 0
+    );
+    if (hasExistingData && !window.confirm(
+      'Esto sobrescribirá el Balance y la Cuenta de P&G de los 12 meses con los valores ' +
+      'calculados en el Forecast Mensual. Los cambios no se guardan hasta pulsar «Guardar todo». ¿Continuar?'
+    )) {
+      return;
+    }
+
+    setAutofilling(true);
+    try {
+      const calc = await monthlyForecastService.calculate(companyId, year);
+
+      setRecords((prev) =>
+        prev.map((rec, mIdx) => {
+          const p = calc.pnl[mIdx];
+          const b = calc.balance[mIdx];
+
+          const income: CreateIncomeStatementData = {
+            ...rec.income,
+            revenue: p.revenue,
+            costOfSales: p.costOfSales,
+            staffCostsSales: 0,
+            adminExpenses: p.adminExpenses,
+            staffCostsAdmin: 0,
+            depreciation: 0,
+            exceptionalIncome: p.exceptionalIncome,
+            exceptionalExpenses: p.exceptionalExpenses,
+            financialIncome: p.financialIncome,
+            financialExpenses: p.financialExpenses,
+            incomeTax: p.incomeTax,
+          };
+
+          const balance: CreateBalanceSheetData = {
+            ...rec.balance,
+            tangibleAssets: b.fixedAssets,
+            intangibleAssets: 0,
+            financialInvestmentsLp: b.financialInvestmentsLp,
+            otherNoncurrentAssets: b.otherNoncurrentAssets,
+            inventory: b.inventory,
+            accountsReceivable: b.accountsReceivable,
+            otherReceivables: 0,
+            taxReceivables: b.taxReceivables,
+            cashEquivalents: b.cashEquivalents,
+            shareCapital: b.equity,
+            reserves: 0,
+            retainedEarnings: 0,
+            treasuryStock: 0,
+            provisionsLp: b.provisionsLp,
+            bankDebtLp: b.bankDebtLp,
+            otherLiabilitiesLp: b.otherLiabilitiesLp,
+            provisionsSp: b.provisionsSp,
+            bankDebtSp: b.bankDebtSp,
+            accountsPayable: b.accountsPayable,
+            taxLiabilities: b.taxLiabilities,
+            otherLiabilitiesSp: b.otherLiabilitiesSp,
+          };
+
+          return { ...rec, income, balance };
+        })
+      );
+    } catch (err: any) {
+      alert(
+        err?.response?.data?.error ||
+        err.message ||
+        'No se pudo calcular el forecast mensual. Configura primero la proyección en "Forecast Mensual".'
+      );
+    } finally {
+      setAutofilling(false);
+    }
+  };
+
+  // ── Steps ────────────────────────────────────────────────────────────────────
   if (!companyId) {
     return (
       <CompanySelector
         companies={companies}
         loading={loadingCompanies}
         onSelect={(c) => setSearchParams({ companyId: c.id })}
-        title="Datos Trimestrales"
-        description="Selecciona una empresa para ingresar datos de un trimestre"
-        icon={<Calendar className="w-7 h-7 text-slate-900" />}
+        title="Datos Mensuales"
+        description="Selecciona una empresa para ingresar datos mes a mes"
+        icon={<Building2 className="w-7 h-7 text-slate-900" />}
       />
     );
   }
 
-  // ── Step 2: no quarter selected ──────────────────────────────────────────
-  if (!yearParam || !qParam) {
+  if (!yearParam) {
     if (!company) return null;
     return (
-      <QuarterSelector
+      <YearSelector
         companyName={company.name}
-        onConfirm={(y, q) => setSearchParams({ companyId, year: String(y), quarter: String(q) })}
+        onConfirm={(y) => setSearchParams({ companyId, year: String(y) })}
         onBack={() => setSearchParams({})}
       />
     );
   }
 
-  const year    = parseInt(yearParam);
-  const quarter = parseInt(qParam);
-  const qInfo   = QUARTER_MONTHS[quarter];
-  const months  = qInfo?.months ?? [];
-  const periodLabel = `T${quarter} ${year} (${qInfo?.short ?? ''})`;
-
   if (loading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500" />
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-500" />
         </div>
       </DashboardLayout>
     );
   }
 
-  // ── Step 3: data entry form ──────────────────────────────────────────────
-  const thClass = 'px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-200';
-  const tdLabel = 'px-3 py-2 text-sm text-slate-700 font-medium border-b border-slate-100 bg-white';
-  const tdCell  = 'px-1 py-1 border-b border-slate-100 bg-white';
-  const tdTotal = 'px-3 py-2 text-right text-sm font-semibold text-slate-900 border-b border-slate-100 bg-amber-50';
+  const year = parseInt(yearParam);
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto px-4 space-y-6">
+      <div className="max-w-full mx-auto px-4 space-y-4">
 
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="font-data text-[10px] text-slate-400 tracking-[0.2em] uppercase">/ Datos Trimestrales</span>
+              <span className="font-data text-[10px] text-slate-400 tracking-[0.2em] uppercase">/ Datos Mensuales</span>
             </div>
             <h1 className="text-2xl font-bold text-slate-900">{company?.name}</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-semibold">
-                <Calendar className="w-3.5 h-3.5" />
-                {periodLabel}
+                <CalendarDays className="w-3.5 h-3.5" />
+                Enero – Diciembre {year}
               </span>
-              <button onClick={() => setSearchParams({ companyId })} className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2">
-                Cambiar trimestre
+              <button
+                onClick={() => setSearchParams({ companyId })}
+                className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2"
+              >
+                Cambiar año
               </button>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {saved && (
-              <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
-                <CheckCircle className="w-4 h-4" /> Guardado
+            {savedAt && (
+              <span className="text-xs text-green-600 font-medium">
+                Guardado {savedAt.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'})}
               </span>
             )}
-            <Button onClick={handleSave} disabled={saving || !fiscalYearId}>
+            <Button
+              variant="secondary"
+              onClick={handleAutofillFromForecast}
+              disabled={autofilling || saving}
+            >
+              <Wand2 className="w-4 h-4 mr-1.5" />
+              {autofilling ? 'Calculando…' : 'Autocompletar desde Forecast'}
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
               <Save className="w-4 h-4 mr-1.5" />
-              {saving ? 'Guardando…' : 'Guardar datos'}
+              {saving ? 'Guardando…' : 'Guardar todo'}
             </Button>
           </div>
         </div>
 
-        {/* Nota informativa */}
-        <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-500" />
-          <div>
-            <span className="font-semibold">P&G acumulada: </span>
-            ingresa los valores mensuales por separado — el sistema calculará el acumulado del trimestre.
-            <span className="ml-2 font-semibold">Balance: </span>
-            ingresa los valores al cierre del último mes del trimestre ({months[2] ?? ''}).
-          </div>
-        </div>
-
         {/* Tabs */}
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit">
-          {(['income', 'balance'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setActiveTab(t)}
-              className={`px-5 py-2 rounded-md text-sm font-medium transition-all ${
-                activeTab === t ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {t === 'income' ? 'Pérdidas y Ganancias' : 'Balance de Situación'}
-            </button>
-          ))}
+        <div className="border-b border-slate-200">
+          <nav className="flex -mb-px space-x-6">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-amber-500 text-amber-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                {tab.name}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        {/* ── P&G Tab ─────────────────────────────────────────────────────── */}
-        {activeTab === 'income' && (
+        {/* ── BALANCE TAB ───────────────────────────────────────────────────── */}
+        {activeTab === 'balance' && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
-            <table className="min-w-full">
+            <table className="min-w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-200 min-w-[220px]">
-                    Concepto
+                  <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-r border-slate-200 sticky left-0 z-20 min-w-[230px]">
+                    Balance de Situación
                   </th>
-                  {months.map((m) => (
-                    <th key={m} className={thClass}>{m}</th>
+                  {MONTHS_SHORT.map((m) => (
+                    <th key={m} className={thBase}>{m}</th>
                   ))}
-                  <th className={`${thClass} text-amber-700 bg-amber-50`}>Total T{quarter}</th>
                 </tr>
               </thead>
               <tbody>
-                {INCOME_FIELDS.map((f) => {
-                  const total = incomeMonths.reduce((s, m) => s + m[f.key], 0);
-                  return (
-                    <tr key={f.key} className="hover:bg-slate-50/60 transition-colors">
-                      <td className={`${tdLabel} ${f.isCost ? 'pl-6 text-slate-500' : 'font-semibold text-slate-900'}`}>
-                        {f.label}
-                      </td>
-                      {months.map((_, mi) => (
-                        <td key={mi} className={tdCell}>
-                          <Cell
-                            value={incomeMonths[mi][f.key]}
-                            onChange={(v) => updateIncome(mi, f.key, v)}
-                          />
+                {BALANCE_ROWS.map((row, ri) => {
+                  if (row.type === 'section') {
+                    return (
+                      <tr key={ri}>
+                        <td colSpan={13} className={`px-3 py-1.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-r border-slate-200 sticky left-0 z-10 ${row.bg}`}>
+                          {row.label}
                         </td>
-                      ))}
-                      <td className={tdTotal}>{total > 0 ? formatNum(total) : '—'}</td>
-                    </tr>
-                  );
+                      </tr>
+                    );
+                  }
+                  if (row.type === 'field') {
+                    const f = row as BalanceRowField;
+                    return (
+                      <tr key={ri} className="hover:bg-slate-50/50">
+                        <td className={tdLabel(f.indent, f.bold, 'bg-white')}>{f.label}</td>
+                        {records.map((rec, mi) => (
+                          <td key={mi} className={tdCell}>
+                            <ExpressionInput
+                              value={rec.balance[f.field as keyof CreateBalanceSheetData]}
+                              onChange={(v) => updateField(mi, 'balance', f.field, v)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  }
+                  if (row.type === 'total') {
+                    const isActivo = (row as any).key === 'totalActivo';
+                    return (
+                      <tr key={ri} className={(row as any).bg}>
+                        <td className={`px-3 py-1.5 text-xs font-bold text-slate-700 uppercase border-b border-r border-slate-200 sticky left-0 z-10 ${(row as any).bg}`}>
+                          {row.label}
+                        </td>
+                        {records.map((rec, mi) => {
+                          const val = isActivo ? calcTotalActivo(rec.balance) : calcTotalPasivo(rec.balance);
+                          return (
+                            <td key={mi} className={`px-2 py-1.5 text-xs text-right font-semibold border-b border-r border-slate-200 ${(row as any).bg}`}>
+                              {val !== 0 ? fmt(val) : '—'}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  }
+                  if (row.type === 'cuadratura') {
+                    const allOk = records.every((r) => Math.abs(calcTotalActivo(r.balance) - calcTotalPasivo(r.balance)) < 1);
+                    return (
+                      <tr key={ri} className={allOk ? 'bg-green-100' : 'bg-red-100'}>
+                        <td className={`px-3 py-1.5 text-xs font-bold border-b border-r border-slate-200 sticky left-0 z-10 ${allOk ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {allOk ? '✓ CUADRATURA' : '⚠ CUADRATURA'}
+                        </td>
+                        {records.map((rec, mi) => {
+                          const diff = calcTotalActivo(rec.balance) - calcTotalPasivo(rec.balance);
+                          const ok   = Math.abs(diff) < 1;
+                          return (
+                            <td key={mi} className={`px-1 py-1.5 text-center text-[10px] font-semibold border-b border-r border-slate-200 ${ok ? 'text-green-700' : 'text-red-700'}`}>
+                              {ok ? '✓' : `Δ${fmt(Math.abs(diff))}`}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  }
+                  return null;
                 })}
               </tbody>
             </table>
           </div>
         )}
 
-        {/* ── Balance Tab ──────────────────────────────────────────────────── */}
-        {activeTab === 'balance' && (
+        {/* ── INCOME TAB ────────────────────────────────────────────────────── */}
+        {activeTab === 'income' && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
-            <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
-              <p className="text-xs text-amber-800 font-medium">
-                Balance al cierre de <strong>{months[2] ?? `${quarter}º mes`}</strong> {year}
-              </p>
-            </div>
-            <table className="min-w-full">
+            <table className="min-w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-200 min-w-[240px]">Concepto</th>
-                  <th className={`${thClass} min-w-[160px]`}>{months[2] ?? ''} {year}</th>
+                  <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-r border-slate-200 sticky left-0 z-20 min-w-[230px]">
+                    Pérdidas y Ganancias
+                  </th>
+                  {MONTHS_SHORT.map((m) => (
+                    <th key={m} className={thBase}>{m}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {BALANCE_SECTIONS.map((section) => (
-                  <React.Fragment key={section.title}>
-                    <tr>
-                      <td colSpan={2} className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
-                        {section.title}
-                      </td>
-                    </tr>
-                    {section.fields.map((f) => (
-                      <tr key={f.key} className="hover:bg-slate-50/60 transition-colors">
-                        <td className={`${tdLabel} pl-6`}>{f.label}</td>
-                        <td className={tdCell}>
-                          <Cell
-                            value={balance[f.key as keyof BalanceSnap]}
-                            onChange={(v) => setBalance((p) => ({ ...p, [f.key]: v }))}
-                          />
+                {INCOME_ROWS.map((row, ri) => {
+                  if (row.type === 'section' || row.type === 'subsection') {
+                    return (
+                      <tr key={ri}>
+                        <td colSpan={13} className={`px-3 py-1.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-r border-slate-200 sticky left-0 z-10 ${(row as any).bg || ''}`}>
+                          {row.label}
                         </td>
                       </tr>
-                    ))}
-                  </React.Fragment>
-                ))}
+                    );
+                  }
+                  if (row.type === 'field') {
+                    const f = row as IncomeRowField;
+                    return (
+                      <tr key={ri} className="hover:bg-slate-50/50">
+                        <td className={tdLabel(f.indent, false, 'bg-white')}>{f.label}</td>
+                        {records.map((rec, mi) => (
+                          <td key={mi} className={tdCell}>
+                            <ExpressionInput
+                              value={rec.income[f.field as keyof CreateIncomeStatementData]}
+                              onChange={(v) => updateField(mi, 'income', f.field, v)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  }
+                  if (row.type === 'calc') {
+                    const r = row as any;
+                    return (
+                      <tr key={ri}>
+                        <td className={`px-3 py-1.5 text-xs font-bold text-slate-700 border-b border-r border-slate-200 sticky left-0 z-10 ${r.bg}`}>
+                          {r.label}
+                        </td>
+                        {records.map((rec, mi) => {
+                          const c = calcIncome(rec.income);
+                          const val = c[r.key as keyof typeof c];
+                          return (
+                            <td key={mi} className={`px-2 py-1.5 text-xs text-right font-semibold border-b border-r border-slate-200 ${r.bg}`}>
+                              <span className={val < 0 ? 'text-red-600' : ''}>
+                                {val !== 0 ? fmt(val) : '—'}
+                              </span>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  }
+                  return null;
+                })}
               </tbody>
             </table>
           </div>
         )}
+
+        {/* ── ADDITIONAL TAB ────────────────────────────────────────────────── */}
+        {activeTab === 'additional' && (
+          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+            <table className="min-w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-r border-slate-200 sticky left-0 z-20 min-w-[230px]">
+                    Datos Adicionales
+                  </th>
+                  {MONTHS_SHORT.map((m) => (
+                    <th key={m} className={thBase}>{m}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {ADDITIONAL_ROWS.map((row, ri) => {
+                  if (row.type === 'section') {
+                    return (
+                      <tr key={ri}>
+                        <td colSpan={13} className={`px-3 py-1.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-r border-slate-200 sticky left-0 z-10 ${(row as any).bg}`}>
+                          {row.label}
+                        </td>
+                      </tr>
+                    );
+                  }
+                  if (row.type === 'field') {
+                    const f = row as AdditionalRowField;
+                    return (
+                      <tr key={ri} className="hover:bg-slate-50/50">
+                        <td className={tdLabel(f.indent, false, 'bg-white')}>{f.label}</td>
+                        {records.map((rec, mi) => (
+                          <td key={mi} className={tdCell}>
+                            <ExpressionInput
+                              value={rec.additional[f.field as keyof CreateAdditionalDataData]}
+                              onChange={(v) => updateField(mi, 'additional', f.field, v)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  }
+                  return null;
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
       </div>
     </DashboardLayout>
   );

@@ -22,6 +22,7 @@ import { AdminPage } from './pages/admin/AdminPage';
 import { QuarterlyDataEntryPage } from './pages/data/QuarterlyDataEntryPage';
 import { QuarterlyReportPage } from './pages/report/QuarterlyReportPage';
 import { CompareCompaniesPage } from './pages/companies/CompareCompaniesPage';
+import { MonthlyForecastPage } from './pages/projections/MonthlyForecastPage';
 
 function App() {
   const { initializeAuth, isLoading } = useAuthStore();
@@ -130,6 +131,14 @@ function App() {
           element={
             <PrivateRoute>
               <CompareCompaniesPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/forecast-mensual"
+          element={
+            <PrivateRoute>
+              <MonthlyForecastPage />
             </PrivateRoute>
           }
         />

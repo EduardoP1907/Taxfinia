@@ -62,11 +62,11 @@ export const financialService = {
   },
 
   /**
-   * Crear un nuevo año fiscal (anual o trimestral)
-   * @param quarter 0=anual, 1=T1, 2=T2, 3=T3
+   * Crear un nuevo año fiscal
+   * @param quarter 0=anual/mensual, 1-3=trimestral (T1/T2/T3)
+   * @param month   0=no mensual, 1-12=mes específico dentro del año
    */
-  async createFiscalYear(companyId: string, userId: string, data: { year: number; quarter?: number; startDate?: Date; endDate?: Date }) {
-    // Verificar que la empresa pertenece al usuario
+  async createFiscalYear(companyId: string, userId: string, data: { year: number; quarter?: number; month?: number; startDate?: Date; endDate?: Date }) {
     const company = await prisma.company.findFirst({
       where: { id: companyId, userId, deletedAt: null },
     });
@@ -76,10 +76,10 @@ export const financialService = {
     }
 
     const quarter = data.quarter ?? 0;
+    const month   = data.month ?? 0;
 
-    // Verificar que no existe ya ese período
     const existing = await prisma.fiscalYear.findFirst({
-      where: { companyId, year: data.year, quarter },
+      where: { companyId, year: data.year, quarter, month },
     });
 
     if (existing) {
@@ -91,6 +91,7 @@ export const financialService = {
         companyId,
         year: data.year,
         quarter,
+        month,
         startDate: data.startDate,
         endDate: data.endDate,
       },

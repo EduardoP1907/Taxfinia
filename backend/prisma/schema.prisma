@@ -93,6 +93,7 @@ model Company {
   fiscalYears      FiscalYear[]
   projections      ProjectionScenario[]
   reports          Report[]
+  monthlyForecasts MonthlyForecast[]
 
   @@index([userId])
   @@map("companies")
@@ -103,6 +104,7 @@ model FiscalYear {
   companyId        String            @map("company_id")
   year             Int
   quarter          Int               @default(0) @map("quarter")
+  month            Int               @default(0) @map("month")
   startDate        DateTime?         @map("start_date")
   endDate          DateTime?         @map("end_date")
   createdAt        DateTime          @default(now()) @map("created_at")
@@ -114,7 +116,7 @@ model FiscalYear {
   company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   incomeStatement  IncomeStatement?
 
-  @@unique([companyId, year, quarter])
+  @@unique([companyId, year, quarter, month])
   @@index([companyId])
   @@map("fiscal_years")
 }
@@ -363,6 +365,42 @@ model Report {
   @@index([companyId])
   @@index([userId])
   @@map("reports")
+}
+
+model MonthlyForecast {
+  id           String  @id @default(uuid())
+  companyId    String  @map("company_id")
+  year         Int
+  closedMonths Int     @default(0) @map("closed_months")
+
+  // Actual monthly values for closed months (12-element JSON arrays)
+  actualRevenue             Json? @map("actual_revenue")
+  actualCostOfSales         Json? @map("actual_cost_of_sales")
+  actualAdminExpenses       Json? @map("actual_admin_expenses")
+  actualExceptionalIncome   Json? @map("actual_exceptional_income")
+  actualExceptionalExpenses Json? @map("actual_exceptional_expenses")
+  actualFinancialIncome     Json? @map("actual_financial_income")
+  actualFinancialExpenses   Json? @map("actual_financial_expenses")
+  actualIncomeTax           Json? @map("actual_income_tax")
+
+  // Growth rates for projected months (12-element JSON arrays, decimal: 0.05 = 5%)
+  rateRevenue             Json? @map("rate_revenue")
+  rateCostOfSales         Json? @map("rate_cost_of_sales")
+  rateAdminExpenses       Json? @map("rate_admin_expenses")
+  rateExceptionalIncome   Json? @map("rate_exceptional_income")
+  rateExceptionalExpenses Json? @map("rate_exceptional_expenses")
+  rateFinancialIncome     Json? @map("rate_financial_income")
+  rateFinancialExpenses   Json? @map("rate_financial_expenses")
+  rateIncomeTax           Json? @map("rate_income_tax")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, year])
+  @@index([companyId])
+  @@map("monthly_forecasts")
 }
 
 enum ReportStatus {

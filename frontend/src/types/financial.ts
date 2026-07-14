@@ -4,6 +4,8 @@ export interface FiscalYear {
   id: string;
   companyId: string;
   year: number;
+  quarter?: number; // 0=anual/mensual, 1-3=trimestral
+  month?: number;   // 0=no mensual, 1-12=mes específico
   startDate?: string;
   endDate?: string;
   createdAt: string;

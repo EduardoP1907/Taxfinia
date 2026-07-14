@@ -30,11 +30,12 @@ export const financialController = {
     try {
       const userId = req.user!.id;
       const { companyId } = req.params;
-      const { year, quarter, startDate, endDate } = req.body;
+      const { year, quarter, month, startDate, endDate } = req.body;
 
       const fiscalYear = await financialService.createFiscalYear(companyId, userId, {
         year: parseInt(year),
         quarter: quarter !== undefined ? parseInt(quarter) : 0,
+        month: month !== undefined ? parseInt(month) : 0,
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
       });

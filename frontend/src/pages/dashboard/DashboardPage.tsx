@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import {
   Building2, FileText, FileBarChart, TrendingUp,
-  ArrowRight, Layers, Activity,
+  ArrowRight, Layers, Activity, CalendarDays, BarChart3,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { companyService } from '../../services/company.service';
@@ -220,6 +220,35 @@ export const DashboardPage: React.FC = () => {
             {quickActions.map((a) => (
               <ActionCard key={a.href} {...a} />
             ))}
+          </div>
+        </div>
+
+        {/* ── MONTHLY ACTIONS ───────────────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <span className="font-data text-[10px] text-slate-400 tracking-[0.2em] uppercase">
+              / Análisis mensual
+            </span>
+            <div className="flex-1 h-px bg-slate-200" />
+            <span className="font-data text-[10px] text-amber-500/70 bg-amber-500/8 border border-amber-500/15 rounded px-2 py-0.5">
+              Ene – Dic
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ActionCard
+              title="Ingresar Datos Mensuales"
+              description="Añade datos financieros mes a mes (enero a diciembre) con los mismos campos del formulario anual"
+              icon={CalendarDays}
+              href="/datos-trimestrales"
+              tag="INPUT MENSUAL"
+            />
+            <ActionCard
+              title="Informe Mensual"
+              description="Consulta el análisis mensual con comparativa de márgenes respecto al ejercicio anual"
+              icon={BarChart3}
+              href="/informe-trimestral"
+              tag="OUTPUT MENSUAL"
+            />
           </div>
         </div>
 

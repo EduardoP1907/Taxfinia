@@ -7,7 +7,14 @@
       "Bash(npm run dev:*)",
       "Bash(node -e:*)",
       "Bash(node checkSheet22Headers.js:*)",
-      "Bash(npx ts-node:*)"
+      "Bash(npx ts-node:*)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(aws s3 sync \"C:\\\\Users\\\\eduar\\\\Desktop\\\\taxfinia-app\\\\frontend\\\\dist\" s3://taxfinia-frontend --delete 2>&1)",
+      "Skill(run)",
+      "Bash(python3 *)",
+      "Bash(pip install *)"
     ]
   }
 }
