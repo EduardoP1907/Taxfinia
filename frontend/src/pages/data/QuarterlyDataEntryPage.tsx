@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Button } from '../../components/ui/Button';
 import { Save, CalendarDays, Building2, Wand2 } from 'lucide-react';
@@ -26,7 +26,6 @@ import type {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const MONTHS_FULL  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 const TABS = [
   { id: 'balance',    name: 'Balance de Situación' },
@@ -305,13 +304,11 @@ const thBase = 'px-1.5 py-2 text-center text-[10px] font-semibold uppercase trac
 const tdLabel = (indent: number, bold?: boolean, bg?: string) =>
   `px-2 py-1.5 text-xs border-b border-r border-slate-100 sticky left-0 z-10 ${bg || 'bg-white'} ${bold ? 'font-semibold' : ''} ${indent === 1 ? 'pl-6' : indent === 2 ? 'pl-10' : ''}`;
 const tdCell = 'px-1 py-1 border-b border-r border-slate-100 bg-white';
-const tdCalc = (bg: string) => `px-2 py-1.5 text-xs text-right font-semibold border-b border-r border-slate-100 ${bg}`;
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export const QuarterlyDataEntryPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const setStoreCompany = useCompanyStore((s) => s.setSelectedCompany);
 
   const companyId = searchParams.get('companyId');
@@ -645,7 +642,7 @@ export const QuarterlyDataEntryPage: React.FC = () => {
                     const f = row as BalanceRowField;
                     return (
                       <tr key={ri} className="hover:bg-slate-50/50">
-                        <td className={tdLabel(f.indent, f.bold, 'bg-white')}>{f.label}</td>
+                        <td className={tdLabel(f.indent, 'bold' in f ? f.bold : undefined, 'bg-white')}>{f.label}</td>
                         {records.map((rec, mi) => (
                           <td key={mi} className={tdCell}>
                             <ExpressionInput

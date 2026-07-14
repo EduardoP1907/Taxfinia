@@ -34,6 +34,11 @@ export const financialService = {
     return all.filter((fy: any) => (fy.quarter ?? 0) === 0 && (fy.month ?? 0) === 0);
   },
 
+  async getQuarterlyFiscalYears(companyId: string): Promise<FiscalYear[]> {
+    const all = await financialService.getFiscalYears(companyId);
+    return all.filter((fy: any) => (fy.quarter ?? 0) > 0);
+  },
+
   async getMonthlyFiscalYears(companyId: string, year: number): Promise<FiscalYear[]> {
     const all = await financialService.getFiscalYears(companyId);
     return all.filter((fy: any) => (fy.month ?? 0) > 0 && fy.year === year);
