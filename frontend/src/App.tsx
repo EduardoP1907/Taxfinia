@@ -19,8 +19,7 @@ import { CombinedProjectionsPage } from './pages/projections/CombinedProjections
 import { Projection41Page } from './pages/projections/Projection41Page';
 import { Projection43Page } from './pages/projections/Projection43Page';
 import { AdminPage } from './pages/admin/AdminPage';
-import { QuarterlyDataEntryPage } from './pages/data/QuarterlyDataEntryPage';
-import { QuarterlyReportPage } from './pages/report/QuarterlyReportPage';
+import { MonthlyReportPage } from './pages/report/MonthlyReportPage';
 import { CompareCompaniesPage } from './pages/companies/CompareCompaniesPage';
 import { MonthlyForecastPage } from './pages/projections/MonthlyForecastPage';
 
@@ -111,18 +110,10 @@ function App() {
         />
 
         <Route
-          path="/datos-trimestrales"
-          element={
-            <PrivateRoute>
-              <QuarterlyDataEntryPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
           path="/informe-trimestral"
           element={
             <PrivateRoute>
-              <QuarterlyReportPage />
+              <MonthlyReportPage />
             </PrivateRoute>
           }
         />

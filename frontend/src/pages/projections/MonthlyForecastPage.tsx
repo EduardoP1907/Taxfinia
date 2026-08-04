@@ -339,10 +339,6 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
     setConfig({ ...config, [key]: arr });
   };
 
-  const applyRateUniform = (key: keyof MonthlyForecastConfig, v: number) => {
-    if (!config) return;
-    setConfig({ ...config, [key]: Array(12).fill(v) });
-  };
 
   const closedMonths = config?.closedMonths ?? 0;
 
@@ -658,17 +654,12 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
                             {m}
                           </th>
                         ))}
-                        <th className="px-3 py-2 text-center w-28 bg-slate-600 font-medium text-slate-300">
-                          Aplicar igual
-                        </th>
                       </tr>
                     </thead>
 
                     <tbody>
                       {PNL_CONCEPTS.filter(c => c.rateKey).map(concept => {
                         const rateArr = config[concept.rateKey!] as number[];
-                        // first projected rate (for "apply all" button reference)
-                        const firstProjectedRate = rateArr[closedMonths] ?? rateArr[0];
 
                         return (
                           <tr
@@ -694,17 +685,6 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
                                 </div>
                               </td>
                             ))}
-
-                            {/* Apply uniform rate button */}
-                            <td className="px-2 py-1 text-center bg-slate-50">
-                              <button
-                                onClick={() => applyRateUniform(concept.rateKey!, firstProjectedRate)}
-                                className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-700
-                                           hover:bg-blue-200 transition-colors whitespace-nowrap"
-                              >
-                                {(firstProjectedRate * 100).toFixed(1)}% a todos
-                              </button>
-                            </td>
                           </tr>
                         );
                       })}

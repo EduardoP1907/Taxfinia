@@ -172,7 +172,7 @@ export function calcPnLClient(
 }
 
 export function defaultRates(): number[] {
-  return Array(12).fill(0.04);
+  return Array(12).fill(0);
 }
 
 export function defaultActuals(): number[] {

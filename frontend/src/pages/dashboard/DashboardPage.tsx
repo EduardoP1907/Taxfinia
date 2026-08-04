@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import {
   Building2, FileText, FileBarChart, TrendingUp,
-  ArrowRight, Layers, Activity, CalendarDays, BarChart3,
+  ArrowRight, Layers, Activity, BarChart3,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { companyService } from '../../services/company.service';
@@ -236,15 +236,15 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <ActionCard
-              title="Ingresar Datos Mensuales"
-              description="Añade datos financieros mes a mes (enero a diciembre) con los mismos campos del formulario anual"
-              icon={CalendarDays}
-              href="/datos-trimestrales"
+              title="Forecast Mensual"
+              description="Proyecta y edita el desglose mensual (enero a diciembre) a partir de los datos anuales"
+              icon={TrendingUp}
+              href="/forecast-mensual"
               tag="INPUT MENSUAL"
             />
             <ActionCard
               title="Informe Mensual"
-              description="Consulta el análisis mensual con comparativa de márgenes respecto al ejercicio anual"
+              description="Consulta el análisis mensual acumulado calculado a partir del Forecast Mensual"
               icon={BarChart3}
               href="/informe-trimestral"
               tag="OUTPUT MENSUAL"

@@ -289,10 +289,6 @@ function calcMonthlyBalance(
   return rows;
 }
 
-// ─── Default rate arrays ──────────────────────────────────────────────────────
-
-const DEFAULT_RATES = Array(12).fill(0.04); // 4% monthly growth as default
-
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 export const monthlyForecastService = {
@@ -375,14 +371,14 @@ export const monthlyForecastService = {
     };
 
     const rates: Record<keyof AnnualPnL, number[]> = {
-      revenue: jsonToArray(stored?.rateRevenue, 0.04),
-      costOfSales: jsonToArray(stored?.rateCostOfSales, 0.04),
-      adminExpenses: jsonToArray(stored?.rateAdminExpenses, 0.04),
-      exceptionalIncome: jsonToArray(stored?.rateExceptionalIncome, 0.04),
-      exceptionalExpenses: jsonToArray(stored?.rateExceptionalExpenses, 0.04),
-      financialIncome: jsonToArray(stored?.rateFinancialIncome, 0.04),
-      financialExpenses: jsonToArray(stored?.rateFinancialExpenses, 0.04),
-      incomeTax: jsonToArray(stored?.rateIncomeTax, 0.04),
+      revenue: jsonToArray(stored?.rateRevenue, 0),
+      costOfSales: jsonToArray(stored?.rateCostOfSales, 0),
+      adminExpenses: jsonToArray(stored?.rateAdminExpenses, 0),
+      exceptionalIncome: jsonToArray(stored?.rateExceptionalIncome, 0),
+      exceptionalExpenses: jsonToArray(stored?.rateExceptionalExpenses, 0),
+      financialIncome: jsonToArray(stored?.rateFinancialIncome, 0),
+      financialExpenses: jsonToArray(stored?.rateFinancialExpenses, 0),
+      incomeTax: jsonToArray(stored?.rateIncomeTax, 0),
     };
 
     const pnl = calcMonthlyPnL(annualPnL, closedMonths, actual, rates);
