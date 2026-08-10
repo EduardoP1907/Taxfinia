@@ -86,6 +86,20 @@ export interface MonthlyForecastResult {
   baseYear: number;             // actual annual data year used as base
 }
 
+// Leaf balance line items the user can manually override (excludes computed
+// totals/subtotals and the "imbalance" check row, which are always derived).
+export const BALANCE_OVERRIDE_KEYS = [
+  'fixedAssets', 'otherNoncurrentAssets', 'financialInvestmentsLp',
+  'inventory', 'accountsReceivable', 'taxReceivables', 'cashEquivalents',
+  'equity', 'provisionsLp', 'bankDebtLp', 'otherLiabilitiesLp',
+  'provisionsSp', 'bankDebtSp', 'accountsPayable', 'taxLiabilities', 'otherLiabilitiesSp',
+] as const;
+
+export type BalanceOverrideKey = typeof BALANCE_OVERRIDE_KEYS[number];
+
+// { [fieldKey]: (number|null)[12] } — null means "use the calculated value".
+export type BalanceOverrides = Partial<Record<BalanceOverrideKey, (number | null)[]>>;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toNum(v: any): number {
@@ -97,6 +111,20 @@ function jsonToArray(json: any, defaultVal = 0): number[] {
   const arr: number[] = Array.isArray(json) ? [...json] : [];
   while (arr.length < 12) arr.push(defaultVal);
   return arr.slice(0, 12).map(v => (typeof v === 'number' ? v : defaultVal));
+}
+
+function jsonToOverrideArray(json: any): (number | null)[] {
+  const arr: (number | null)[] = Array.isArray(json) ? [...json] : [];
+  while (arr.length < 12) arr.push(null);
+  return arr.slice(0, 12).map(v => (typeof v === 'number' && !isNaN(v) ? v : null));
+}
+
+function normalizeBalanceOverrides(stored: any): BalanceOverrides {
+  const result: BalanceOverrides = {};
+  for (const key of BALANCE_OVERRIDE_KEYS) {
+    result[key] = jsonToOverrideArray(stored?.[key]);
+  }
+  return result;
 }
 
 function buildAnnualPnL(is: any): AnnualPnL {
@@ -222,11 +250,18 @@ function calcMonthlyBalance(
   annualRevenue: number,
   annualCosts: number,
   pnl: MonthlyPnLRow[],
+  overrides: BalanceOverrides = {},
 ): MonthlyBalanceRow[] {
   const rows: MonthlyBalanceRow[] = [];
   let cumRevenue = 0;
   let cumCosts = 0;
   let equity = base.equity;
+
+  // Manual override for a given field/month, or null if none was entered.
+  const ov = (key: BalanceOverrideKey, m: number): number | null => {
+    const v = overrides[key]?.[m];
+    return typeof v === 'number' && !isNaN(v) ? v : null;
+  };
 
   for (let m = 0; m < 12; m++) {
     cumRevenue += pnl[m].revenue;
@@ -238,43 +273,54 @@ function calcMonthlyBalance(
     const rf = annualRevenue !== 0 ? (cumRevenue - expectedFlatRev) / annualRevenue + 1 : 1;
     const cf = annualCosts !== 0 ? (cumCosts - expectedFlatCst) / annualCosts + 1 : 1;
 
-    // Patrimonio Neto rolls forward with net income (fixed only for month 0, the base).
+    // Patrimonio Neto rolls forward with net income (fixed only for month 0, the base),
+    // unless the user entered a manual override for this month — in which case later
+    // months keep rolling forward from the overridden value.
     if (m > 0) equity += pnl[m].netIncome;
+    equity = ov('equity', m) ?? equity;
 
-    const fixedAssetsUnplugged = rf * base.fixedAssets;
-    const otherNoncurrentAssets = rf * base.otherNoncurrentAssets;
-    const financialInvestmentsLp = rf * base.financialInvestmentsLp;
+    const otherNoncurrentAssets = ov('otherNoncurrentAssets', m) ?? rf * base.otherNoncurrentAssets;
+    const financialInvestmentsLp = ov('financialInvestmentsLp', m) ?? rf * base.financialInvestmentsLp;
 
-    const inventory = cf * base.inventory;
-    const accountsReceivable = rf * base.accountsReceivable;
-    const taxReceivables = rf * base.taxReceivables;
-    const cashEquivalents = rf * base.cashEquivalents;
+    const inventory = ov('inventory', m) ?? cf * base.inventory;
+    const accountsReceivable = ov('accountsReceivable', m) ?? rf * base.accountsReceivable;
+    const taxReceivables = ov('taxReceivables', m) ?? rf * base.taxReceivables;
+    const cashEquivalents = ov('cashEquivalents', m) ?? rf * base.cashEquivalents;
     const totalCurrentAssets = inventory + accountsReceivable + taxReceivables + cashEquivalents;
 
-    const provisionsLp = rf * base.provisionsLp;
-    const bankDebtLp = rf * base.bankDebtLp;
-    const otherLiabilitiesLp = rf * base.otherLiabilitiesLp;
+    const provisionsLp = ov('provisionsLp', m) ?? rf * base.provisionsLp;
+    const bankDebtLp = ov('bankDebtLp', m) ?? rf * base.bankDebtLp;
+    const otherLiabilitiesLp = ov('otherLiabilitiesLp', m) ?? rf * base.otherLiabilitiesLp;
     const totalNoncurrentLiabilities = provisionsLp + bankDebtLp + otherLiabilitiesLp;
 
-    const provisionsSp = rf * base.provisionsSp;
-    const bankDebtSp = rf * base.bankDebtSp;
-    const accountsPayable = cf * base.accountsPayable;
-    const taxLiabilities = rf * base.taxLiabilities;
-    const otherLiabilitiesSp = rf * base.otherLiabilitiesSp;
+    const provisionsSp = ov('provisionsSp', m) ?? rf * base.provisionsSp;
+    const bankDebtSp = ov('bankDebtSp', m) ?? rf * base.bankDebtSp;
+    const accountsPayable = ov('accountsPayable', m) ?? cf * base.accountsPayable;
+    const taxLiabilities = ov('taxLiabilities', m) ?? rf * base.taxLiabilities;
+    const otherLiabilitiesSp = ov('otherLiabilitiesSp', m) ?? rf * base.otherLiabilitiesSp;
     const totalCurrentLiabilities =
       provisionsSp + bankDebtSp + accountsPayable + taxLiabilities + otherLiabilitiesSp;
 
     const totalEquityAndLiabilities = equity + totalNoncurrentLiabilities + totalCurrentLiabilities;
 
-    // Balancing plug ("CUADRATURA"): absorbed into Activo Fijo so the sheet always squares.
-    const totalAssetsUnplugged =
-      fixedAssetsUnplugged + otherNoncurrentAssets + financialInvestmentsLp + totalCurrentAssets;
-    const plug = totalEquityAndLiabilities - totalAssetsUnplugged;
-    const fixedAssets = fixedAssetsUnplugged + plug;
+    // Balancing plug ("CUADRATURA"): absorbed into Activo Fijo so the sheet always squares,
+    // unless the user overrode Activo Fijo directly — then the sheet may show a non-zero
+    // "Descuadratura" row, same as manually editing the Excel cell would.
+    const fixedAssetsOverride = ov('fixedAssets', m);
+    let fixedAssets: number;
+    if (fixedAssetsOverride !== null) {
+      fixedAssets = fixedAssetsOverride;
+    } else {
+      const fixedAssetsUnplugged = rf * base.fixedAssets;
+      const totalAssetsUnplugged =
+        fixedAssetsUnplugged + otherNoncurrentAssets + financialInvestmentsLp + totalCurrentAssets;
+      const plug = totalEquityAndLiabilities - totalAssetsUnplugged;
+      fixedAssets = fixedAssetsUnplugged + plug;
+    }
 
     const totalNoncurrentAssets = fixedAssets + otherNoncurrentAssets + financialInvestmentsLp;
     const totalAssets = totalNoncurrentAssets + totalCurrentAssets;
-    const imbalance = totalEquityAndLiabilities - totalAssets; // always ~0 by construction
+    const imbalance = totalEquityAndLiabilities - totalAssets; // ~0 unless overridden
 
     rows.push({
       fixedAssets, otherNoncurrentAssets, financialInvestmentsLp, totalNoncurrentAssets,
@@ -314,6 +360,7 @@ export const monthlyForecastService = {
     rateFinancialIncome?: number[];
     rateFinancialExpenses?: number[];
     rateIncomeTax?: number[];
+    balanceOverrides?: BalanceOverrides;
   }) {
     return prisma.monthlyForecast.upsert({
       where: { companyId_year: { companyId, year } },
@@ -381,8 +428,12 @@ export const monthlyForecastService = {
       incomeTax: jsonToArray(stored?.rateIncomeTax, 0),
     };
 
+    const balanceOverrides = normalizeBalanceOverrides(stored?.balanceOverrides);
+
     const pnl = calcMonthlyPnL(annualPnL, closedMonths, actual, rates);
-    const balance = calcMonthlyBalance(annualBalance, annualPnL.revenue, annualPnL.costOfSales, pnl);
+    const balance = calcMonthlyBalance(
+      annualBalance, annualPnL.revenue, annualPnL.costOfSales, pnl, balanceOverrides,
+    );
 
     return { pnl, balance, annualPnL, annualBalance, baseYear: fiscalYear.year };
   },

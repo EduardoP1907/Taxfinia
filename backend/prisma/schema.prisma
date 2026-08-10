@@ -393,6 +393,10 @@ model MonthlyForecast {
   rateFinancialExpenses   Json? @map("rate_financial_expenses")
   rateIncomeTax           Json? @map("rate_income_tax")
 
+  // Manual overrides for the projected balance sheet line items.
+  // JSON shape: { [fieldKey]: (number|null)[12] } — null means "use the calculated value".
+  balanceOverrides Json? @map("balance_overrides")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

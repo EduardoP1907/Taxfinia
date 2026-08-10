@@ -7,6 +7,7 @@ import type { Company } from '../../types/company';
 import {
   monthlyForecastService, mergeConfig, MONTHS, calcPnLClient,
   type MonthlyForecastConfig, type MonthlyForecastResult, type MonthlyPnLRow,
+  type BalanceOverrideKey,
 } from '../../services/monthly-forecast.service';
 import {
   CalendarDays, RefreshCw, Save, ChevronDown, ChevronUp, AlertCircle, CheckCircle2,
@@ -135,33 +136,34 @@ interface BalanceLine {
   isSubtotal?: boolean;
   indent?: boolean;
   driver?: 'revenue' | 'costs' | 'fixed';
+  editable?: boolean;
 }
 
 const BALANCE_ASSETS: BalanceLine[] = [
   { label: 'A) ACTIVO NO CORRIENTE', key: 'totalNoncurrentAssets', isSubtotal: true },
-  { label: 'Activo fijo (inmovilizado)', key: 'fixedAssets', indent: true, driver: 'revenue' },
-  { label: 'Otros activos no corrientes', key: 'otherNoncurrentAssets', indent: true, driver: 'revenue' },
-  { label: 'Inversiones financieras LP', key: 'financialInvestmentsLp', indent: true, driver: 'revenue' },
+  { label: 'Activo fijo (inmovilizado)', key: 'fixedAssets', indent: true, driver: 'revenue', editable: true },
+  { label: 'Otros activos no corrientes', key: 'otherNoncurrentAssets', indent: true, driver: 'revenue', editable: true },
+  { label: 'Inversiones financieras LP', key: 'financialInvestmentsLp', indent: true, driver: 'revenue', editable: true },
   { label: 'B) ACTIVO CORRIENTE', key: 'totalCurrentAssets', isSubtotal: true },
-  { label: 'Existencias', key: 'inventory', indent: true, driver: 'costs' },
-  { label: 'Clientes y deudores', key: 'accountsReceivable', indent: true, driver: 'revenue' },
-  { label: 'Impuestos activo corriente', key: 'taxReceivables', indent: true, driver: 'revenue' },
-  { label: 'Disponible (tesorería)', key: 'cashEquivalents', indent: true, driver: 'revenue' },
+  { label: 'Existencias', key: 'inventory', indent: true, driver: 'costs', editable: true },
+  { label: 'Clientes y deudores', key: 'accountsReceivable', indent: true, driver: 'revenue', editable: true },
+  { label: 'Impuestos activo corriente', key: 'taxReceivables', indent: true, driver: 'revenue', editable: true },
+  { label: 'Disponible (tesorería)', key: 'cashEquivalents', indent: true, driver: 'revenue', editable: true },
   { label: 'TOTAL ACTIVO', key: 'totalAssets', isTotal: true },
 ];
 
 const BALANCE_LIABILITIES: BalanceLine[] = [
-  { label: 'A) PATRIMONIO NETO', key: 'equity', isSubtotal: true },
+  { label: 'A) PATRIMONIO NETO', key: 'equity', isSubtotal: true, editable: true },
   { label: 'B) PASIVO NO CORRIENTE', key: 'totalNoncurrentLiabilities', isSubtotal: true },
-  { label: 'Provisiones LP', key: 'provisionsLp', indent: true, driver: 'revenue' },
-  { label: 'Deudas LP', key: 'bankDebtLp', indent: true, driver: 'revenue' },
-  { label: 'Otros pasivos LP', key: 'otherLiabilitiesLp', indent: true, driver: 'revenue' },
+  { label: 'Provisiones LP', key: 'provisionsLp', indent: true, driver: 'revenue', editable: true },
+  { label: 'Deudas LP', key: 'bankDebtLp', indent: true, driver: 'revenue', editable: true },
+  { label: 'Otros pasivos LP', key: 'otherLiabilitiesLp', indent: true, driver: 'revenue', editable: true },
   { label: 'C) PASIVO CORRIENTE', key: 'totalCurrentLiabilities', isSubtotal: true },
-  { label: 'Provisiones CP', key: 'provisionsSp', indent: true, driver: 'revenue' },
-  { label: 'Deudas CP', key: 'bankDebtSp', indent: true, driver: 'revenue' },
-  { label: 'Proveedores', key: 'accountsPayable', indent: true, driver: 'costs' },
-  { label: 'Impuestos pasivo corriente', key: 'taxLiabilities', indent: true, driver: 'revenue' },
-  { label: 'Otros pasivos CP', key: 'otherLiabilitiesSp', indent: true, driver: 'revenue' },
+  { label: 'Provisiones CP', key: 'provisionsSp', indent: true, driver: 'revenue', editable: true },
+  { label: 'Deudas CP', key: 'bankDebtSp', indent: true, driver: 'revenue', editable: true },
+  { label: 'Proveedores', key: 'accountsPayable', indent: true, driver: 'costs', editable: true },
+  { label: 'Impuestos pasivo corriente', key: 'taxLiabilities', indent: true, driver: 'revenue', editable: true },
+  { label: 'Otros pasivos CP', key: 'otherLiabilitiesSp', indent: true, driver: 'revenue', editable: true },
   { label: 'TOTAL PATRIMONIO Y PASIVO', key: 'totalEquityAndLiabilities', isTotal: true },
   { label: 'Descuadratura', key: 'imbalance', isSubtotal: true },
 ];
@@ -224,6 +226,41 @@ const RateInput: React.FC<{
       className="w-full text-center text-xs border border-slate-200 rounded px-0.5 py-0.5
                  focus:outline-none focus:ring-1 focus:ring-amber-400
                  disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed
+                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+    />
+  );
+};
+
+// Editable cell for the projected balance — overrides the calculated value.
+// Empty input = no override, falls back to the calculated value (shown as placeholder).
+const BalanceOverrideInput: React.FC<{
+  value: number | null;
+  computed: number;
+  onChange: (v: number | null) => void;
+}> = ({ value, computed, onChange }) => {
+  const [local, setLocal] = useState(value === null ? '' : String(value));
+
+  useEffect(() => {
+    setLocal(value === null ? '' : String(value));
+  }, [value]);
+
+  return (
+    <input
+      type="number"
+      value={local}
+      placeholder={fmt(computed)}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={() => {
+        if (local.trim() === '') {
+          onChange(null);
+          return;
+        }
+        const parsed = parseFloat(local);
+        onChange(isNaN(parsed) ? null : parsed);
+        if (isNaN(parsed)) setLocal('');
+      }}
+      className="w-full text-right text-xs border border-slate-200 rounded px-1 py-0.5 bg-white
+                 focus:outline-none focus:ring-1 focus:ring-amber-400
                  [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
     />
   );
@@ -337,6 +374,13 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
     const arr = [...(config[key] as number[])];
     arr[m] = v;
     setConfig({ ...config, [key]: arr });
+  };
+
+  const setBalanceOverride = (key: BalanceOverrideKey, m: number, v: number | null) => {
+    if (!config) return;
+    const arr = [...(config.balanceOverrides[key] ?? Array(12).fill(null))];
+    arr[m] = v;
+    setConfig({ ...config, balanceOverrides: { ...config.balanceOverrides, [key]: arr } });
   };
 
 
@@ -779,14 +823,29 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
                               {line.label}
                             </div>
                           </td>
-                          {result.balance.map((month, i) => (
-                            <td
-                              key={i}
-                              className={`px-2 py-1.5 text-right ${i < closedMonths ? 'bg-green-50' : ''}`}
-                            >
-                              {fmt(month[line.key] as number)}
-                            </td>
-                          ))}
+                          {result.balance.map((month, i) => {
+                            const computed = month[line.key] as number;
+                            if (line.editable && config) {
+                              const key = line.key as BalanceOverrideKey;
+                              return (
+                                <td key={i} className="px-1 py-1">
+                                  <BalanceOverrideInput
+                                    value={config.balanceOverrides[key]?.[i] ?? null}
+                                    computed={computed}
+                                    onChange={v => setBalanceOverride(key, i, v)}
+                                  />
+                                </td>
+                              );
+                            }
+                            return (
+                              <td
+                                key={i}
+                                className={`px-2 py-1.5 text-right ${i < closedMonths ? 'bg-green-50' : ''}`}
+                              >
+                                {fmt(computed)}
+                              </td>
+                            );
+                          })}
                         </tr>
                       );
                     })}
@@ -835,6 +894,18 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
                           </td>
                           {result.balance.map((month, i) => {
                             const val = month[line.key] as number;
+                            if (line.editable && config) {
+                              const key = line.key as BalanceOverrideKey;
+                              return (
+                                <td key={i} className="px-1 py-1">
+                                  <BalanceOverrideInput
+                                    value={config.balanceOverrides[key]?.[i] ?? null}
+                                    computed={val}
+                                    onChange={v => setBalanceOverride(key, i, v)}
+                                  />
+                                </td>
+                              );
+                            }
                             return (
                               <td
                                 key={i}
@@ -860,7 +931,8 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
             )}
 
             <p className="text-xs text-slate-400">
-              El Activo Fijo absorbe automáticamente cualquier descuadre (igual que la fórmula CUADRATURA de la hoja FCASTBCE2026), por lo que Total Activo = Total Pasivo + Patrimonio Neto todos los meses.
+              Cada partida es editable: escribe un valor para sobrescribir el cálculo automático de ese mes, o deja la casilla vacía para usar el valor proyectado (mostrado en gris como referencia). Pulsa «Guardar y recalcular» para aplicar los cambios.
+              El Activo Fijo absorbe automáticamente cualquier descuadre (igual que la fórmula CUADRATURA de la hoja FCASTBCE2026) mientras no lo sobrescribas manualmente, por lo que Total Activo = Total Pasivo + Patrimonio Neto todos los meses.
             </p>
           </div>
         )}

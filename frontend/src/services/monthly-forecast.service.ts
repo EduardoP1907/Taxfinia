@@ -1,5 +1,19 @@
 import api from './api';
 
+// Leaf balance line items the user can manually override (excludes computed
+// totals/subtotals and the "imbalance" check row, which are always derived).
+export const BALANCE_OVERRIDE_KEYS = [
+  'fixedAssets', 'otherNoncurrentAssets', 'financialInvestmentsLp',
+  'inventory', 'accountsReceivable', 'taxReceivables', 'cashEquivalents',
+  'equity', 'provisionsLp', 'bankDebtLp', 'otherLiabilitiesLp',
+  'provisionsSp', 'bankDebtSp', 'accountsPayable', 'taxLiabilities', 'otherLiabilitiesSp',
+] as const;
+
+export type BalanceOverrideKey = typeof BALANCE_OVERRIDE_KEYS[number];
+
+// { [fieldKey]: (number|null)[12] } — null means "use the calculated value".
+export type BalanceOverrides = Record<BalanceOverrideKey, (number | null)[]>;
+
 export interface MonthlyForecastConfig {
   closedMonths: number;
   actualRevenue: number[];
@@ -18,6 +32,7 @@ export interface MonthlyForecastConfig {
   rateFinancialIncome: number[];
   rateFinancialExpenses: number[];
   rateIncomeTax: number[];
+  balanceOverrides: BalanceOverrides;
 }
 
 export interface MonthlyPnLRow {
@@ -179,6 +194,12 @@ export function defaultActuals(): number[] {
   return Array(12).fill(0);
 }
 
+export function defaultBalanceOverrides(): BalanceOverrides {
+  const obj = {} as BalanceOverrides;
+  for (const key of BALANCE_OVERRIDE_KEYS) obj[key] = Array(12).fill(null);
+  return obj;
+}
+
 export function buildDefaultConfig(): MonthlyForecastConfig {
   return {
     closedMonths: 0,
@@ -198,6 +219,7 @@ export function buildDefaultConfig(): MonthlyForecastConfig {
     rateFinancialIncome: defaultRates(),
     rateFinancialExpenses: defaultRates(),
     rateIncomeTax: defaultRates(),
+    balanceOverrides: defaultBalanceOverrides(),
   };
 }
 
@@ -206,6 +228,15 @@ export function mergeConfig(stored: any | null): MonthlyForecastConfig {
   if (!stored) return def;
   const arr = (v: any, fallback: number[]) =>
     Array.isArray(v) && v.length === 12 ? v : fallback;
+  const overrideArr = (v: any): (number | null)[] => {
+    const a = Array.isArray(v) ? [...v] : [];
+    while (a.length < 12) a.push(null);
+    return a.slice(0, 12).map(x => (typeof x === 'number' && !isNaN(x) ? x : null));
+  };
+  const balanceOverrides = BALANCE_OVERRIDE_KEYS.reduce((acc, key) => {
+    acc[key] = overrideArr(stored.balanceOverrides?.[key]);
+    return acc;
+  }, {} as BalanceOverrides);
   return {
     closedMonths: stored.closedMonths ?? 0,
     actualRevenue: arr(stored.actualRevenue, def.actualRevenue),
@@ -224,5 +255,6 @@ export function mergeConfig(stored: any | null): MonthlyForecastConfig {
     rateFinancialIncome: arr(stored.rateFinancialIncome, def.rateFinancialIncome),
     rateFinancialExpenses: arr(stored.rateFinancialExpenses, def.rateFinancialExpenses),
     rateIncomeTax: arr(stored.rateIncomeTax, def.rateIncomeTax),
+    balanceOverrides,
   };
 }
