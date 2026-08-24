@@ -22,6 +22,7 @@ import { AdminPage } from './pages/admin/AdminPage';
 import { MonthlyReportPage } from './pages/report/MonthlyReportPage';
 import { CompareCompaniesPage } from './pages/companies/CompareCompaniesPage';
 import { MonthlyForecastPage } from './pages/projections/MonthlyForecastPage';
+import { BudgetPage } from './pages/projections/BudgetPage';
 
 function App() {
   const { initializeAuth, isLoading } = useAuthStore();
@@ -130,6 +131,14 @@ function App() {
           element={
             <PrivateRoute>
               <MonthlyForecastPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/budget"
+          element={
+            <PrivateRoute>
+              <BudgetPage />
             </PrivateRoute>
           }
         />

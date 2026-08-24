@@ -19,7 +19,8 @@ interface AnnualBalance {
   fixedAssets: number;             // tangibleAssets + intangibleAssets
   otherNoncurrentAssets: number;
   financialInvestmentsLp: number;
-  accountsReceivable: number;      // accountsReceivable + otherReceivables
+  accountsReceivable: number;
+  otherReceivables: number;
   taxReceivables: number;
   cashEquivalents: number;
   inventory: number;               // costs driver
@@ -59,6 +60,7 @@ export interface MonthlyBalanceRow {
   totalNoncurrentAssets: number;
   inventory: number;
   accountsReceivable: number;
+  otherReceivables: number;
   taxReceivables: number;
   cashEquivalents: number;
   totalCurrentAssets: number;
@@ -90,7 +92,7 @@ export interface MonthlyForecastResult {
 // totals/subtotals and the "imbalance" check row, which are always derived).
 export const BALANCE_OVERRIDE_KEYS = [
   'fixedAssets', 'otherNoncurrentAssets', 'financialInvestmentsLp',
-  'inventory', 'accountsReceivable', 'taxReceivables', 'cashEquivalents',
+  'inventory', 'accountsReceivable', 'otherReceivables', 'taxReceivables', 'cashEquivalents',
   'equity', 'provisionsLp', 'bankDebtLp', 'otherLiabilitiesLp',
   'provisionsSp', 'bankDebtSp', 'accountsPayable', 'taxLiabilities', 'otherLiabilitiesSp',
 ] as const;
@@ -145,7 +147,8 @@ function buildAnnualBalance(bs: any): AnnualBalance {
     fixedAssets: toNum(bs.tangibleAssets) + toNum(bs.intangibleAssets),
     otherNoncurrentAssets: toNum(bs.otherNoncurrentAssets),
     financialInvestmentsLp: toNum(bs.financialInvestmentsLp),
-    accountsReceivable: toNum(bs.accountsReceivable) + toNum(bs.otherReceivables),
+    accountsReceivable: toNum(bs.accountsReceivable),
+    otherReceivables: toNum(bs.otherReceivables),
     taxReceivables: toNum(bs.taxReceivables),
     cashEquivalents: toNum(bs.cashEquivalents),
     inventory: toNum(bs.inventory),
@@ -284,9 +287,10 @@ function calcMonthlyBalance(
 
     const inventory = ov('inventory', m) ?? cf * base.inventory;
     const accountsReceivable = ov('accountsReceivable', m) ?? rf * base.accountsReceivable;
+    const otherReceivables = ov('otherReceivables', m) ?? rf * base.otherReceivables;
     const taxReceivables = ov('taxReceivables', m) ?? rf * base.taxReceivables;
     const cashEquivalents = ov('cashEquivalents', m) ?? rf * base.cashEquivalents;
-    const totalCurrentAssets = inventory + accountsReceivable + taxReceivables + cashEquivalents;
+    const totalCurrentAssets = inventory + accountsReceivable + otherReceivables + taxReceivables + cashEquivalents;
 
     const provisionsLp = ov('provisionsLp', m) ?? rf * base.provisionsLp;
     const bankDebtLp = ov('bankDebtLp', m) ?? rf * base.bankDebtLp;
@@ -324,7 +328,7 @@ function calcMonthlyBalance(
 
     rows.push({
       fixedAssets, otherNoncurrentAssets, financialInvestmentsLp, totalNoncurrentAssets,
-      inventory, accountsReceivable, taxReceivables, cashEquivalents, totalCurrentAssets,
+      inventory, accountsReceivable, otherReceivables, taxReceivables, cashEquivalents, totalCurrentAssets,
       totalAssets, equity,
       provisionsLp, bankDebtLp, otherLiabilitiesLp, totalNoncurrentLiabilities,
       provisionsSp, bankDebtSp, accountsPayable, taxLiabilities, otherLiabilitiesSp,

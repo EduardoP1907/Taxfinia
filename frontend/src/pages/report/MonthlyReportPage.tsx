@@ -19,6 +19,7 @@ import {
   type MonthlyForecastResult, type MonthlyPnLRow, type MonthlyBalanceRow,
 } from '../../services/monthly-forecast.service';
 import { CompanySelector } from '../../components/companies/CompanySelector';
+import { MonthlyAIReportPanel } from '../../components/report/MonthlyAIReportPanel';
 import type { Company } from '../../types/company';
 import {
   CalendarDays, AlertCircle, RefreshCw, BarChart3, FileText, Scale,
@@ -89,7 +90,7 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ companyName, onSelect, onBack
           <div className="h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
           <div className="p-5">
             <p className="text-xs text-slate-500 mb-4">
-              Elige el mes de {year} hasta el que quieres ver el informe acumulado (basado en el Forecast Mensual).
+              Elige el mes de {year} hasta el que quieres ver el informe acumulado (basado en el Forecast {year}).
             </p>
             <div className="grid grid-cols-3 gap-2 mb-5">
               {MONTHS.map((m, i) => (
@@ -171,10 +172,10 @@ const IncomeSummary: React.FC<IncomeSummaryProps> = ({ pnl, currency, month, yea
         <p className="text-xs text-blue-700">
           <span className="font-semibold">Nota: </span>
           {pnl.allClosed
-            ? 'Todos los meses incluidos son datos reales introducidos en el Forecast Mensual.'
+            ? `Todos los meses incluidos son datos reales introducidos en el Forecast ${year}.`
             : pnl.anyClosed
-            ? 'Combina meses reales (cerrados) y meses proyectados con las tasas de crecimiento del Forecast Mensual.'
-            : 'Los importes son una proyección calculada con las tasas de crecimiento configuradas en el Forecast Mensual.'}
+            ? `Combina meses reales (cerrados) y meses proyectados con las tasas de crecimiento del Forecast ${year}.`
+            : `Los importes son una proyección calculada con las tasas de crecimiento configuradas en el Forecast ${year}.`}
         </p>
       </div>
     </div>
@@ -206,6 +207,7 @@ const BalanceSummary: React.FC<BalanceSummaryProps> = ({ balance, currency, mont
       children: [
         { label: 'Existencias', value: balance.inventory },
         { label: 'Clientes y deudores', value: balance.accountsReceivable },
+        { label: 'Otros Realizables', value: balance.otherReceivables },
         { label: 'Impuestos activo corriente', value: balance.taxReceivables },
         { label: 'Efectivo y equivalentes', value: balance.cashEquivalents },
       ],
@@ -312,7 +314,7 @@ export const MonthlyReportPage: React.FC = () => {
     setError(null);
     monthlyForecastService.calculate(companyId, year)
       .then(setResult)
-      .catch((e) => setError(e?.response?.data?.error || e.message || 'No se pudo calcular el Forecast Mensual'))
+      .catch((e) => setError(e?.response?.data?.error || e.message || `No se pudo calcular el Forecast ${year}`))
       .finally(() => setLoading(false));
   }, [companyId, mParam, year]);
 
@@ -388,12 +390,17 @@ export const MonthlyReportPage: React.FC = () => {
               {error}
               <br />
               <a href={`/forecast-mensual?companyId=${companyId}`} className="text-amber-700 underline mt-2 inline-block">
-                Configurar Forecast Mensual
+                Configurar Forecast {year}
               </a>
             </div>
           </div>
         ) : result ? (
           <>
+            <MonthlyAIReportPanel
+              companyId={companyId}
+              companyName={company?.name ?? ''}
+              year={year}
+            />
             <IncomeSummary
               pnl={accumulatePnl(result.pnl, month - 1)}
               currency={company?.currency ?? 'EUR'}

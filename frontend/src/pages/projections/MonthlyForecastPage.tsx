@@ -147,6 +147,7 @@ const BALANCE_ASSETS: BalanceLine[] = [
   { label: 'B) ACTIVO CORRIENTE', key: 'totalCurrentAssets', isSubtotal: true },
   { label: 'Existencias', key: 'inventory', indent: true, driver: 'costs', editable: true },
   { label: 'Clientes y deudores', key: 'accountsReceivable', indent: true, driver: 'revenue', editable: true },
+  { label: 'Otros Realizables', key: 'otherReceivables', indent: true, driver: 'revenue', editable: true },
   { label: 'Impuestos activo corriente', key: 'taxReceivables', indent: true, driver: 'revenue', editable: true },
   { label: 'Disponible (tesorería)', key: 'cashEquivalents', indent: true, driver: 'revenue', editable: true },
   { label: 'TOTAL ACTIVO', key: 'totalAssets', isTotal: true },
@@ -269,6 +270,22 @@ const BalanceOverrideInput: React.FC<{
 // ─── Outer page: company selection via URL ────────────────────────────────────
 
 export const MonthlyForecastPage: React.FC = () => {
+  return (
+    <MonthlyForecastShell
+      year={new Date().getFullYear()}
+      titlePrefix="Forecast"
+      companySelectorDescription="Selecciona la empresa para ver o crear su proyección mensual"
+    />
+  );
+};
+
+// ─── Shell: company selection via URL, shared by Forecast and Budget ─────────
+
+export const MonthlyForecastShell: React.FC<{
+  year: number;
+  titlePrefix: string;
+  companySelectorDescription: string;
+}> = ({ year, titlePrefix, companySelectorDescription }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
@@ -293,8 +310,8 @@ export const MonthlyForecastPage: React.FC = () => {
           p.set('companyId', company.id);
           setSearchParams(p);
         }}
-        title="Forecast Mensual"
-        description="Selecciona la empresa para ver o crear su proyección mensual"
+        title={`${titlePrefix} ${year}`}
+        description={companySelectorDescription}
         icon={<CalendarDays className="w-7 h-7 text-slate-900" />}
       />
     );
@@ -304,18 +321,25 @@ export const MonthlyForecastPage: React.FC = () => {
     <MonthlyForecastContent
       companyId={companyId}
       companyName={selectedCompany?.name ?? companyId}
+      year={year}
+      titlePrefix={titlePrefix}
     />
   );
 };
 
 // ─── Inner content (renders once companyId is known) ─────────────────────────
 
-const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string }> = ({
+const MonthlyForecastContent: React.FC<{
+  companyId: string;
+  companyName: string;
+  year: number;
+  titlePrefix: string;
+}> = ({
   companyId,
   companyName,
+  year,
+  titlePrefix,
 }) => {
-  const currentYear = new Date().getFullYear();
-  const [year] = useState(currentYear);
   const [config, setConfig] = useState<MonthlyForecastConfig | null>(null);
   const [result, setResult] = useState<MonthlyForecastResult | null>(null);
   const [baseYear, setBaseYear] = useState<number | null>(null);
@@ -417,7 +441,7 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
           <div>
             <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
               <CalendarDays className="w-5 h-5 text-amber-500" />
-              Forecast Mensual {year}
+              {titlePrefix} {year}
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">{companyName}</p>
           </div>
@@ -825,10 +849,11 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
                           </td>
                           {result.balance.map((month, i) => {
                             const computed = month[line.key] as number;
-                            if (line.editable && config) {
+                            const isClosed = (noBaseData && closedMonths === 0) ? true : (i < closedMonths);
+                            if (line.editable && config && isClosed) {
                               const key = line.key as BalanceOverrideKey;
                               return (
-                                <td key={i} className="px-1 py-1">
+                                <td key={i} className="px-1 py-1 bg-green-50">
                                   <BalanceOverrideInput
                                     value={config.balanceOverrides[key]?.[i] ?? null}
                                     computed={computed}
@@ -840,7 +865,7 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
                             return (
                               <td
                                 key={i}
-                                className={`px-2 py-1.5 text-right ${i < closedMonths ? 'bg-green-50' : ''}`}
+                                className={`px-2 py-1.5 text-right ${isClosed ? 'bg-green-50' : ''}`}
                               >
                                 {fmt(computed)}
                               </td>
@@ -894,10 +919,11 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
                           </td>
                           {result.balance.map((month, i) => {
                             const val = month[line.key] as number;
-                            if (line.editable && config) {
+                            const isClosed = (noBaseData && closedMonths === 0) ? true : (i < closedMonths);
+                            if (line.editable && config && isClosed) {
                               const key = line.key as BalanceOverrideKey;
                               return (
-                                <td key={i} className="px-1 py-1">
+                                <td key={i} className="px-1 py-1 bg-green-50">
                                   <BalanceOverrideInput
                                     value={config.balanceOverrides[key]?.[i] ?? null}
                                     computed={val}
@@ -910,7 +936,7 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
                               <td
                                 key={i}
                                 className={`px-2 py-1.5 text-right ${
-                                  i < closedMonths ? 'bg-green-50' : ''
+                                  isClosed ? 'bg-green-50' : ''
                                 } ${isImbalance && val !== 0 ? 'text-amber-600 font-medium' : ''}`}
                               >
                                 {fmt(val)}
@@ -931,7 +957,7 @@ const MonthlyForecastContent: React.FC<{ companyId: string; companyName: string 
             )}
 
             <p className="text-xs text-slate-400">
-              Cada partida es editable: escribe un valor para sobrescribir el cálculo automático de ese mes, o deja la casilla vacía para usar el valor proyectado (mostrado en gris como referencia). Pulsa «Guardar y recalcular» para aplicar los cambios.
+              Solo los meses cerrados (en verde) son editables: escribe un valor para sobrescribir el cálculo de ese mes, o deja la casilla vacía para usar el valor calculado. Los meses proyectados se calculan automáticamente según la evolución de ventas/costes y no se pueden editar directamente — ajusta «Meses cerrados» arriba para habilitar más meses. Pulsa «Guardar y recalcular» para aplicar los cambios.
               El Activo Fijo absorbe automáticamente cualquier descuadre (igual que la fórmula CUADRATURA de la hoja FCASTBCE2026) mientras no lo sobrescribas manualmente, por lo que Total Activo = Total Pasivo + Patrimonio Neto todos los meses.
             </p>
           </div>

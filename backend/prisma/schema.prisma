@@ -24,6 +24,7 @@ model User {
   companies       Company[]
   otpCodes        OtpCode[]
   reports         Report[]
+  monthlyReports  MonthlyReport[]
   sessions        Session[]
   inviteTokens    InviteToken[] @relation("creator")
 
@@ -94,6 +95,7 @@ model Company {
   projections      ProjectionScenario[]
   reports          Report[]
   monthlyForecasts MonthlyForecast[]
+  monthlyReports   MonthlyReport[]
 
   @@index([userId])
   @@map("companies")
@@ -405,6 +407,30 @@ model MonthlyForecast {
   @@unique([companyId, year])
   @@index([companyId])
   @@map("monthly_forecasts")
+}
+
+model MonthlyReport {
+  id                   String       @id @default(uuid())
+  companyId            String       @map("company_id")
+  userId               String       @map("user_id")
+  year                 Int
+  status               ReportStatus @default(PENDING)
+  aiAnalysisPrometheia Json?        @map("ai_analysis_prometheia")
+  aiAnalysisEjecutivo  Json?        @map("ai_analysis_ejecutivo")
+  docxPathPrometheia   String?      @map("docx_path_prometheia")
+  docxPathEjecutivo    String?      @map("docx_path_ejecutivo")
+  downloadCode         String?      @map("download_code")
+  errorMessage         String?      @map("error_message")
+  generatedAt          DateTime?    @map("generated_at")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+  company              Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, year])
+  @@index([companyId])
+  @@index([userId])
+  @@map("monthly_reports")
 }
 
 enum ReportStatus {

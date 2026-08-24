@@ -45,7 +45,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     {
       label: 'Análisis Mensual',
       items: [
-        { name: 'Forecast Mensual',   href: '/forecast-mensual',    icon: TrendingUp },
+        { name: `Forecast ${new Date().getFullYear()}`, href: '/forecast-mensual',    icon: TrendingUp },
+        { name: `Budget ${new Date().getFullYear() + 1}`, href: '/budget',    icon: TrendingUp },
         { name: 'Informe Mensual',    href: '/informe-trimestral',  icon: FileBarChart },
       ],
     },

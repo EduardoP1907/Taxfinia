@@ -234,13 +234,20 @@ export const DashboardPage: React.FC = () => {
               Ene – Dic
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <ActionCard
-              title="Forecast Mensual"
+              title={`Forecast ${new Date().getFullYear()}`}
               description="Proyecta y edita el desglose mensual (enero a diciembre) a partir de los datos anuales"
               icon={TrendingUp}
               href="/forecast-mensual"
               tag="INPUT MENSUAL"
+            />
+            <ActionCard
+              title={`Budget ${new Date().getFullYear() + 1}`}
+              description="Presupuesta el desglose mensual del próximo ejercicio (P&G y balance proyectado)"
+              icon={TrendingUp}
+              href="/budget"
+              tag="PRESUPUESTO"
             />
             <ActionCard
               title="Informe Mensual"

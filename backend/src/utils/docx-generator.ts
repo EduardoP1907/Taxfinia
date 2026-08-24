@@ -21,7 +21,7 @@ import type { AIAnalysisResult } from '../services/ai-analysis.service';
 // ─── Sanitize text for XML 1.0 (DOCX internal format) ───────────────────────
 // Removes control characters invalid in XML 1.0 that cause Word's "unreadable content" error.
 // Also replaces box-drawing / arrow chars the AI may echo from the prompt.
-function sanitize(text: string): string {
+export function sanitize(text: string): string {
   return text
     // Strip XML 1.0 illegal characters (except \t \n \r which are valid)
     // eslint-disable-next-line no-control-regex
@@ -36,14 +36,14 @@ function sanitize(text: string): string {
 }
 
 // ─── Color palette (PROMETHEIA: navy + amber) ────────────────────────────────
-const NAVY_DARK = '0f172a';
-const AMBER = 'f59e0b';
-const AMBER_LIGHT = 'fef3c7';
-const GRAY_LIGHT = 'f9fafb';
-const WHITE = 'ffffff';
+export const NAVY_DARK = '0f172a';
+export const AMBER = 'f59e0b';
+export const AMBER_LIGHT = 'fef3c7';
+export const GRAY_LIGHT = 'f9fafb';
+export const WHITE = 'ffffff';
 
 // ─── Helper: styled paragraph ───────────────────────────────────────────────
-function styledParagraph(text: string, options?: {
+export function styledParagraph(text: string, options?: {
   bold?: boolean;
   size?: number;  // half-points
   color?: string;
@@ -68,7 +68,7 @@ function styledParagraph(text: string, options?: {
 }
 
 // ─── Section heading ────────────────────────────────────────────────────────
-function sectionHeading(number: string, title: string): Paragraph {
+export function sectionHeading(number: string, title: string): Paragraph {
   return new Paragraph({
     spacing: { before: 300, after: 120 },
     shading: { type: ShadingType.SOLID, color: AMBER },
@@ -92,7 +92,7 @@ function sectionHeading(number: string, title: string): Paragraph {
 }
 
 // ─── Sub-section heading ────────────────────────────────────────────────────
-function subSectionHeading(number: string, title: string): Paragraph {
+export function subSectionHeading(number: string, title: string): Paragraph {
   return new Paragraph({
     spacing: { before: 200, after: 80 },
     border: {
@@ -111,7 +111,7 @@ function subSectionHeading(number: string, title: string): Paragraph {
 }
 
 // ─── Multi-paragraph text ───────────────────────────────────────────────────
-function bodyText(text: string): Paragraph[] {
+export function bodyText(text: string): Paragraph[] {
   // Normalize literal \n escape sequences that AI may produce as text (e.g. ".\n\n .")
   const normalized = text
     .replace(/\\n/g, '\n')
@@ -137,7 +137,7 @@ function bodyText(text: string): Paragraph[] {
 }
 
 // ─── Info box ───────────────────────────────────────────────────────────────
-function infoBox(label: string, value: string): TableRow {
+export function infoBox(label: string, value: string): TableRow {
   return new TableRow({
     children: [
       new TableCell({

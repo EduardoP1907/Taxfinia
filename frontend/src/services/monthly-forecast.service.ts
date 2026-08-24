@@ -4,7 +4,7 @@ import api from './api';
 // totals/subtotals and the "imbalance" check row, which are always derived).
 export const BALANCE_OVERRIDE_KEYS = [
   'fixedAssets', 'otherNoncurrentAssets', 'financialInvestmentsLp',
-  'inventory', 'accountsReceivable', 'taxReceivables', 'cashEquivalents',
+  'inventory', 'accountsReceivable', 'otherReceivables', 'taxReceivables', 'cashEquivalents',
   'equity', 'provisionsLp', 'bankDebtLp', 'otherLiabilitiesLp',
   'provisionsSp', 'bankDebtSp', 'accountsPayable', 'taxLiabilities', 'otherLiabilitiesSp',
 ] as const;
@@ -60,6 +60,7 @@ export interface MonthlyBalanceRow {
   totalNoncurrentAssets: number;
   inventory: number;
   accountsReceivable: number;
+  otherReceivables: number;
   taxReceivables: number;
   cashEquivalents: number;
   totalCurrentAssets: number;

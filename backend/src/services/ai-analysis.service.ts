@@ -95,7 +95,7 @@ export interface AIAnalysisResult {
 
 // ─── Formatting helpers ────────────────────────────────────────────────────────
 
-function formatAmount(value: number, currency: string): string {
+export function formatAmount(value: number, currency: string): string {
   const abs = Math.abs(value);
   const sign = value < 0 ? '-' : '';
   if (currency === 'CLP') {
@@ -109,7 +109,7 @@ function formatAmount(value: number, currency: string): string {
   return `${sign}${abs.toLocaleString('es-CL')} ${currency}`;
 }
 
-function pct(value: number, decimals = 1): string {
+export function pct(value: number, decimals = 1): string {
   return `${value.toFixed(decimals)}%`;
 }
 
@@ -120,7 +120,7 @@ function growthLabel(current: number, previous: number): string {
   return `${arrow} ${Math.abs(g).toFixed(1)}%`;
 }
 
-function nd(val: number | null | undefined, decimals = 2): string {
+export function nd(val: number | null | undefined, decimals = 2): string {
   return val != null ? val.toFixed(decimals) : 'N/D';
 }
 

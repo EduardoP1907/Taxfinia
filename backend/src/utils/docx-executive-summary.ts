@@ -16,16 +16,16 @@ import type { AIAnalysisResult } from '../services/ai-analysis.service';
 import type { PDFReportData } from './pdf-generator';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
-const NAVY    = '0f172a';
-const AMBER   = 'f59e0b';
-const WHITE   = 'ffffff';
-const GRAY    = 'f8fafc';
-const GRAY2   = 'e2e8f0';
-const TEXT    = '1e293b';
-const TEXT_S  = '64748b';
-const GREEN   = '059669';
+export const NAVY    = '0f172a';
+export const AMBER   = 'f59e0b';
+export const WHITE   = 'ffffff';
+export const GRAY    = 'f8fafc';
+export const GRAY2   = 'e2e8f0';
+export const TEXT    = '1e293b';
+export const TEXT_S  = '64748b';
+export const GREEN   = '059669';
 const GREEN_L = 'd1fae5';
-const RED     = 'dc2626';
+export const RED     = 'dc2626';
 const RED_L   = 'fee2e2';
 
 const chartCanvas = new ChartJSNodeCanvas({ width: 680, height: 260, backgroundColour: 'white' });
@@ -218,7 +218,7 @@ function sectionCell(text: string, cols: number): TableCell {
   });
 }
 
-function spacer(after = 120): Paragraph {
+export function spacer(after = 120): Paragraph {
   return new Paragraph({ spacing: { after } });
 }
 
@@ -230,7 +230,7 @@ function imgPar(buf: Buffer, w: number, h: number): Paragraph {
   });
 }
 
-function sectionTitle(num: number, text: string): Paragraph {
+export function sectionTitle(num: number, text: string): Paragraph {
   return new Paragraph({
     spacing: { before: 240, after: 120 },
     shading: { type: ShadingType.SOLID, color: NAVY },
@@ -241,14 +241,14 @@ function sectionTitle(num: number, text: string): Paragraph {
   });
 }
 
-function subTitle(text: string): Paragraph {
+export function subTitle(text: string): Paragraph {
   return new Paragraph({
     spacing: { before: 160, after: 80 },
     children: [new TextRun({ text, bold: true, size: 20, color: NAVY, font: 'Calibri' })],
   });
 }
 
-function para(text: string, opts: { bold?: boolean; size?: number; color?: string } = {}): Paragraph {
+export function para(text: string, opts: { bold?: boolean; size?: number; color?: string } = {}): Paragraph {
   return new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 80, before: 0 },
@@ -257,7 +257,7 @@ function para(text: string, opts: { bold?: boolean; size?: number; color?: strin
 }
 
 // ─── AI text renderer ─────────────────────────────────────────────────────────
-function renderAIText(text: string, type: 'alerts' | 'recommendations' | 'plain'): Paragraph[] {
+export function renderAIText(text: string, type: 'alerts' | 'recommendations' | 'plain'): Paragraph[] {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   return lines.map(line => {
     const isHeader = /^\[(NIVEL|PRIORIDAD):/.test(line) || /^\[CRITICO|ALTA|MEDIA|BAJA/.test(line);
@@ -286,20 +286,20 @@ function renderAIText(text: string, type: 'alerts' | 'recommendations' | 'plain'
 }
 
 // ─── Border helper ────────────────────────────────────────────────────────────
-function borders(color: string, size = 1) {
+export function borders(color: string, size = 1) {
   const s = { style: BorderStyle.SINGLE, size, color } as const;
   return { top: s, bottom: s, left: s, right: s };
 }
 
 // ─── Alert card parsing & rendering ──────────────────────────────────────────
-interface AlertBlock {
+export interface AlertBlock {
   nivel: 'CRITICA' | 'ALTA' | 'MEDIA' | 'BAJA';
   title: string;
   body: string;
   index: number;
 }
 
-function parseAlerts(text: string): AlertBlock[] {
+export function parseAlerts(text: string): AlertBlock[] {
   const blocks: AlertBlock[] = [];
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   let current: { nivel: AlertBlock['nivel']; title: string; bodyLines: string[] } | null = null;
@@ -326,7 +326,7 @@ function alertStyle(nivel: AlertBlock['nivel']): { bg: string; fg: string; label
   }
 }
 
-function buildAlertCards(alerts: AlertBlock[]): (Table | Paragraph)[] {
+export function buildAlertCards(alerts: AlertBlock[]): (Table | Paragraph)[] {
   const result: (Table | Paragraph)[] = [];
   for (const alert of alerts) {
     const { bg, fg, label } = alertStyle(alert.nivel);
@@ -364,7 +364,7 @@ function buildAlertCards(alerts: AlertBlock[]): (Table | Paragraph)[] {
 }
 
 // ─── Recommendation card parsing & rendering ──────────────────────────────────
-interface RecommendationBlock {
+export interface RecommendationBlock {
   priority: 'ALTA' | 'MEDIA' | 'BAJA';
   area: string;
   body: string;
@@ -372,7 +372,7 @@ interface RecommendationBlock {
   index: number;
 }
 
-function parseRecommendations(text: string): RecommendationBlock[] {
+export function parseRecommendations(text: string): RecommendationBlock[] {
   const blocks: RecommendationBlock[] = [];
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   let current: { priority: RecommendationBlock['priority']; area: string; bodyLines: string[] } | null = null;
@@ -417,7 +417,7 @@ function recStyle(priority: RecommendationBlock['priority']): {
   }
 }
 
-function buildRecommendationCards(recs: RecommendationBlock[]): (Table | Paragraph)[] {
+export function buildRecommendationCards(recs: RecommendationBlock[]): (Table | Paragraph)[] {
   const result: (Table | Paragraph)[] = [];
   for (const rec of recs) {
     const s = recStyle(rec.priority);
