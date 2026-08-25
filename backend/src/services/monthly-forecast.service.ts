@@ -373,42 +373,112 @@ export const monthlyForecastService = {
     });
   },
 
-  async calculate(companyId: string, userId: string, year: number): Promise<MonthlyForecastResult> {
+  async calculate(
+    companyId: string,
+    userId: string,
+    year: number,
+    opts: { mode?: 'forecast' | 'budget' } = {},
+  ): Promise<MonthlyForecastResult> {
+    const mode = opts.mode ?? 'forecast';
+
     // Verify company ownership
     const company = await prisma.company.findFirst({
       where: { id: companyId, userId, deletedAt: null },
     });
     if (!company) throw new Error('Empresa no encontrada');
 
-    // Load base annual data: most recent year ≤ forecastYear that has both statements.
-    // For a 2026 forecast the ideal base is 2025; falls back to whatever is newest available.
-    const fiscalYear = await prisma.fiscalYear.findFirst({
-      where: {
-        companyId,
-        year: { lte: year },
-        quarter: 0,
-        month: 0,
-        incomeStatement: { isNot: null },
-        balanceSheet:    { isNot: null },
-      },
-      include: { incomeStatement: true, balanceSheet: true },
-      orderBy: { year: 'desc' },
-    });
-    if (!fiscalYear) {
-      throw new Error(
-        'No hay datos financieros anuales disponibles. Introduce primero los datos anuales de la empresa.',
+    let annualPnL: AnnualPnL;
+    let annualBalance: AnnualBalance;
+    let baseYear: number;
+
+    if (mode === 'budget') {
+      // Budget bases itself on this company's own Forecast for the prior year
+      // (its target year minus 1) — the Forecast already blends real closed
+      // months with projected ones into a full-year figure. Budget never reads
+      // the stored annual FiscalYear data directly.
+      const forecastYear = year - 1;
+      let forecastResult: MonthlyForecastResult;
+      try {
+        forecastResult = await monthlyForecastService.calculate(companyId, userId, forecastYear, { mode: 'forecast' });
+      } catch {
+        throw new Error(
+          `No hay datos de Forecast ${forecastYear} disponibles. Completa primero el Forecast ${forecastYear} para poder generar el Budget ${year}.`,
+        );
+      }
+
+      annualPnL = forecastResult.pnl.reduce<AnnualPnL>(
+        (acc, row) => ({
+          revenue: acc.revenue + row.revenue,
+          costOfSales: acc.costOfSales + row.costOfSales,
+          adminExpenses: acc.adminExpenses + row.adminExpenses,
+          exceptionalIncome: acc.exceptionalIncome + row.exceptionalIncome,
+          exceptionalExpenses: acc.exceptionalExpenses + row.exceptionalExpenses,
+          financialIncome: acc.financialIncome + row.financialIncome,
+          financialExpenses: acc.financialExpenses + row.financialExpenses,
+          incomeTax: acc.incomeTax + row.incomeTax,
+        }),
+        {
+          revenue: 0, costOfSales: 0, adminExpenses: 0,
+          exceptionalIncome: 0, exceptionalExpenses: 0,
+          financialIncome: 0, financialExpenses: 0, incomeTax: 0,
+        },
       );
+
+      const dec = forecastResult.balance[11];
+      annualBalance = {
+        fixedAssets: dec.fixedAssets,
+        otherNoncurrentAssets: dec.otherNoncurrentAssets,
+        financialInvestmentsLp: dec.financialInvestmentsLp,
+        accountsReceivable: dec.accountsReceivable,
+        otherReceivables: dec.otherReceivables,
+        taxReceivables: dec.taxReceivables,
+        cashEquivalents: dec.cashEquivalents,
+        inventory: dec.inventory,
+        equity: dec.equity,
+        provisionsLp: dec.provisionsLp,
+        bankDebtLp: dec.bankDebtLp,
+        otherLiabilitiesLp: dec.otherLiabilitiesLp,
+        provisionsSp: dec.provisionsSp,
+        bankDebtSp: dec.bankDebtSp,
+        accountsPayable: dec.accountsPayable,
+        taxLiabilities: dec.taxLiabilities,
+        otherLiabilitiesSp: dec.otherLiabilitiesSp,
+      };
+      baseYear = forecastYear;
+    } else {
+      // Load base annual data: most recent year ≤ forecastYear that has both statements.
+      // For a 2026 forecast the ideal base is 2025; falls back to whatever is newest available.
+      const fiscalYear = await prisma.fiscalYear.findFirst({
+        where: {
+          companyId,
+          year: { lte: year },
+          quarter: 0,
+          month: 0,
+          incomeStatement: { isNot: null },
+          balanceSheet:    { isNot: null },
+        },
+        include: { incomeStatement: true, balanceSheet: true },
+        orderBy: { year: 'desc' },
+      });
+      if (!fiscalYear) {
+        throw new Error(
+          'No hay datos financieros anuales disponibles. Introduce primero los datos anuales de la empresa.',
+        );
+      }
+
+      annualPnL = buildAnnualPnL(fiscalYear.incomeStatement);
+      annualBalance = buildAnnualBalance(fiscalYear.balanceSheet);
+      baseYear = fiscalYear.year;
     }
 
-    const annualPnL = buildAnnualPnL(fiscalYear.incomeStatement);
-    const annualBalance = buildAnnualBalance(fiscalYear.balanceSheet);
-
-    // Load stored forecast config
+    // Load stored forecast/budget config for the requested year
     const stored = await prisma.monthlyForecast.findUnique({
       where: { companyId_year: { companyId, year } },
     });
 
-    const closedMonths = stored?.closedMonths ?? 0;
+    // Budget has no "closed months" concept — every month is rate-driven from
+    // the Forecast base above, and only the growth-rate cells are editable.
+    const closedMonths = mode === 'budget' ? 0 : (stored?.closedMonths ?? 0);
 
     const actual: Record<keyof AnnualPnL, number[]> = {
       revenue: jsonToArray(stored?.actualRevenue),
@@ -432,13 +502,14 @@ export const monthlyForecastService = {
       incomeTax: jsonToArray(stored?.rateIncomeTax, 0),
     };
 
-    const balanceOverrides = normalizeBalanceOverrides(stored?.balanceOverrides);
+    // Budget rows are never manually overridden — only their growth rates are editable.
+    const balanceOverrides = mode === 'budget' ? {} : normalizeBalanceOverrides(stored?.balanceOverrides);
 
     const pnl = calcMonthlyPnL(annualPnL, closedMonths, actual, rates);
     const balance = calcMonthlyBalance(
       annualBalance, annualPnL.revenue, annualPnL.costOfSales, pnl, balanceOverrides,
     );
 
-    return { pnl, balance, annualPnL, annualBalance, baseYear: fiscalYear.year };
+    return { pnl, balance, annualPnL, annualBalance, baseYear };
   },
 };

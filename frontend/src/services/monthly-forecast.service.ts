@@ -88,7 +88,7 @@ export interface MonthlyForecastResult {
     exceptionalIncome: number; exceptionalExpenses: number;
     financialIncome: number; financialExpenses: number; incomeTax: number;
   };
-  annualBalance: Record<string, number>;
+  annualBalance: AnnualBalanceBase;
   baseYear: number;
 }
 
@@ -107,8 +107,14 @@ export const monthlyForecastService = {
     return res.data.data;
   },
 
-  async calculate(companyId: string, year: number): Promise<MonthlyForecastResult> {
-    const res = await api.get(`/monthly-forecast/${companyId}/${year}/calculate`);
+  async calculate(
+    companyId: string,
+    year: number,
+    mode: 'forecast' | 'budget' = 'forecast',
+  ): Promise<MonthlyForecastResult> {
+    const res = await api.get(`/monthly-forecast/${companyId}/${year}/calculate`, {
+      params: mode === 'budget' ? { mode } : undefined,
+    });
     return res.data.data;
   },
 };
@@ -184,6 +190,115 @@ export function calcPnLClient(
       ebt, incomeTax, netIncome, isClosed,
     });
   }
+  return rows;
+}
+
+// ─── Client-side Balance calculation (mirrors backend calcMonthlyBalance) ─────
+// Lets the Balance Proyectado tab reflect overrides (and their knock-on totals,
+// e.g. Activo No Corriente) instantly as the user types, without waiting for
+// "Guardar y recalcular".
+
+export interface AnnualBalanceBase {
+  fixedAssets: number;
+  otherNoncurrentAssets: number;
+  financialInvestmentsLp: number;
+  accountsReceivable: number;
+  otherReceivables: number;
+  taxReceivables: number;
+  cashEquivalents: number;
+  inventory: number;
+  equity: number;
+  provisionsLp: number;
+  bankDebtLp: number;
+  otherLiabilitiesLp: number;
+  provisionsSp: number;
+  bankDebtSp: number;
+  accountsPayable: number;
+  taxLiabilities: number;
+  otherLiabilitiesSp: number;
+}
+
+export function calcBalanceClient(
+  base: AnnualBalanceBase,
+  annualRevenue: number,
+  annualCosts: number,
+  pnl: MonthlyPnLRow[],
+  overrides: BalanceOverrides,
+): MonthlyBalanceRow[] {
+  const rows: MonthlyBalanceRow[] = [];
+  let cumRevenue = 0;
+  let cumCosts = 0;
+  let equity = base.equity;
+
+  const ov = (key: BalanceOverrideKey, m: number): number | null => {
+    const v = overrides[key]?.[m];
+    return typeof v === 'number' && !isNaN(v) ? v : null;
+  };
+
+  for (let m = 0; m < 12; m++) {
+    cumRevenue += pnl[m].revenue;
+    cumCosts += pnl[m].costOfSales;
+
+    const expectedFlatRev = (annualRevenue / 12) * (m + 1);
+    const expectedFlatCst = (annualCosts / 12) * (m + 1);
+
+    const rf = annualRevenue !== 0 ? (cumRevenue - expectedFlatRev) / annualRevenue + 1 : 1;
+    const cf = annualCosts !== 0 ? (cumCosts - expectedFlatCst) / annualCosts + 1 : 1;
+
+    if (m > 0) equity += pnl[m].netIncome;
+    equity = ov('equity', m) ?? equity;
+
+    const otherNoncurrentAssets = ov('otherNoncurrentAssets', m) ?? rf * base.otherNoncurrentAssets;
+    const financialInvestmentsLp = ov('financialInvestmentsLp', m) ?? rf * base.financialInvestmentsLp;
+
+    const inventory = ov('inventory', m) ?? cf * base.inventory;
+    const accountsReceivable = ov('accountsReceivable', m) ?? rf * base.accountsReceivable;
+    const otherReceivables = ov('otherReceivables', m) ?? rf * base.otherReceivables;
+    const taxReceivables = ov('taxReceivables', m) ?? rf * base.taxReceivables;
+    const cashEquivalents = ov('cashEquivalents', m) ?? rf * base.cashEquivalents;
+    const totalCurrentAssets = inventory + accountsReceivable + otherReceivables + taxReceivables + cashEquivalents;
+
+    const provisionsLp = ov('provisionsLp', m) ?? rf * base.provisionsLp;
+    const bankDebtLp = ov('bankDebtLp', m) ?? rf * base.bankDebtLp;
+    const otherLiabilitiesLp = ov('otherLiabilitiesLp', m) ?? rf * base.otherLiabilitiesLp;
+    const totalNoncurrentLiabilities = provisionsLp + bankDebtLp + otherLiabilitiesLp;
+
+    const provisionsSp = ov('provisionsSp', m) ?? rf * base.provisionsSp;
+    const bankDebtSp = ov('bankDebtSp', m) ?? rf * base.bankDebtSp;
+    const accountsPayable = ov('accountsPayable', m) ?? cf * base.accountsPayable;
+    const taxLiabilities = ov('taxLiabilities', m) ?? rf * base.taxLiabilities;
+    const otherLiabilitiesSp = ov('otherLiabilitiesSp', m) ?? rf * base.otherLiabilitiesSp;
+    const totalCurrentLiabilities =
+      provisionsSp + bankDebtSp + accountsPayable + taxLiabilities + otherLiabilitiesSp;
+
+    const totalEquityAndLiabilities = equity + totalNoncurrentLiabilities + totalCurrentLiabilities;
+
+    const fixedAssetsOverride = ov('fixedAssets', m);
+    let fixedAssets: number;
+    if (fixedAssetsOverride !== null) {
+      fixedAssets = fixedAssetsOverride;
+    } else {
+      const fixedAssetsUnplugged = rf * base.fixedAssets;
+      const totalAssetsUnplugged =
+        fixedAssetsUnplugged + otherNoncurrentAssets + financialInvestmentsLp + totalCurrentAssets;
+      const plug = totalEquityAndLiabilities - totalAssetsUnplugged;
+      fixedAssets = fixedAssetsUnplugged + plug;
+    }
+
+    const totalNoncurrentAssets = fixedAssets + otherNoncurrentAssets + financialInvestmentsLp;
+    const totalAssets = totalNoncurrentAssets + totalCurrentAssets;
+    const imbalance = totalEquityAndLiabilities - totalAssets;
+
+    rows.push({
+      fixedAssets, otherNoncurrentAssets, financialInvestmentsLp, totalNoncurrentAssets,
+      inventory, accountsReceivable, otherReceivables, taxReceivables, cashEquivalents, totalCurrentAssets,
+      totalAssets, equity,
+      provisionsLp, bankDebtLp, otherLiabilitiesLp, totalNoncurrentLiabilities,
+      provisionsSp, bankDebtSp, accountsPayable, taxLiabilities, otherLiabilitiesSp,
+      totalCurrentLiabilities, totalEquityAndLiabilities, imbalance,
+    });
+  }
+
   return rows;
 }
 

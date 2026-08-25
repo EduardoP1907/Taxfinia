@@ -34,13 +34,14 @@ export const monthlyForecastController = {
     }
   },
 
-  // GET /api/monthly-forecast/:companyId/:year/calculate
+  // GET /api/monthly-forecast/:companyId/:year/calculate?mode=budget
   async calculate(req: Request, res: Response) {
     try {
       const userId = req.user!.id;
       const { companyId, year } = req.params;
+      const mode = req.query.mode === 'budget' ? 'budget' : 'forecast';
 
-      const result = await monthlyForecastService.calculate(companyId, userId, parseInt(year));
+      const result = await monthlyForecastService.calculate(companyId, userId, parseInt(year), { mode });
       res.json({ success: true, data: result });
     } catch (error: any) {
       console.error('Error calculating monthly forecast:', error);

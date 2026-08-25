@@ -5,10 +5,11 @@ import { CompanySelector } from '../../components/companies/CompanySelector';
 import { companyService } from '../../services/company.service';
 import type { Company } from '../../types/company';
 import {
-  monthlyForecastService, mergeConfig, MONTHS, calcPnLClient,
+  monthlyForecastService, mergeConfig, MONTHS, calcPnLClient, calcBalanceClient,
   type MonthlyForecastConfig, type MonthlyForecastResult, type MonthlyPnLRow,
-  type BalanceOverrideKey,
+  type MonthlyBalanceRow, type BalanceOverrideKey,
 } from '../../services/monthly-forecast.service';
+import { evaluateArithmeticExpression } from '../../utils/arithmetic';
 import {
   CalendarDays, RefreshCw, Save, ChevronDown, ChevronUp, AlertCircle, CheckCircle2,
 } from 'lucide-react';
@@ -186,14 +187,16 @@ const ActualInput: React.FC<{
   return (
     <input
       ref={ref}
-      type="number"
+      type="text"
+      inputMode="decimal"
       value={local}
       placeholder="0"
       onChange={e => setLocal(e.target.value)}
       onBlur={() => {
-        const parsed = parseFloat(local || '0');
-        onChange(isNaN(parsed) ? 0 : parsed);
-        setLocal(isNaN(parsed) || parsed === 0 ? '' : String(parsed));
+        const parsed = evaluateArithmeticExpression(local);
+        const value = parsed ?? 0;
+        onChange(value);
+        setLocal(value === 0 ? '' : String(value));
       }}
       className="w-full text-right text-xs border border-green-300 rounded px-1 py-0.5 bg-green-50
                  focus:outline-none focus:ring-1 focus:ring-green-500 focus:bg-white
@@ -215,14 +218,14 @@ const RateInput: React.FC<{
 
   return (
     <input
-      type="number"
-      step="0.1"
+      type="text"
+      inputMode="decimal"
       disabled={disabled}
       value={local}
       onChange={e => setLocal(e.target.value)}
       onBlur={() => {
-        const parsed = parseFloat(local || '0') / 100;
-        onChange(isNaN(parsed) ? 0 : parsed);
+        const parsed = evaluateArithmeticExpression(local);
+        onChange((parsed ?? 0) / 100);
       }}
       className="w-full text-center text-xs border border-slate-200 rounded px-0.5 py-0.5
                  focus:outline-none focus:ring-1 focus:ring-amber-400
@@ -247,7 +250,8 @@ const BalanceOverrideInput: React.FC<{
 
   return (
     <input
-      type="number"
+      type="text"
+      inputMode="decimal"
       value={local}
       placeholder={fmt(computed)}
       onChange={e => setLocal(e.target.value)}
@@ -256,9 +260,10 @@ const BalanceOverrideInput: React.FC<{
           onChange(null);
           return;
         }
-        const parsed = parseFloat(local);
-        onChange(isNaN(parsed) ? null : parsed);
-        if (isNaN(parsed)) setLocal('');
+        const parsed = evaluateArithmeticExpression(local);
+        onChange(parsed);
+        if (parsed === null) setLocal('');
+        else setLocal(String(parsed));
       }}
       className="w-full text-right text-xs border border-slate-200 rounded px-1 py-0.5 bg-white
                  focus:outline-none focus:ring-1 focus:ring-amber-400
@@ -285,7 +290,8 @@ export const MonthlyForecastShell: React.FC<{
   year: number;
   titlePrefix: string;
   companySelectorDescription: string;
-}> = ({ year, titlePrefix, companySelectorDescription }) => {
+  mode?: 'forecast' | 'budget';
+}> = ({ year, titlePrefix, companySelectorDescription, mode = 'forecast' }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
@@ -323,6 +329,7 @@ export const MonthlyForecastShell: React.FC<{
       companyName={selectedCompany?.name ?? companyId}
       year={year}
       titlePrefix={titlePrefix}
+      mode={mode}
     />
   );
 };
@@ -334,12 +341,15 @@ const MonthlyForecastContent: React.FC<{
   companyName: string;
   year: number;
   titlePrefix: string;
+  mode?: 'forecast' | 'budget';
 }> = ({
   companyId,
   companyName,
   year,
   titlePrefix,
+  mode = 'forecast',
 }) => {
+  const isBudget = mode === 'budget';
   const [config, setConfig] = useState<MonthlyForecastConfig | null>(null);
   const [result, setResult] = useState<MonthlyForecastResult | null>(null);
   const [baseYear, setBaseYear] = useState<number | null>(null);
@@ -356,7 +366,7 @@ const MonthlyForecastContent: React.FC<{
     try {
       const stored = await monthlyForecastService.get(companyId, year);
       setConfig(mergeConfig(stored));
-      const calc = await monthlyForecastService.calculate(companyId, year);
+      const calc = await monthlyForecastService.calculate(companyId, year, mode);
       setResult(calc);
       setBaseYear(calc.baseYear ?? null);
     } catch (e: any) {
@@ -364,7 +374,7 @@ const MonthlyForecastContent: React.FC<{
     } finally {
       setLoading(false);
     }
-  }, [companyId, year]);
+  }, [companyId, year, mode]);
 
   useEffect(() => { loadAndCalculate(); }, [loadAndCalculate]);
 
@@ -374,7 +384,7 @@ const MonthlyForecastContent: React.FC<{
     setError(null);
     try {
       await monthlyForecastService.save(companyId, year, config);
-      const calc = await monthlyForecastService.calculate(companyId, year);
+      const calc = await monthlyForecastService.calculate(companyId, year, mode);
       setResult(calc);
       setBaseYear(calc.baseYear ?? null);
       setSaved(true);
@@ -408,14 +418,25 @@ const MonthlyForecastContent: React.FC<{
   };
 
 
-  const closedMonths = config?.closedMonths ?? 0;
+  // Budget has no "closed months" concept — every month is rate-driven, and
+  // only the growth-rate cells are editable (no actual-value entry, no
+  // balance overrides).
+  const closedMonths = isBudget ? 0 : (config?.closedMonths ?? 0);
 
   // True when loading finished but there's no annual base data (calculate threw)
   const noBaseData = !loading && !result;
 
+  // Centralizes "is this month editable as a real/override value" across the
+  // P&G and Balance tables. Budget is always fully rate-driven (never closed).
+  const isClosedMonth = useCallback(
+    (i: number) => (isBudget ? false : ((noBaseData && closedMonths === 0) ? true : i < closedMonths)),
+    [isBudget, noBaseData, closedMonths],
+  );
+
   // Live P&G computed client-side so rate changes are instant (no save required).
   // When there's no annual base, treat all 12 months as direct-entry (closedMonths=12)
   // using zero as base — the user types actual values and subtotals derive from them.
+  // (Budget always uses closedMonths=0 — it never falls back to direct entry.)
   const livePnl = useMemo<MonthlyPnLRow[]>(() => {
     if (!config) return [];
     const emptyBase = {
@@ -424,10 +445,25 @@ const MonthlyForecastContent: React.FC<{
       financialIncome: 0, financialExpenses: 0, incomeTax: 0,
     };
     const base = result?.annualPnL ?? emptyBase;
-    // When no base data and no closed months selected, treat all months as direct entry
-    const effectiveConfig = (noBaseData && closedMonths === 0) ? { ...config, closedMonths: 12 } : config;
+    const effectiveConfig = isBudget
+      ? { ...config, closedMonths: 0 }
+      : ((noBaseData && closedMonths === 0) ? { ...config, closedMonths: 12 } : config);
     return calcPnLClient(effectiveConfig, base);
-  }, [config, result, noBaseData]);
+  }, [config, result, noBaseData, isBudget, closedMonths]);
+
+  // Live Balance computed client-side from the live P&G + current overrides,
+  // so editing e.g. Activo Fijo instantly updates Activo No Corriente (and
+  // every other dependent total) without requiring "Guardar y recalcular".
+  const liveBalance = useMemo<MonthlyBalanceRow[]>(() => {
+    if (!config || !result || livePnl.length === 0) return [];
+    return calcBalanceClient(
+      result.annualBalance,
+      result.annualPnL.revenue,
+      result.annualPnL.costOfSales,
+      livePnl,
+      config.balanceOverrides,
+    );
+  }, [config, result, livePnl]);
 
   const annualTotal = (key: keyof MonthlyPnLRow) =>
     livePnl.reduce((s, row) => s + (row[key] as number), 0);
@@ -450,12 +486,14 @@ const MonthlyForecastContent: React.FC<{
             {/* Base year badge */}
             {baseYear && (
               <span className="text-xs bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full border border-slate-200">
-                Base de datos: <strong className="text-slate-700">{baseYear}</strong>
+                {isBudget ? 'Base: Forecast ' : 'Base de datos: '}
+                <strong className="text-slate-700">{baseYear}</strong>
               </span>
             )}
 
-            {/* Closed months: controls split between actual entry and auto-projection */}
-            {config && (
+            {/* Closed months: controls split between actual entry and auto-projection.
+                Budget has no closed-month concept — it's always fully rate-driven. */}
+            {config && !isBudget && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-500">Meses cerrados:</span>
                 <select
@@ -489,19 +527,23 @@ const MonthlyForecastContent: React.FC<{
 
         {/* ── Legend ── */}
         <div className="flex items-center gap-5 text-xs text-slate-500">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-green-100 border border-green-300" />
-            Mes cerrado — introduce el dato real
-          </span>
+          {!isBudget && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded bg-green-100 border border-green-300" />
+              Mes cerrado — introduce el dato real
+            </span>
+          )}
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-slate-100 border border-slate-200" />
-            Mes proyectado — valor calculado automáticamente según las tasas FORECAST de abajo
+            {isBudget
+              ? `Valor calculado automáticamente según las tasas ${titlePrefix.toUpperCase()} de abajo, a partir del Forecast ${baseYear ?? year - 1}`
+              : 'Mes proyectado — valor calculado automáticamente según las tasas FORECAST de abajo'}
           </span>
         </div>
 
         {/* ── Alerts ── */}
         {error && (() => {
-          const isNoData = error.includes('datos financieros anuales');
+          const isNoData = error.includes('datos financieros anuales') || error.includes('datos de Forecast');
           return (
             <div className={`flex items-start gap-2 rounded-lg px-4 py-3 text-sm border ${
               isNoData
@@ -513,7 +555,9 @@ const MonthlyForecastContent: React.FC<{
                 <p>{error}</p>
                 {isNoData && (
                   <p className="text-xs mt-1 opacity-80">
-                    Introduce los datos reales en la tabla y usa «Meses cerrados» para indicar hasta qué mes tienes datos — los meses siguientes se proyectarán automáticamente usando los porcentajes de crecimiento de cada celda.
+                    {isBudget
+                      ? `Completa primero el Forecast ${year - 1} (con sus meses cerrados y tasas de crecimiento) — el Budget ${year} se construye a partir de su resultado anual.`
+                      : 'Introduce los datos reales en la tabla y usa «Meses cerrados» para indicar hasta qué mes tienes datos — los meses siguientes se proyectarán automáticamente usando los porcentajes de crecimiento de cada celda.'}
                   </p>
                 )}
               </div>
@@ -585,12 +629,12 @@ const MonthlyForecastContent: React.FC<{
                         <th
                           key={m}
                           className={`px-1 py-2.5 text-center w-[72px] font-medium ${
-                            ((noBaseData && closedMonths === 0) || i < closedMonths) ? 'text-green-300' : 'text-slate-300'
+                            isClosedMonth(i) ? 'text-green-300' : 'text-slate-300'
                           }`}
                         >
                           <span className="block">{m}</span>
                           <span className="block text-[9px] font-normal mt-0.5">
-                            {((noBaseData && closedMonths === 0) || i < closedMonths) ? 'Real' : 'Proy.'}
+                            {isClosedMonth(i) ? 'Real' : 'Proy.'}
                           </span>
                         </th>
                       ))}
@@ -629,8 +673,7 @@ const MonthlyForecastContent: React.FC<{
                             ? MONTHS.map((_, i) => {
                                 const row = livePnl[i];
                                 const val = row[concept.resultKey] as number;
-                                // When no base data and no months selected, treat all as direct entry
-                                const isClosed = (noBaseData && closedMonths === 0) ? true : (i < closedMonths);
+                                const isClosed = isClosedMonth(i);
 
                                 // Mes cerrado + fila de datos → input editable (verde)
                                 if (isClosed && concept.actualKey && !isSection) {
@@ -687,8 +730,10 @@ const MonthlyForecastContent: React.FC<{
             </div>
 
             <p className="text-xs text-slate-400 -mt-2">
-              Los meses cerrados muestran el dato real introducido (verde). Los meses proyectados calculan el valor a partir del último mes real usando las tasas de la sección FORECAST.
-              Ajusta las tasas abajo y pulsa «Guardar y recalcular» para persistir y actualizar el balance.
+              {isBudget
+                ? `Todos los meses se calculan a partir del resultado anual del Forecast ${baseYear ?? year - 1} aplicando las tasas de crecimiento de la sección de abajo.`
+                : 'Los meses cerrados muestran el dato real introducido (verde). Los meses proyectados calculan el valor a partir del último mes real usando las tasas de la sección FORECAST.'}
+              {' '}Ajusta las tasas abajo y pulsa «Guardar y recalcular» para persistir y actualizar el balance.
             </p>
 
             {/* ── Section B: Tasas de crecimiento (edición masiva) ── */}
@@ -698,7 +743,7 @@ const MonthlyForecastContent: React.FC<{
                 className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2 hover:text-slate-900 transition-colors"
               >
                 <span className="w-1.5 h-5 bg-blue-400 rounded-full inline-block" />
-                FORECAST — Tasas de crecimiento mensual (%)
+                {titlePrefix.toUpperCase()} — Tasas de crecimiento mensual (%)
                 {ratesOpen
                   ? <ChevronUp className="w-4 h-4 text-slate-400" />
                   : <ChevronDown className="w-4 h-4 text-slate-400" />}
@@ -716,7 +761,7 @@ const MonthlyForecastContent: React.FC<{
                           <th
                             key={m}
                             className={`px-1 py-2 text-center w-[72px] font-medium ${
-                              i < closedMonths ? 'text-slate-400' : 'text-blue-200'
+                              isClosedMonth(i) || i === 0 ? 'text-slate-400' : 'text-blue-200'
                             }`}
                           >
                             {m}
@@ -738,21 +783,28 @@ const MonthlyForecastContent: React.FC<{
                               {concept.label}
                             </td>
 
-                            {rateArr.map((rate, i) => (
-                              <td
-                                key={i}
-                                className={`px-1 py-1 ${i < closedMonths ? 'bg-slate-50' : 'bg-blue-50/40'}`}
-                              >
-                                <div className="flex items-center gap-0.5">
-                                  <RateInput
-                                    value={rate}
-                                    onChange={v => setRate(concept.rateKey!, i, v)}
-                                    disabled={i < closedMonths}
-                                  />
-                                  <span className="text-[10px] text-slate-400 shrink-0">%</span>
-                                </div>
-                              </td>
-                            ))}
+                            {rateArr.map((rate, i) => {
+                              // January is always anchored to the annual base ÷ 12 (matches
+                              // the Excel FCASTPPGG row 4 formula) — it never grows from a
+                              // previous month, so its rate is structurally a no-op. Disable
+                              // it so the UI doesn't invite an edit that can't do anything.
+                              const inert = isClosedMonth(i) || i === 0;
+                              return (
+                                <td
+                                  key={i}
+                                  className={`px-1 py-1 ${inert ? 'bg-slate-50' : 'bg-blue-50/40'}`}
+                                >
+                                  <div className="flex items-center gap-0.5" title={i === 0 && !isClosedMonth(0) ? 'Enero usa el promedio anual como base — no aplica tasa' : undefined}>
+                                    <RateInput
+                                      value={rate}
+                                      onChange={v => setRate(concept.rateKey!, i, v)}
+                                      disabled={inert}
+                                    />
+                                    <span className="text-[10px] text-slate-400 shrink-0">%</span>
+                                  </div>
+                                </td>
+                              );
+                            })}
                           </tr>
                         );
                       })}
@@ -762,8 +814,9 @@ const MonthlyForecastContent: React.FC<{
               )}
 
               <p className="text-xs text-slate-400 mt-2">
-                Los meses cerrados (en gris) ignoran la tasa — usa el dato real introducido arriba.
-                Los meses proyectados aplican: <code className="bg-slate-100 px-1 rounded">Mes N = Mes (N−1) × (1 + tasa)</code>
+                {!isBudget && 'Los meses cerrados (en gris) ignoran la tasa — usa el dato real introducido arriba. '}
+                Los meses proyectados aplican: <code className="bg-slate-100 px-1 rounded">Mes N = Mes (N−1) × (1 + tasa)</code>.{' '}
+                Enero (gris) no tiene mes anterior del cual crecer — siempre parte del promedio anual (Total base ÷ 12), por eso su tasa está deshabilitada y no afecta al resultado.
               </p>
             </div>
           </div>
@@ -787,9 +840,14 @@ const MonthlyForecastContent: React.FC<{
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
                 Patrimonio Neto + resultado acumulado
               </span>
+              {liveBalance.length > 0 && (
+                <span className="text-[10px] font-normal text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  ● En tiempo real
+                </span>
+              )}
             </div>
 
-            {result ? (
+            {result && liveBalance.length > 0 ? (
               <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
                 <table className="min-w-full text-xs">
                   <thead>
@@ -801,7 +859,7 @@ const MonthlyForecastContent: React.FC<{
                         <th
                           key={m}
                           className={`px-2 py-2.5 text-right w-20 font-medium ${
-                            i < closedMonths ? 'text-green-300' : 'text-slate-300'
+                            isClosedMonth(i) ? 'text-green-300' : 'text-slate-300'
                           }`}
                         >
                           {m}
@@ -847,9 +905,9 @@ const MonthlyForecastContent: React.FC<{
                               {line.label}
                             </div>
                           </td>
-                          {result.balance.map((month, i) => {
+                          {liveBalance.map((month, i) => {
                             const computed = month[line.key] as number;
-                            const isClosed = (noBaseData && closedMonths === 0) ? true : (i < closedMonths);
+                            const isClosed = isClosedMonth(i);
                             if (line.editable && config && isClosed) {
                               const key = line.key as BalanceOverrideKey;
                               return (
@@ -917,9 +975,9 @@ const MonthlyForecastContent: React.FC<{
                               {line.label}
                             </div>
                           </td>
-                          {result.balance.map((month, i) => {
+                          {liveBalance.map((month, i) => {
                             const val = month[line.key] as number;
-                            const isClosed = (noBaseData && closedMonths === 0) ? true : (i < closedMonths);
+                            const isClosed = isClosedMonth(i);
                             if (line.editable && config && isClosed) {
                               const key = line.key as BalanceOverrideKey;
                               return (
@@ -957,7 +1015,9 @@ const MonthlyForecastContent: React.FC<{
             )}
 
             <p className="text-xs text-slate-400">
-              Solo los meses cerrados (en verde) son editables: escribe un valor para sobrescribir el cálculo de ese mes, o deja la casilla vacía para usar el valor calculado. Los meses proyectados se calculan automáticamente según la evolución de ventas/costes y no se pueden editar directamente — ajusta «Meses cerrados» arriba para habilitar más meses. Pulsa «Guardar y recalcular» para aplicar los cambios.
+              {isBudget
+                ? 'El balance se calcula automáticamente a partir del cierre proyectado del Forecast y las tasas de crecimiento — no es editable directamente aquí. Ajusta las tasas en la pestaña Proyección P&G y pulsa «Guardar y recalcular».'
+                : 'Solo los meses cerrados (en verde) son editables: escribe un valor para sobrescribir el cálculo de ese mes, o deja la casilla vacía para usar el valor calculado. Los meses proyectados se calculan automáticamente según la evolución de ventas/costes y no se pueden editar directamente — ajusta «Meses cerrados» arriba para habilitar más meses. Pulsa «Guardar y recalcular» para aplicar los cambios.'}
               El Activo Fijo absorbe automáticamente cualquier descuadre (igual que la fórmula CUADRATURA de la hoja FCASTBCE2026) mientras no lo sobrescribas manualmente, por lo que Total Activo = Total Pasivo + Patrimonio Neto todos los meses.
             </p>
           </div>
