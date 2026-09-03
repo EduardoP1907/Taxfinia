@@ -448,7 +448,7 @@ const MonthlyForecastContent: React.FC<{
     const effectiveConfig = isBudget
       ? { ...config, closedMonths: 0 }
       : ((noBaseData && closedMonths === 0) ? { ...config, closedMonths: 12 } : config);
-    return calcPnLClient(effectiveConfig, base);
+    return calcPnLClient(effectiveConfig, base, isBudget);
   }, [config, result, noBaseData, isBudget, closedMonths]);
 
   // Live Balance computed client-side from the live P&G + current overrides,
@@ -761,7 +761,7 @@ const MonthlyForecastContent: React.FC<{
                           <th
                             key={m}
                             className={`px-1 py-2 text-center w-[72px] font-medium ${
-                              isClosedMonth(i) || i === 0 ? 'text-slate-400' : 'text-blue-200'
+                              isClosedMonth(i) || (i === 0 && !isBudget) ? 'text-slate-400' : 'text-blue-200'
                             }`}
                           >
                             {m}
@@ -784,17 +784,19 @@ const MonthlyForecastContent: React.FC<{
                             </td>
 
                             {rateArr.map((rate, i) => {
-                              // January is always anchored to the annual base ÷ 12 (matches
-                              // the Excel FCASTPPGG row 4 formula) — it never grows from a
-                              // previous month, so its rate is structurally a no-op. Disable
-                              // it so the UI doesn't invite an edit that can't do anything.
-                              const inert = isClosedMonth(i) || i === 0;
+                              // In Forecast mode, January is always anchored to the annual
+                              // base ÷ 12 (matches the Excel FCASTPPGG row 4 formula) — it
+                              // never grows from a previous month, so its rate is
+                              // structurally a no-op there. In Budget mode there are no
+                              // closed months, so January's own rate is applied over that
+                              // base average and remains editable.
+                              const inert = isClosedMonth(i) || (i === 0 && !isBudget);
                               return (
                                 <td
                                   key={i}
                                   className={`px-1 py-1 ${inert ? 'bg-slate-50' : 'bg-blue-50/40'}`}
                                 >
-                                  <div className="flex items-center gap-0.5" title={i === 0 && !isClosedMonth(0) ? 'Enero usa el promedio anual como base — no aplica tasa' : undefined}>
+                                  <div className="flex items-center gap-0.5" title={i === 0 && !isBudget && !isClosedMonth(0) ? 'Enero usa el promedio anual como base — no aplica tasa' : undefined}>
                                     <RateInput
                                       value={rate}
                                       onChange={v => setRate(concept.rateKey!, i, v)}
@@ -816,7 +818,9 @@ const MonthlyForecastContent: React.FC<{
               <p className="text-xs text-slate-400 mt-2">
                 {!isBudget && 'Los meses cerrados (en gris) ignoran la tasa — usa el dato real introducido arriba. '}
                 Los meses proyectados aplican: <code className="bg-slate-100 px-1 rounded">Mes N = Mes (N−1) × (1 + tasa)</code>.{' '}
-                Enero (gris) no tiene mes anterior del cual crecer — siempre parte del promedio anual (Total base ÷ 12), por eso su tasa está deshabilitada y no afecta al resultado.
+                {isBudget
+                  ? 'Enero parte del promedio anual (Total base ÷ 12) y aplica su propia tasa de crecimiento sobre ese promedio.'
+                  : 'Enero (gris) no tiene mes anterior del cual crecer — siempre parte del promedio anual (Total base ÷ 12), por eso su tasa está deshabilitada y no afecta al resultado.'}
               </p>
             </div>
           </div>

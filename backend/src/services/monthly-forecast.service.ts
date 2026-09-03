@@ -179,6 +179,7 @@ function calcMonthlyPnL(
   closedMonths: number,
   actual: Record<keyof AnnualPnL, number[]>,
   rates: Record<keyof AnnualPnL, number[]>,
+  applyJanuaryRate = false,
 ): MonthlyPnLRow[] {
   const rows: MonthlyPnLRow[] = [];
 
@@ -198,15 +199,18 @@ function calcMonthlyPnL(
       financialExpenses = actual.financialExpenses[m];
       incomeTax = actual.incomeTax[m];
     } else if (m === 0) {
-      // First projected month: base / 12 (matches Excel FCASTPPGG row 4 January formula)
-      revenue = base.revenue / 12;
-      costOfSales = base.costOfSales / 12;
-      adminExpenses = base.adminExpenses / 12;
-      exceptionalIncome = base.exceptionalIncome / 12;
-      exceptionalExpenses = base.exceptionalExpenses / 12;
-      financialIncome = base.financialIncome / 12;
-      financialExpenses = base.financialExpenses / 12;
-      incomeTax = base.incomeTax / 12;
+      // First projected month: base / 12 (matches Excel FCASTPPGG row 4 January formula).
+      // Budget mode has no prior month either, but lets the user apply January's own
+      // growth rate over that annual-average base.
+      const jf = (r: number[]) => (applyJanuaryRate ? 1 + (r[0] ?? 0) : 1);
+      revenue = (base.revenue / 12) * jf(rates.revenue);
+      costOfSales = (base.costOfSales / 12) * jf(rates.costOfSales);
+      adminExpenses = (base.adminExpenses / 12) * jf(rates.adminExpenses);
+      exceptionalIncome = (base.exceptionalIncome / 12) * jf(rates.exceptionalIncome);
+      exceptionalExpenses = (base.exceptionalExpenses / 12) * jf(rates.exceptionalExpenses);
+      financialIncome = (base.financialIncome / 12) * jf(rates.financialIncome);
+      financialExpenses = (base.financialExpenses / 12) * jf(rates.financialExpenses);
+      incomeTax = (base.incomeTax / 12) * jf(rates.incomeTax);
     } else {
       const prev = rows[m - 1];
       revenue = prev.revenue * (1 + rates.revenue[m]);
@@ -505,7 +509,7 @@ export const monthlyForecastService = {
     // Budget rows are never manually overridden — only their growth rates are editable.
     const balanceOverrides = mode === 'budget' ? {} : normalizeBalanceOverrides(stored?.balanceOverrides);
 
-    const pnl = calcMonthlyPnL(annualPnL, closedMonths, actual, rates);
+    const pnl = calcMonthlyPnL(annualPnL, closedMonths, actual, rates, mode === 'budget');
     const balance = calcMonthlyBalance(
       annualBalance, annualPnL.revenue, annualPnL.costOfSales, pnl, balanceOverrides,
     );

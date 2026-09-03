@@ -134,6 +134,7 @@ export interface AnnualPnLBase {
 export function calcPnLClient(
   cfg: MonthlyForecastConfig,
   base: AnnualPnLBase,
+  applyJanuaryRate = false,
 ): MonthlyPnLRow[] {
   const rows: MonthlyPnLRow[] = [];
   const { closedMonths } = cfg;
@@ -155,14 +156,17 @@ export function calcPnLClient(
       financialExpenses  = cfg.actualFinancialExpenses[m]  ?? 0;
       incomeTax          = cfg.actualIncomeTax[m]          ?? 0;
     } else if (m === 0) {
-      revenue            = base.revenue            / 12;
-      costOfSales        = base.costOfSales        / 12;
-      adminExpenses      = base.adminExpenses      / 12;
-      exceptionalIncome  = base.exceptionalIncome  / 12;
-      exceptionalExpenses= base.exceptionalExpenses/ 12;
-      financialIncome    = base.financialIncome    / 12;
-      financialExpenses  = base.financialExpenses  / 12;
-      incomeTax          = base.incomeTax          / 12;
+      // Budget mode allows editing January's own growth rate — applied over
+      // the annual average (base / 12) — since budget has no prior month.
+      const jf = (r: number[]) => (applyJanuaryRate ? 1 + (r[0] ?? 0) : 1);
+      revenue            = (base.revenue            / 12) * jf(cfg.rateRevenue);
+      costOfSales        = (base.costOfSales        / 12) * jf(cfg.rateCostOfSales);
+      adminExpenses      = (base.adminExpenses      / 12) * jf(cfg.rateAdminExpenses);
+      exceptionalIncome  = (base.exceptionalIncome  / 12) * jf(cfg.rateExceptionalIncome);
+      exceptionalExpenses= (base.exceptionalExpenses/ 12) * jf(cfg.rateExceptionalExpenses);
+      financialIncome    = (base.financialIncome    / 12) * jf(cfg.rateFinancialIncome);
+      financialExpenses  = (base.financialExpenses  / 12) * jf(cfg.rateFinancialExpenses);
+      incomeTax          = (base.incomeTax          / 12) * jf(cfg.rateIncomeTax);
     } else {
       const prev = rows[m - 1];
       revenue            = prev.revenue            * (1 + (cfg.rateRevenue[m]            ?? 0));
