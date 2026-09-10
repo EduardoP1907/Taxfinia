@@ -177,6 +177,9 @@ export interface DocxReportData {
   };
   latestYear: number;
   years: number[];
+  // Optional display labels per year (e.g. "2026 (Forecast)") used only on the
+  // cover page's "Período de Análisis" line. Omit to keep the plain year range.
+  periodLabels?: Record<number, string>;
   dcfData?: {
     wacc?: number | null;
     equityValue?: number | null;
@@ -310,7 +313,7 @@ export async function generateNarrativeDocx(data: DocxReportData, outputPath: st
               infoBox('Sector / Industria', data.company.industry || 'No especificado'),
               infoBox('País', data.company.country || 'No especificado'),
               infoBox('Moneda', currency),
-              infoBox('Período de Análisis', data.years.slice().sort((a, b) => a - b).join(' — ')),
+              infoBox('Período de Análisis', data.years.slice().sort((a, b) => a - b).map(y => data.periodLabels?.[y] ?? String(y)).join(' — ')),
               infoBox('Año Base', String(data.latestYear)),
             ],
           }),

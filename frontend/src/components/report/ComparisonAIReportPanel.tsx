@@ -1,0 +1,281 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Sparkles, RefreshCw, XCircle, CheckCircle2, Clock, FileText, Lock, KeyRound, AlertTriangle,
+} from 'lucide-react';
+import { Button } from '../ui/Button';
+import {
+  comparisonReportService, type ComparisonReport, type ComparisonReportType,
+} from '../../services/comparison-report.service';
+import { DownloadCodeModal } from './DownloadCodeModal';
+
+const StatusBadge: React.FC<{ status: ComparisonReport['status'] }> = ({ status }) => {
+  const config = {
+    PENDING:    { icon: Clock,        label: 'Pendiente',  color: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
+    GENERATING: { icon: RefreshCw,    label: 'Generando…', color: 'text-blue-600 bg-blue-50 border-blue-200 animate-pulse' },
+    COMPLETED:  { icon: CheckCircle2, label: 'Completado', color: 'text-green-700 bg-green-50 border-green-200' },
+    FAILED:     { icon: XCircle,      label: 'Error',      color: 'text-red-600 bg-red-50 border-red-200' },
+  }[status];
+  const Icon = config.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${config.color}`}>
+      <Icon className="w-3 h-3" />
+      {config.label}
+    </span>
+  );
+};
+
+interface ComparisonAIReportPanelProps {
+  companyId: string;
+  companyName: string;
+  type: ComparisonReportType;
+  title: string;
+  description: string;
+}
+
+export const ComparisonAIReportPanel: React.FC<ComparisonAIReportPanelProps> = ({
+  companyId, companyName, type, title, description,
+}) => {
+  const [reports, setReports] = useState<ComparisonReport[]>([]);
+  const [eligible, setEligible] = useState<boolean | null>(null);
+  const [ineligibleReason, setIneligibleReason] = useState<string | null>(null);
+  const [checkingEligibility, setCheckingEligibility] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [downloading, setDownloading] = useState<Record<string, boolean>>({});
+  const [generatingCode, setGeneratingCode] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const [codeModal, setCodeModal] = useState<{ reportId: string; format: 'pdf' | 'docx' } | null>(null);
+  const [codeError, setCodeError] = useState<string | undefined>();
+  const [codeLoading, setCodeLoading] = useState(false);
+
+  const loadReports = useCallback(async () => {
+    try {
+      const all = await comparisonReportService.getCompanyReports(companyId);
+      setReports(all.filter(r => r.type === type));
+    } catch { /* silently fail */ }
+  }, [companyId, type]);
+
+  const loadEligibility = useCallback(async () => {
+    setCheckingEligibility(true);
+    try {
+      const result = await comparisonReportService.getEligibility(companyId, type);
+      setEligible(result.eligible);
+      setIneligibleReason(result.eligible ? null : (result.reason || 'No es posible generar este informe.'));
+    } catch {
+      setEligible(false);
+      setIneligibleReason('No se pudo verificar la disponibilidad de datos.');
+    } finally {
+      setCheckingEligibility(false);
+    }
+  }, [companyId, type]);
+
+  useEffect(() => { loadReports(); loadEligibility(); }, [loadReports, loadEligibility]);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setError(null);
+    try {
+      const { report } = await comparisonReportService.generateReport(companyId, type);
+      setReports(prev => [report, ...prev.filter(r => r.id !== report.id)]);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Error al generar el informe comparativo.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const reportCodeKey = (reportId: string) => `comparison_report_code_${reportId}`;
+
+  const doDownload = async (reportId: string, format: 'pdf' | 'docx', forecastYear: number, code?: string) => {
+    const key = `${reportId}-${format}`;
+    setDownloading(prev => ({ ...prev, [key]: true }));
+    try {
+      await comparisonReportService.downloadReport(reportId, type, format, companyName, forecastYear, code);
+      if (code) localStorage.setItem(reportCodeKey(reportId), code);
+      setCodeModal(null);
+    } catch (err: any) {
+      let requiresCode = false;
+      if (err?.response?.data instanceof Blob) {
+        try { const json = JSON.parse(await err.response.data.text()); requiresCode = !!json.requiresCode; } catch {}
+      } else {
+        requiresCode = !!err?.response?.data?.requiresCode;
+      }
+      if (requiresCode) {
+        localStorage.removeItem(reportCodeKey(reportId));
+        setCodeError(undefined);
+        setCodeModal({ reportId, format });
+      } else {
+        alert('Error al descargar el archivo');
+      }
+    } finally {
+      setDownloading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleDownloadClick = (reportId: string, format: 'pdf' | 'docx', forecastYear: number) => {
+    const stored = localStorage.getItem(reportCodeKey(reportId));
+    doDownload(reportId, format, forecastYear, stored || undefined);
+  };
+
+  const handleCodeConfirm = async (code: string) => {
+    if (!codeModal) return;
+    const report = reports.find(r => r.id === codeModal.reportId);
+    if (!report) return;
+    setCodeLoading(true);
+    setCodeError(undefined);
+    try {
+      await doDownload(codeModal.reportId, codeModal.format, report.forecastYear, code);
+    } catch {
+      setCodeError('Código incorrecto');
+    } finally {
+      setCodeLoading(false);
+    }
+  };
+
+  const handleGenerateCode = async (reportId: string) => {
+    setGeneratingCode(prev => ({ ...prev, [reportId]: true }));
+    try {
+      await comparisonReportService.generateDownloadCode(reportId);
+      localStorage.removeItem(reportCodeKey(reportId));
+      await loadReports();
+      alert('Código solicitado. El administrador recibirá un correo con el código de descarga.');
+    } catch {
+      alert('Error al solicitar el código');
+    } finally {
+      setGeneratingCode(prev => ({ ...prev, [reportId]: false }));
+    }
+  };
+
+  return (
+    <>
+      {codeModal && (
+        <DownloadCodeModal
+          onConfirm={handleCodeConfirm}
+          onCancel={() => setCodeModal(null)}
+          loading={codeLoading}
+          error={codeError}
+        />
+      )}
+
+      <div className="bg-gradient-to-br from-amber-50 to-slate-50 border border-amber-200 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-500 rounded-lg">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">{title}</h3>
+              <p className="text-xs text-amber-600">{description}</p>
+            </div>
+          </div>
+          <Button
+            onClick={handleGenerate}
+            disabled={generating || checkingEligibility || eligible === false}
+            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm disabled:opacity-60"
+          >
+            {generating ? (
+              <><RefreshCw className="w-4 h-4 animate-spin" /> Generando informe…</>
+            ) : (
+              <><Sparkles className="w-4 h-4" /> Generar Informe</>
+            )}
+          </Button>
+        </div>
+
+        {!checkingEligibility && eligible === false && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-amber-700">{ineligibleReason}</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+            <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {generating && (
+          <div className="mb-4 flex justify-center py-4">
+            <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" />
+          </div>
+        )}
+
+        {reports.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Informes Generados</p>
+              <button onClick={loadReports} className="text-xs text-amber-500 hover:text-amber-700 flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" /> Actualizar
+              </button>
+            </div>
+            <div className="space-y-2">
+              {reports.map(report => (
+                <div key={report.id} className="bg-white rounded-lg p-3 border border-amber-100">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800">
+                          Forecast {report.forecastYear}{report.budgetYear ? ` · Budget ${report.budgetYear}` : ''}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {report.generatedAt
+                            ? new Date(report.generatedAt).toLocaleString('es-ES')
+                            : new Date(report.createdAt).toLocaleString('es-ES')}
+                        </p>
+                      </div>
+                      <StatusBadge status={report.status} />
+                    </div>
+
+                    {report.status === 'COMPLETED' && report.docxPath && (
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2 flex-wrap">
+                        {report.hasDownloadCode ? (
+                          <button
+                            onClick={() => handleDownloadClick(report.id, 'pdf', report.forecastYear)}
+                            disabled={downloading[`${report.id}-pdf`]}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+                            title="Descargar informe en PDF (requiere código)"
+                          >
+                            {downloading[`${report.id}-pdf`]
+                              ? <RefreshCw className="w-3 h-3 animate-spin" />
+                              : <Lock className="w-3 h-3" />}
+                            Descargar (PDF)
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleGenerateCode(report.id)}
+                            disabled={generatingCode[report.id]}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition-colors"
+                            title="Solicitar código al administrador"
+                          >
+                            {generatingCode[report.id]
+                              ? <RefreshCw className="w-3 h-3 animate-spin" />
+                              : <KeyRound className="w-3 h-3" />}
+                            Solicitar código
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {report.status === 'FAILED' && (
+                      <p className="text-xs text-red-500 max-w-[220px] truncate ml-2" title={report.errorMessage || ''}>
+                        {report.errorMessage || 'Error desconocido'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {reports.length === 0 && !generating && eligible !== false && (
+          <p className="text-sm text-amber-500 text-center py-2">
+            Aún no hay informes generados. Haz clic en "Generar Informe" para crear el primero.
+          </p>
+        )}
+      </div>
+    </>
+  );
+};

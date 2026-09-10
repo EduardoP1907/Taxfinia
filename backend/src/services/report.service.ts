@@ -36,7 +36,7 @@ function ensureReportsDir() {
 }
 
 // ─── Build financial data structures ─────────────────────────────────────────
-async function buildFinancialData(companyId: string) {
+export async function buildFinancialData(companyId: string) {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     include: {

@@ -48,6 +48,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
         { name: `Forecast ${new Date().getFullYear()}`, href: '/forecast-mensual',    icon: TrendingUp },
         { name: `Budget ${new Date().getFullYear() + 1}`, href: '/budget',    icon: TrendingUp },
         { name: 'Informe Mensual',    href: '/informe-trimestral',  icon: FileBarChart },
+        { name: 'Informes Comparativos', href: '/informes-comparativos', icon: FileBarChart },
       ],
     },
     ...(isAdmin ? [{

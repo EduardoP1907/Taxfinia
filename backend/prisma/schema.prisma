@@ -25,6 +25,7 @@ model User {
   otpCodes        OtpCode[]
   reports         Report[]
   monthlyReports  MonthlyReport[]
+  comparisonReports ComparisonReport[]
   sessions        Session[]
   inviteTokens    InviteToken[] @relation("creator")
 
@@ -96,6 +97,7 @@ model Company {
   reports          Report[]
   monthlyForecasts MonthlyForecast[]
   monthlyReports   MonthlyReport[]
+  comparisonReports ComparisonReport[]
 
   @@index([userId])
   @@map("companies")
@@ -431,6 +433,35 @@ model MonthlyReport {
   @@index([companyId])
   @@index([userId])
   @@map("monthly_reports")
+}
+
+model ComparisonReport {
+  id           String               @id @default(uuid())
+  companyId    String               @map("company_id")
+  userId       String               @map("user_id")
+  type         ComparisonReportType
+  forecastYear Int                  @map("forecast_year")
+  budgetYear   Int?                 @map("budget_year")
+  status       ReportStatus         @default(PENDING)
+  aiAnalysis   Json?                @map("ai_analysis")
+  docxPath     String?              @map("docx_path")
+  downloadCode String?              @map("download_code")
+  errorMessage String?              @map("error_message")
+  generatedAt  DateTime?            @map("generated_at")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  company      Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, type, forecastYear])
+  @@index([companyId])
+  @@index([userId])
+  @@map("comparison_reports")
+}
+
+enum ComparisonReportType {
+  FORECAST_VS_ANNUAL
+  FORECAST_BUDGET_VS_ANNUAL
 }
 
 enum ReportStatus {
