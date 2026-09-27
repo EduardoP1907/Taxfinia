@@ -23,6 +23,10 @@ import comparisonReportRoutes from './routes/comparison-report.routes';
 
 const app = express();
 
+// Trust the first hop (CloudFront) so req.ip / X-Forwarded-For are read
+// correctly — required for express-rate-limit to work behind a proxy.
+app.set('trust proxy', 1);
+
 // Security headers
 app.use(helmet());
 
