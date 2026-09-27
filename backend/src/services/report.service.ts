@@ -184,6 +184,7 @@ export async function buildFinancialData(companyId: string) {
       businessActivity: (company as any).businessActivity ?? undefined,
       country: company.country,
       currency: company.currency,
+      deedDocumentText: company.deedDocumentText ?? undefined,
     },
     years,
     latestYear,

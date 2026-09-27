@@ -19,6 +19,18 @@ import {
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(Math.round(n));
 
+// Browsers place the caret where the user clicked inside the input, which for a
+// short numeric value often lands before/between digits (e.g. right after "0").
+// These editable cells are meant to be overwritten from the right, so push the
+// caret to the end once the browser's own click positioning has happened.
+const caretToEnd = (e: React.FocusEvent<HTMLInputElement> | React.MouseEvent<HTMLInputElement>) => {
+  const el = e.currentTarget;
+  requestAnimationFrame(() => {
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
+  });
+};
+
 // ─── P&G concept definitions ─────────────────────────────────────────────────
 
 interface PnLConcept {
@@ -192,6 +204,8 @@ const ActualInput: React.FC<{
       value={local}
       placeholder="0"
       onChange={e => setLocal(e.target.value)}
+      onFocus={caretToEnd}
+      onMouseUp={caretToEnd}
       onBlur={() => {
         const parsed = evaluateArithmeticExpression(local);
         const value = parsed ?? 0;
@@ -223,6 +237,8 @@ const RateInput: React.FC<{
       disabled={disabled}
       value={local}
       onChange={e => setLocal(e.target.value)}
+      onFocus={caretToEnd}
+      onMouseUp={caretToEnd}
       onBlur={() => {
         const parsed = evaluateArithmeticExpression(local);
         onChange((parsed ?? 0) / 100);
@@ -255,6 +271,8 @@ const BalanceOverrideInput: React.FC<{
       value={local}
       placeholder={fmt(computed)}
       onChange={e => setLocal(e.target.value)}
+      onFocus={caretToEnd}
+      onMouseUp={caretToEnd}
       onBlur={() => {
         if (local.trim() === '') {
           onChange(null);
@@ -448,7 +466,7 @@ const MonthlyForecastContent: React.FC<{
     const effectiveConfig = isBudget
       ? { ...config, closedMonths: 0 }
       : ((noBaseData && closedMonths === 0) ? { ...config, closedMonths: 12 } : config);
-    return calcPnLClient(effectiveConfig, base, isBudget);
+    return calcPnLClient(effectiveConfig, base, true);
   }, [config, result, noBaseData, isBudget, closedMonths]);
 
   // Live Balance computed client-side from the live P&G + current overrides,
@@ -761,7 +779,7 @@ const MonthlyForecastContent: React.FC<{
                           <th
                             key={m}
                             className={`px-1 py-2 text-center w-[72px] font-medium ${
-                              isClosedMonth(i) || (i === 0 && !isBudget) ? 'text-slate-400' : 'text-blue-200'
+                              isClosedMonth(i) ? 'text-slate-400' : 'text-blue-200'
                             }`}
                           >
                             {m}
@@ -784,19 +802,18 @@ const MonthlyForecastContent: React.FC<{
                             </td>
 
                             {rateArr.map((rate, i) => {
-                              // In Forecast mode, January is always anchored to the annual
-                              // base ÷ 12 (matches the Excel FCASTPPGG row 4 formula) — it
-                              // never grows from a previous month, so its rate is
-                              // structurally a no-op there. In Budget mode there are no
-                              // closed months, so January's own rate is applied over that
-                              // base average and remains editable.
-                              const inert = isClosedMonth(i) || (i === 0 && !isBudget);
+                              // January has no prior month to grow from, so when it isn't
+                              // already closed (actual data entered) it starts from the
+                              // annual base ÷ 12 and applies its own rate over that average
+                              // — same behavior as every other open month, in both Forecast
+                              // and Budget modes.
+                              const inert = isClosedMonth(i);
                               return (
                                 <td
                                   key={i}
                                   className={`px-1 py-1 ${inert ? 'bg-slate-50' : 'bg-blue-50/40'}`}
                                 >
-                                  <div className="flex items-center gap-0.5" title={i === 0 && !isBudget && !isClosedMonth(0) ? 'Enero usa el promedio anual como base — no aplica tasa' : undefined}>
+                                  <div className="flex items-center gap-0.5">
                                     <RateInput
                                       value={rate}
                                       onChange={v => setRate(concept.rateKey!, i, v)}
@@ -818,9 +835,7 @@ const MonthlyForecastContent: React.FC<{
               <p className="text-xs text-slate-400 mt-2">
                 {!isBudget && 'Los meses cerrados (en gris) ignoran la tasa — usa el dato real introducido arriba. '}
                 Los meses proyectados aplican: <code className="bg-slate-100 px-1 rounded">Mes N = Mes (N−1) × (1 + tasa)</code>.{' '}
-                {isBudget
-                  ? 'Enero parte del promedio anual (Total base ÷ 12) y aplica su propia tasa de crecimiento sobre ese promedio.'
-                  : 'Enero (gris) no tiene mes anterior del cual crecer — siempre parte del promedio anual (Total base ÷ 12), por eso su tasa está deshabilitada y no afecta al resultado.'}
+                Enero no tiene mes anterior del cual crecer, así que parte del promedio anual (Total base ÷ 12) y aplica su propia tasa de crecimiento sobre ese promedio.
               </p>
             </div>
           </div>

@@ -91,6 +91,10 @@ model Company {
   businessActivity String?              @map("business_activity")
   companySize      String?              @map("company_size")
   isLocked         Boolean              @default(false) @map("is_locked")
+  deedDocumentPath String?              @map("deed_document_path")
+  deedDocumentName String?              @map("deed_document_name")
+  deedDocumentText String?              @map("deed_document_text")
+  deedDocumentUploadedAt DateTime?      @map("deed_document_uploaded_at")
   user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   fiscalYears      FiscalYear[]
   projections      ProjectionScenario[]

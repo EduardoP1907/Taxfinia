@@ -47,8 +47,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       items: [
         { name: `Forecast ${new Date().getFullYear()}`, href: '/forecast-mensual',    icon: TrendingUp },
         { name: `Budget ${new Date().getFullYear() + 1}`, href: '/budget',    icon: TrendingUp },
-        { name: 'Informe Mensual',    href: '/informe-trimestral',  icon: FileBarChart },
-        { name: 'Informes Comparativos', href: '/informes-comparativos', icon: FileBarChart },
+        { name: 'Informe Forecast y Budget', href: '/informes-comparativos', icon: FileBarChart },
       ],
     },
     ...(isAdmin ? [{
@@ -175,7 +174,7 @@ const Sidebar: React.FC<SidebarProps> = ({ navGroups, location, user, isAdmin, o
         {navGroups.map((group, gi) => (
           <div key={gi}>
             {group.label && (
-              <p className="px-3 mb-1.5 font-data text-[10px] text-slate-600 tracking-[0.15em] uppercase">
+              <p className="px-3 mb-1.5 font-data text-[10px] font-semibold text-amber-500/80 tracking-[0.15em] uppercase">
                 {group.label}
               </p>
             )}

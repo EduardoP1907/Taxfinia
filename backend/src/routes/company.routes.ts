@@ -1,7 +1,10 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { body } from 'express-validator';
 import { companyController } from '../controllers/company.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -121,5 +124,7 @@ router.put('/:id', updateCompanyValidation, companyController.updateCompany);
 router.delete('/:id', companyController.deleteCompany);
 router.get('/:id/summary', companyController.getCompanySummary);
 router.post('/:id/unlock', companyController.unlockCompany.bind(companyController));
+router.post('/:id/deed-document', upload.single('file'), companyController.uploadDeedDocument.bind(companyController));
+router.delete('/:id/deed-document', companyController.deleteDeedDocument.bind(companyController));
 
 export default router;

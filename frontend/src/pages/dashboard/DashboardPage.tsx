@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import {
   Building2, FileText, FileBarChart, TrendingUp,
-  ArrowRight, Layers, Activity, BarChart3,
+  ArrowRight, Layers, Activity,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { companyService } from '../../services/company.service';
@@ -234,7 +234,7 @@ export const DashboardPage: React.FC = () => {
               Ene – Dic
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <ActionCard
               title={`Forecast ${new Date().getFullYear()}`}
               description="Proyecta y edita el desglose mensual (enero a diciembre) a partir de los datos anuales"
@@ -248,13 +248,6 @@ export const DashboardPage: React.FC = () => {
               icon={TrendingUp}
               href="/budget"
               tag="PRESUPUESTO"
-            />
-            <ActionCard
-              title="Informe Mensual"
-              description="Consulta el análisis mensual acumulado calculado a partir del Forecast Mensual"
-              icon={BarChart3}
-              href="/informe-trimestral"
-              tag="OUTPUT MENSUAL"
             />
           </div>
         </div>

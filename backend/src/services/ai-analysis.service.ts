@@ -12,6 +12,7 @@ export interface FinancialDataForAI {
     businessActivity?: string;
     country?: string;
     currency?: string;
+    deedDocumentText?: string;
   };
   years: number[];
   latestYear: number;
@@ -261,7 +262,7 @@ DATOS DE LA EMPRESA:
 - Moneda de análisis: ${currencyLabel}
 - Año base (análisis principal): ${latest}
 - Años disponibles: ${sortedYears.join(', ')} (${sortedYears.length} ejercicio${sortedYears.length > 1 ? 's' : ''})
-
+${data.company.deedDocumentText ? `\nEXTRACTO DE LA ESCRITURA/DOCUMENTO CONSTITUTIVO DE LA EMPRESA:\n${data.company.deedDocumentText}\n` : ''}
 ${formatInstructions}
 
 ${multiYearTable}

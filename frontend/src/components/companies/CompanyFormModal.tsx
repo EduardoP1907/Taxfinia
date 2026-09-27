@@ -4,6 +4,8 @@ import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import type { Company, CompanySize, CreateCompanyData, UpdateCompanyData } from '../../types/company';
 import { INDUSTRY_LIST } from '../../constants/industries';
+import { companyService } from '../../services/company.service';
+import { FileText, Upload, X } from 'lucide-react';
 
 interface CompanyFormModalProps {
   isOpen: boolean;
@@ -46,6 +48,11 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [deedFile, setDeedFile] = useState<File | null>(null);
+  const [deedName, setDeedName] = useState<string | null>(null);
+  const [deedBusy, setDeedBusy] = useState(false);
+  const [deedError, setDeedError] = useState('');
+
   useEffect(() => {
     if (company) {
       setFormData({
@@ -79,6 +86,9 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
         currency: 'CLP',
       });
     }
+    setDeedFile(null);
+    setDeedName(company?.deedDocumentName || null);
+    setDeedError('');
     setError('');
   }, [company, isOpen, currentYear]);
 
@@ -118,11 +128,40 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
       };
 
       await onSubmit(dataToSubmit);
+
+      if (deedFile && company) {
+        setDeedBusy(true);
+        try {
+          await companyService.uploadDeedDocument(company.id, deedFile);
+        } catch (err: any) {
+          setDeedError(err.response?.data?.message || 'Error al cargar el documento de escritura');
+          setDeedBusy(false);
+          setIsLoading(false);
+          return;
+        }
+        setDeedBusy(false);
+      }
+
       onClose();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al guardar la empresa');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRemoveDeed = async () => {
+    if (!company) return;
+    setDeedBusy(true);
+    setDeedError('');
+    try {
+      await companyService.deleteDeedDocument(company.id);
+      setDeedName(null);
+      setDeedFile(null);
+    } catch (err: any) {
+      setDeedError(err.response?.data?.message || 'Error al eliminar el documento de escritura');
+    } finally {
+      setDeedBusy(false);
     }
   };
 
@@ -299,6 +338,55 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
             </select>
           </div>
         </div>
+
+        {/* Documento de escritura de la empresa */}
+        {company && (
+          <div className="border-t border-gray-200 pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Documento de escritura de la empresa
+            </label>
+            <p className="text-xs text-gray-500 mb-2">
+              La IA lo usará como contexto al momento de generar los informes.
+            </p>
+
+            {deedError && (
+              <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg text-red-600 text-xs">
+                {deedError}
+              </div>
+            )}
+
+            {deedName && !deedFile ? (
+              <div className="flex items-center justify-between gap-3 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <span className="text-sm text-gray-700 truncate">{deedName}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveDeed}
+                  disabled={deedBusy}
+                  className="text-gray-400 hover:text-red-600 disabled:opacity-50 flex-shrink-0"
+                  title="Eliminar documento"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-amber-400 hover:bg-amber-50/40 transition-colors">
+                <Upload className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <span className="text-sm text-gray-600 truncate">
+                  {deedFile ? deedFile.name : 'Seleccionar archivo (PDF o TXT)'}
+                </span>
+                <input
+                  type="file"
+                  accept="application/pdf,text/plain"
+                  className="hidden"
+                  onChange={(e) => setDeedFile(e.target.files?.[0] || null)}
+                />
+              </label>
+            )}
+          </div>
+        )}
 
         {/* Botones */}
         <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">

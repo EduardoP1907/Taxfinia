@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { companyService, unlockCompany, getAllCompaniesAdmin } from '../services/company.service';
+import { uploadDeedDocument, deleteDeedDocument } from '../services/deed-document.service';
 import { validationResult } from 'express-validator';
 import prisma from '../config/database';
 import { refreshWaccForScenario } from './projections.controller';
@@ -178,6 +179,49 @@ export class CompanyController {
       res.status(500).json({
         success: false,
         message: error.message || 'Error al obtener el resumen de la empresa',
+      });
+    }
+  }
+
+  async uploadDeedDocument(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const { id } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, message: 'No se recibió ningún archivo' });
+        return;
+      }
+
+      await uploadDeedDocument(id, userId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+      });
+
+      res.status(200).json({ success: true, message: 'Documento de escritura cargado exitosamente' });
+    } catch (error: any) {
+      console.error('Error uploading deed document:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error al cargar el documento de escritura',
+      });
+    }
+  }
+
+  async deleteDeedDocument(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const { id } = req.params;
+
+      await deleteDeedDocument(id, userId);
+
+      res.status(200).json({ success: true, message: 'Documento de escritura eliminado' });
+    } catch (error: any) {
+      console.error('Error deleting deed document:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error al eliminar el documento de escritura',
       });
     }
   }

@@ -40,4 +40,16 @@ export const companyService = {
     const response = await api.get('/companies/stats');
     return response.data.data;
   },
+
+  async uploadDeedDocument(id: string, file: File): Promise<void> {
+    const formData = new FormData();
+    formData.append('file', file);
+    await api.post(`/companies/${id}/deed-document`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  async deleteDeedDocument(id: string): Promise<void> {
+    await api.delete(`/companies/${id}/deed-document`);
+  },
 };

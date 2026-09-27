@@ -134,7 +134,6 @@ export interface AnnualPnLBase {
 export function calcPnLClient(
   cfg: MonthlyForecastConfig,
   base: AnnualPnLBase,
-  applyJanuaryRate = false,
 ): MonthlyPnLRow[] {
   const rows: MonthlyPnLRow[] = [];
   const { closedMonths } = cfg;
@@ -156,9 +155,9 @@ export function calcPnLClient(
       financialExpenses  = cfg.actualFinancialExpenses[m]  ?? 0;
       incomeTax          = cfg.actualIncomeTax[m]          ?? 0;
     } else if (m === 0) {
-      // Budget mode allows editing January's own growth rate — applied over
-      // the annual average (base / 12) — since budget has no prior month.
-      const jf = (r: number[]) => (applyJanuaryRate ? 1 + (r[0] ?? 0) : 1);
+      // January has no prior month to grow from, so it starts from the annual
+      // average (base / 12) and applies its own editable growth rate over it.
+      const jf = (r: number[]) => 1 + (r[0] ?? 0);
       revenue            = (base.revenue            / 12) * jf(cfg.rateRevenue);
       costOfSales        = (base.costOfSales        / 12) * jf(cfg.rateCostOfSales);
       adminExpenses      = (base.adminExpenses      / 12) * jf(cfg.rateAdminExpenses);

@@ -14,6 +14,8 @@ export interface Company {
   baseYear: number;
   currency?: string;
   isLocked?: boolean;
+  deedDocumentName?: string;
+  deedDocumentUploadedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
