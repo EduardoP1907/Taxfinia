@@ -466,7 +466,7 @@ const MonthlyForecastContent: React.FC<{
     const effectiveConfig = isBudget
       ? { ...config, closedMonths: 0 }
       : ((noBaseData && closedMonths === 0) ? { ...config, closedMonths: 12 } : config);
-    return calcPnLClient(effectiveConfig, base, true);
+    return calcPnLClient(effectiveConfig, base);
   }, [config, result, noBaseData, isBudget, closedMonths]);
 
   // Live Balance computed client-side from the live P&G + current overrides,
