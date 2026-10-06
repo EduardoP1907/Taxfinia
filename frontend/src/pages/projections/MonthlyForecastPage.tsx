@@ -6,13 +6,11 @@ import { companyService } from '../../services/company.service';
 import type { Company } from '../../types/company';
 import {
   monthlyForecastService, mergeConfig, MONTHS, calcPnLClient, calcBalanceClient,
-  RATE_SUGGESTION_KEYS,
   type MonthlyForecastConfig, type MonthlyForecastResult, type MonthlyPnLRow,
   type MonthlyBalanceRow, type BalanceOverrideKey,
 } from '../../services/monthly-forecast.service';
 import { evaluateArithmeticExpression } from '../../utils/arithmetic';
 import { PercentInput } from '../../components/ui/PercentInput';
-import { formatRateReference } from '../../utils/percent';
 import {
   CalendarDays, RefreshCw, Save, ChevronDown, ChevronUp, AlertCircle, CheckCircle2,
 } from 'lucide-react';
@@ -771,12 +769,6 @@ const MonthlyForecastContent: React.FC<{
                         <th className="text-left px-3 py-2 w-52 sticky left-0 bg-slate-700 z-10 font-medium">
                           Concepto
                         </th>
-                        <th
-                          className="px-2 py-2 text-center font-medium text-amber-200 whitespace-nowrap"
-                          title="Crecimiento anual promedio de los últimos 3 años de Datos anuales (valor sugerido)"
-                        >
-                          Prom. 3 años
-                        </th>
                         {MONTHS.map((m, i) => (
                           <th
                             key={m}
@@ -801,11 +793,6 @@ const MonthlyForecastContent: React.FC<{
                           >
                             <td className="px-3 py-1.5 sticky left-0 bg-white z-10 text-slate-700">
                               {concept.label}
-                            </td>
-                            <td className="px-2 py-1.5 text-center font-mono text-slate-500 bg-amber-50/60 whitespace-nowrap">
-                              {formatRateReference(
-                                result?.suggestedRates?.[RATE_SUGGESTION_KEYS[concept.rateKey!]],
-                              )}
                             </td>
 
                             {rateArr.map((rate, i) => {
@@ -848,9 +835,7 @@ const MonthlyForecastContent: React.FC<{
                     Los meses proyectados aplican: <code className="bg-slate-100 px-1 rounded">Mes N = Mes (N−1) × (1 + tasa)</code>.{' '}
                     Enero no tiene mes anterior del cual crecer, así que parte del promedio anual (Total base ÷ 12) y aplica su propia tasa de crecimiento sobre ese promedio.{' '}
                   </>
-                )}
-                «Prom. 3 años» es el crecimiento anual promedio de los últimos 3 años de Datos anuales: es el valor inicial sugerido de cada mes y puedes editarlo libremente.
-              </p>
+                )}              </p>
             </div>
           </div>
         )}
