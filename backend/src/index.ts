@@ -32,7 +32,7 @@ app.use(helmet());
 
 // CORS
 app.use(cors({
-  origin: ['http://localhost:5177', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://taxfinia-frontend.s3-website-us-east-1.amazonaws.com', 'https://d38cf5pekavluz.cloudfront.net'],
+  origin: ['http://localhost:5177', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://taxfinia-frontend.s3-website-us-east-1.amazonaws.com', 'https://d38cf5pekavluz.cloudfront.net', 'https://app.prometheia.cl'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
