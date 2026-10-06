@@ -7,7 +7,15 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
-import { projectionsService, type ProjectionScenarioWithData } from '../../services/projections.service';
+import {
+  projectionsService,
+  type ProjectionScenarioWithData,
+  type FinancialProjection,
+  type HistoricalRates,
+  type AnnualSuggestedRates,
+} from '../../services/projections.service';
+import { PercentInput } from '../../components/ui/PercentInput';
+import { formatRateReference } from '../../utils/percent';
 import { companyService } from '../../services/company.service';
 import { toast } from 'sonner';
 import { Settings, TrendingUp, ArrowRight, Plus, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -16,6 +24,40 @@ import { Button } from '../../components/ui/Button';
 interface GrowthRatesConfigPageProps {
   tabsHeader?: React.ReactNode;
 }
+
+type UniformRates = Record<keyof AnnualSuggestedRates, number>;
+
+// Tasa impositiva si no hay ningún año histórico con EBT positivo
+const DEFAULT_TAX_RATE = 0.27;
+
+const toPct = (rate: number | string | null | undefined): number =>
+  rate === null || rate === undefined || rate === '' ? 0 : Number(rate) * 100;
+
+const ratesFromSuggestions = (s: AnnualSuggestedRates | null): UniformRates => ({
+  revenueGrowthRate: toPct(s?.revenueGrowthRate),
+  costOfSalesGrowthRate: toPct(s?.costOfSalesGrowthRate),
+  otherOperatingExpensesGrowthRate: toPct(s?.otherOperatingExpensesGrowthRate),
+  depreciationGrowthRate: toPct(s?.depreciationGrowthRate),
+  exceptionalNetGrowthRate: toPct(s?.exceptionalNetGrowthRate),
+  financialNetGrowthRate: toPct(s?.financialNetGrowthRate),
+  totalAssetsGrowthRate: toPct(s?.totalAssetsGrowthRate),
+  equityGrowthRate: toPct(s?.equityGrowthRate),
+  totalLiabilitiesGrowthRate: toPct(s?.totalLiabilitiesGrowthRate),
+  taxRate: toPct(s?.taxRate ?? DEFAULT_TAX_RATE),
+});
+
+const ratesFromProjection = (p: FinancialProjection): UniformRates => ({
+  revenueGrowthRate: toPct(p.revenueGrowthRate),
+  costOfSalesGrowthRate: toPct(p.costOfSalesGrowthRate),
+  otherOperatingExpensesGrowthRate: toPct(p.otherOperatingExpensesGrowthRate),
+  depreciationGrowthRate: toPct(p.depreciationGrowthRate),
+  exceptionalNetGrowthRate: toPct(p.exceptionalNetGrowthRate),
+  financialNetGrowthRate: toPct(p.financialIncomeGrowthRate),
+  totalAssetsGrowthRate: toPct(p.totalAssetsGrowthRate),
+  equityGrowthRate: toPct(p.equityGrowthRate),
+  totalLiabilitiesGrowthRate: toPct(p.totalLiabilitiesGrowthRate),
+  taxRate: toPct(p.taxRate ?? DEFAULT_TAX_RATE),
+});
 
 export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ tabsHeader }) => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,19 +69,10 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
   const [company, setCompany] = useState<any>(null);
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
 
-  // Tasas uniformes (se aplican a todos los años)
-  const [uniformRates, setUniformRates] = useState({
-    revenueGrowthRate: 5,
-    costOfSalesGrowthRate: 4,
-    otherOperatingExpensesGrowthRate: 3,
-    depreciationGrowthRate: 2,
-    exceptionalNetGrowthRate: 0,
-    financialNetGrowthRate: 0,
-    totalAssetsGrowthRate: 5,
-    equityGrowthRate: 5,
-    totalLiabilitiesGrowthRate: 5,
-    taxRate: 27,
-  });
+  // Tasas uniformes (se aplican a todos los años), en puntos porcentuales (5 = 5%)
+  const [uniformRates, setUniformRates] = useState<UniformRates>(() => ratesFromSuggestions(null));
+  // Promedio histórico de los últimos 3 años de "Datos anuales" (referencia)
+  const [historical, setHistorical] = useState<HistoricalRates | null>(null);
 
   useEffect(() => {
     if (companyId) {
@@ -47,59 +80,46 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
     }
   }, [companyId]);
 
+  // Valores iniciales: las tasas ya guardadas en el escenario; si aún no se
+  // aplicaron, el promedio histórico de los últimos 3 años.
+  const initRates = async (sc: ProjectionScenarioWithData | null) => {
+    let hist: HistoricalRates | null = null;
+    try {
+      hist = await projectionsService.getHistoricalRates(companyId!, sc?.baseYear);
+    } catch (err) {
+      console.error('Error loading historical rates:', err);
+    }
+    setHistorical(hist);
+
+    const firstProjected = sc?.projections?.find((p) => p.year > sc.baseYear);
+    const hasSavedRates =
+      firstProjected?.revenueGrowthRate !== null && firstProjected?.revenueGrowthRate !== undefined;
+    setUniformRates(
+      hasSavedRates ? ratesFromProjection(firstProjected!) : ratesFromSuggestions(hist?.annual ?? null),
+    );
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
       const companyData = await companyService.getCompany(companyId!);
       setCompany(companyData);
 
-      // Auto-cargar el escenario más reciente o el especificado en URL
-      const sid = scenarioId;
-      if (sid) {
-        const sc = await projectionsService.getScenario(sid);
-        setScenario(sc);
-        // Pre-cargar tasas del primer año de proyección si existen
-        if (sc.projections && sc.projections.length > 0) {
-          const firstProj = sc.projections[0];
-          setUniformRates({
-            revenueGrowthRate: Math.round((firstProj.revenueGrowthRate ?? 0.05) * 100 * 100) / 100,
-            costOfSalesGrowthRate: Math.round((firstProj.costOfSalesGrowthRate ?? 0.04) * 100 * 100) / 100,
-            otherOperatingExpensesGrowthRate: Math.round((firstProj.otherOperatingExpensesGrowthRate ?? 0.03) * 100 * 100) / 100,
-            depreciationGrowthRate: Math.round((firstProj.depreciationGrowthRate ?? 0.02) * 100 * 100) / 100,
-            exceptionalNetGrowthRate: Math.round((firstProj.exceptionalNetGrowthRate ?? 0) * 100 * 100) / 100,
-            financialNetGrowthRate: Math.round((firstProj.financialIncomeGrowthRate ?? 0) * 100 * 100) / 100,
-            totalAssetsGrowthRate: Math.round((firstProj.totalAssetsGrowthRate ?? 0.05) * 100 * 100) / 100,
-            equityGrowthRate: Math.round((firstProj.equityGrowthRate ?? 0.05) * 100 * 100) / 100,
-            totalLiabilitiesGrowthRate: Math.round((firstProj.totalLiabilitiesGrowthRate ?? 0.05) * 100 * 100) / 100,
-            taxRate: Math.round((firstProj.taxRate ?? 0.27) * 100 * 100) / 100,
-          });
-        }
+      // Auto-cargar el escenario especificado en URL o el más reciente
+      let sc: ProjectionScenarioWithData | null = null;
+      if (scenarioId) {
+        sc = await projectionsService.getScenario(scenarioId);
       } else {
-        // Intentar cargar el escenario más reciente
         const scenarios = await projectionsService.getCompanyScenarios(companyId!);
         if (scenarios.length > 0) {
-          const latest = scenarios[0];
-          setScenario(latest);
+          sc = scenarios[0];
           const newParams = new URLSearchParams(searchParams);
-          newParams.set('scenarioId', latest.id);
+          newParams.set('scenarioId', sc.id);
           setSearchParams(newParams);
-          if (latest.projections && latest.projections.length > 0) {
-            const firstProj = latest.projections[0];
-            setUniformRates({
-              revenueGrowthRate: Math.round((firstProj.revenueGrowthRate ?? 0.05) * 100 * 100) / 100,
-              costOfSalesGrowthRate: Math.round((firstProj.costOfSalesGrowthRate ?? 0.04) * 100 * 100) / 100,
-              otherOperatingExpensesGrowthRate: Math.round((firstProj.otherOperatingExpensesGrowthRate ?? 0.03) * 100 * 100) / 100,
-              depreciationGrowthRate: Math.round((firstProj.depreciationGrowthRate ?? 0.02) * 100 * 100) / 100,
-              exceptionalNetGrowthRate: Math.round((firstProj.exceptionalNetGrowthRate ?? 0) * 100 * 100) / 100,
-              financialNetGrowthRate: Math.round((firstProj.financialIncomeGrowthRate ?? 0) * 100 * 100) / 100,
-              totalAssetsGrowthRate: Math.round((firstProj.totalAssetsGrowthRate ?? 0.05) * 100 * 100) / 100,
-              equityGrowthRate: Math.round((firstProj.equityGrowthRate ?? 0.05) * 100 * 100) / 100,
-              totalLiabilitiesGrowthRate: Math.round((firstProj.totalLiabilitiesGrowthRate ?? 0.05) * 100 * 100) / 100,
-              taxRate: Math.round((firstProj.taxRate ?? 0.27) * 100 * 100) / 100,
-            });
-          }
         }
       }
+      setScenario(sc);
+      await initRates(sc);
     } catch (err) {
       console.error('Error loading data:', err);
     } finally {
@@ -117,6 +137,7 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
       });
       toast.success('Escenario de proyección creado');
       setScenario(newScenario);
+      await initRates(newScenario);
       const newParams = new URLSearchParams(searchParams);
       newParams.set('scenarioId', newScenario.id);
       setSearchParams(newParams);
@@ -247,6 +268,13 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
                   Estas tasas se aplican de forma uniforme a todos los {scenario.projectionYears} años proyectados.
                   Para tasas diferentes por año, edite directamente en la Hoja 4.2.
                 </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Valores sugeridos: promedio del crecimiento de los últimos 3 años de Datos anuales
+                  {historical && historical.yearsUsed.length > 1
+                    ? ` (${historical.yearsUsed[0]}–${historical.yearsUsed[historical.yearsUsed.length - 1]})`
+                    : ''}
+                  ; la tasa impositiva es el promedio de Impuestos / Resultado antes de impuestos. Todos son editables.
+                </p>
               </div>
 
               <div className="p-6">
@@ -262,20 +290,24 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
                         {fields.map(({ key, label }) => (
                           <div key={key}>
                             <label className="block text-sm font-medium text-gray-700 mb-1">{label} (%)</label>
-                            <div className="relative">
-                              <input
-                                type="number"
-                                step="0.01"
+                            <div className="flex items-center gap-3">
+                              <PercentInput
+                                className="flex-1"
                                 value={uniformRates[key]}
-                                onChange={(e) =>
-                                  setUniformRates((prev) => ({
-                                    ...prev,
-                                    [key]: parseFloat(e.target.value) || 0,
-                                  }))
+                                onCommit={(v) =>
+                                  setUniformRates((prev) => ({ ...prev, [key]: v ?? 0 }))
                                 }
-                                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-right font-mono"
+                                aria-label={label}
                               />
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+                              <span
+                                className="w-32 shrink-0 text-xs text-gray-500 leading-tight"
+                                title="Valor sugerido: promedio de los últimos 3 años de Datos anuales"
+                              >
+                                Prom. 3 años:{' '}
+                                <span className="font-mono text-gray-700">
+                                  {formatRateReference(historical?.annual[key])}
+                                </span>
+                              </span>
                             </div>
                           </div>
                         ))}

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getHistoricalRates, type MonthlySuggestedRates } from './historical-rates.service';
 
 const prisma = new PrismaClient();
 
@@ -86,6 +87,11 @@ export interface MonthlyForecastResult {
   annualPnL: AnnualPnL;
   annualBalance: AnnualBalance;
   baseYear: number;             // actual annual data year used as base
+  // Budget only: the prior-year Forecast months each Budget month grows over
+  basePnL?: MonthlyPnLRow[];
+  // Recommended monthly rates (avg growth of the last 3 annual years), decimal;
+  // used as the initial value of every month when no rates were saved yet
+  suggestedRates: MonthlySuggestedRates;
 }
 
 // Leaf balance line items the user can manually override (excludes computed
@@ -169,16 +175,20 @@ function buildAnnualBalance(bs: any): AnnualBalance {
 }
 
 // ─── Core calculation: monthly P&G ───────────────────────────────────────────
-// Matches FCASTPPGG2026 logic:
+// Forecast — matches FCASTPPGG2026 logic:
 //   Month 0 (Jan, projected) = base / 12
 //   Month N (projected)      = prev * (1 + rate[N])
 //   Closed months            = actual values entered by user
+// Budget — when `monthlyBase` (the prior-year Forecast months) is given, every
+// month grows over the SAME month of the Forecast:
+//   Month N = forecast[N] * (1 + rate[N])
 
 function calcMonthlyPnL(
   base: AnnualPnL,
   closedMonths: number,
   actual: Record<keyof AnnualPnL, number[]>,
   rates: Record<keyof AnnualPnL, number[]>,
+  monthlyBase?: MonthlyPnLRow[],
 ): MonthlyPnLRow[] {
   const rows: MonthlyPnLRow[] = [];
 
@@ -188,7 +198,17 @@ function calcMonthlyPnL(
     let exceptionalIncome: number, exceptionalExpenses: number;
     let financialIncome: number, financialExpenses: number, incomeTax: number;
 
-    if (isClosed) {
+    if (monthlyBase && !isClosed) {
+      const b = monthlyBase[m];
+      revenue = b.revenue * (1 + rates.revenue[m]);
+      costOfSales = b.costOfSales * (1 + rates.costOfSales[m]);
+      adminExpenses = b.adminExpenses * (1 + rates.adminExpenses[m]);
+      exceptionalIncome = b.exceptionalIncome * (1 + rates.exceptionalIncome[m]);
+      exceptionalExpenses = b.exceptionalExpenses * (1 + rates.exceptionalExpenses[m]);
+      financialIncome = b.financialIncome * (1 + rates.financialIncome[m]);
+      financialExpenses = b.financialExpenses * (1 + rates.financialExpenses[m]);
+      incomeTax = b.incomeTax * (1 + rates.incomeTax[m]);
+    } else if (isClosed) {
       revenue = actual.revenue[m];
       costOfSales = actual.costOfSales[m];
       adminExpenses = actual.adminExpenses[m];
@@ -392,6 +412,9 @@ export const monthlyForecastService = {
     let annualPnL: AnnualPnL;
     let annualBalance: AnnualBalance;
     let baseYear: number;
+    let basePnL: MonthlyPnLRow[] | undefined;
+    // Last annual ("Datos anuales") year the recommended rates are averaged up to
+    let historicalUpToYear: number;
 
     if (mode === 'budget') {
       // Budget bases itself on this company's own Forecast for the prior year
@@ -447,6 +470,8 @@ export const monthlyForecastService = {
         otherLiabilitiesSp: dec.otherLiabilitiesSp,
       };
       baseYear = forecastYear;
+      basePnL = forecastResult.pnl;
+      historicalUpToYear = forecastResult.baseYear;
     } else {
       // Load base annual data: most recent year ≤ forecastYear that has both statements.
       // For a 2026 forecast the ideal base is 2025; falls back to whatever is newest available.
@@ -471,6 +496,7 @@ export const monthlyForecastService = {
       annualPnL = buildAnnualPnL(fiscalYear.incomeStatement);
       annualBalance = buildAnnualBalance(fiscalYear.balanceSheet);
       baseYear = fiscalYear.year;
+      historicalUpToYear = fiscalYear.year;
     }
 
     // Load stored forecast/budget config for the requested year
@@ -493,25 +519,32 @@ export const monthlyForecastService = {
       incomeTax: jsonToArray(stored?.actualIncomeTax),
     };
 
+    // Recommended rates: average growth of the last 3 annual years. Used for
+    // every month of any concept whose rates were never saved; saved rates
+    // (even 0%) always win.
+    const suggestedRates = (await getHistoricalRates(companyId, historicalUpToYear)).monthly;
+    const rateArray = (json: any, suggested: number | null) =>
+      Array.isArray(json) ? jsonToArray(json, 0) : Array(12).fill(suggested ?? 0);
+
     const rates: Record<keyof AnnualPnL, number[]> = {
-      revenue: jsonToArray(stored?.rateRevenue, 0),
-      costOfSales: jsonToArray(stored?.rateCostOfSales, 0),
-      adminExpenses: jsonToArray(stored?.rateAdminExpenses, 0),
-      exceptionalIncome: jsonToArray(stored?.rateExceptionalIncome, 0),
-      exceptionalExpenses: jsonToArray(stored?.rateExceptionalExpenses, 0),
-      financialIncome: jsonToArray(stored?.rateFinancialIncome, 0),
-      financialExpenses: jsonToArray(stored?.rateFinancialExpenses, 0),
-      incomeTax: jsonToArray(stored?.rateIncomeTax, 0),
+      revenue: rateArray(stored?.rateRevenue, suggestedRates.revenue),
+      costOfSales: rateArray(stored?.rateCostOfSales, suggestedRates.costOfSales),
+      adminExpenses: rateArray(stored?.rateAdminExpenses, suggestedRates.adminExpenses),
+      exceptionalIncome: rateArray(stored?.rateExceptionalIncome, suggestedRates.exceptionalIncome),
+      exceptionalExpenses: rateArray(stored?.rateExceptionalExpenses, suggestedRates.exceptionalExpenses),
+      financialIncome: rateArray(stored?.rateFinancialIncome, suggestedRates.financialIncome),
+      financialExpenses: rateArray(stored?.rateFinancialExpenses, suggestedRates.financialExpenses),
+      incomeTax: rateArray(stored?.rateIncomeTax, suggestedRates.incomeTax),
     };
 
     // Budget rows are never manually overridden — only their growth rates are editable.
     const balanceOverrides = mode === 'budget' ? {} : normalizeBalanceOverrides(stored?.balanceOverrides);
 
-    const pnl = calcMonthlyPnL(annualPnL, closedMonths, actual, rates);
+    const pnl = calcMonthlyPnL(annualPnL, closedMonths, actual, rates, basePnL);
     const balance = calcMonthlyBalance(
       annualBalance, annualPnL.revenue, annualPnL.costOfSales, pnl, balanceOverrides,
     );
 
-    return { pnl, balance, annualPnL, annualBalance, baseYear };
+    return { pnl, balance, annualPnL, annualBalance, baseYear, basePnL, suggestedRates };
   },
 };

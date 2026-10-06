@@ -19,6 +19,7 @@ import { useCompanyStore } from '../../store/companyStore';
 import { toast } from 'sonner';
 import { ArrowLeft, Calculator, DollarSign, Save, Sparkles } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { PercentInput } from '../../components/ui/PercentInput';
 
 interface Projection43PageProps {
   tabsHeader?: React.ReactNode;
@@ -470,23 +471,13 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
               </label>
               <div className="flex items-center gap-6">
                 <div className="flex-1 max-w-xs">
-                  <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="20"
-                      value={terminalGrowthPct ?? ''}
-                      onChange={(e) =>
-                        setTerminalGrowthPct(e.target.value === '' ? null : parseFloat(e.target.value))
-                      }
-                      placeholder="Ej: 2.00"
-                      className="flex-1 px-3 py-2 text-right font-semibold text-gray-900 text-lg focus:outline-none bg-transparent"
-                    />
-                    <span className="px-3 py-2 bg-gray-100 text-gray-600 font-semibold border-l border-gray-300 text-sm">
-                      %
-                    </span>
-                  </div>
+                  <PercentInput
+                    value={terminalGrowthPct}
+                    onCommit={setTerminalGrowthPct}
+                    allowEmpty
+                    placeholder="Ej: 2"
+                    aria-label="Tasa de crecimiento perpetuo"
+                  />
                   <p className="text-xs text-gray-400 mt-1">Ingresada manualmente por el usuario</p>
                 </div>
                 <div className="flex-1 text-xs text-gray-600">

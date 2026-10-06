@@ -8,6 +8,7 @@ import { ProjectionsService } from '../services/projections.service';
 import { bigIntToJSON } from '../utils/bigint';
 import { estimateWACC, WACCFinancialContext } from '../services/ai-analysis.service';
 import prisma from '../config/database';
+import { getHistoricalRates as getHistoricalRatesForCompany } from '../services/historical-rates.service';
 
 const projectionsService = new ProjectionsService();
 
@@ -70,6 +71,32 @@ export const getCompanyScenarios = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[PROJECTIONS] Error getting company scenarios:', error);
     res.status(500).json({ error: error.message || 'Error al obtener escenarios' });
+  }
+};
+
+/**
+ * Tasas recomendadas (promedio de crecimiento de los últimos 3 años de "Datos anuales")
+ * GET /api/projections/historical-rates/:companyId?upToYear=2025
+ */
+export const getHistoricalRates = async (req: Request, res: Response) => {
+  try {
+    const { companyId } = req.params;
+    const company = await prisma.company.findFirst({
+      where: { id: companyId, userId: req.user!.id, deletedAt: null },
+    });
+    if (!company) {
+      return res.status(404).json({ error: 'Empresa no encontrada' });
+    }
+
+    const upToYear = req.query.upToYear ? parseInt(req.query.upToYear as string) : undefined;
+    const rates = await getHistoricalRatesForCompany(
+      companyId,
+      upToYear !== undefined && !Number.isNaN(upToYear) ? upToYear : undefined,
+    );
+    res.json(rates);
+  } catch (error: any) {
+    console.error('[PROJECTIONS] Error getting historical rates:', error);
+    res.status(500).json({ error: error.message || 'Error al calcular las tasas históricas' });
   }
 };
 

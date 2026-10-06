@@ -6,10 +6,13 @@ import { companyService } from '../../services/company.service';
 import type { Company } from '../../types/company';
 import {
   monthlyForecastService, mergeConfig, MONTHS, calcPnLClient, calcBalanceClient,
+  RATE_SUGGESTION_KEYS,
   type MonthlyForecastConfig, type MonthlyForecastResult, type MonthlyPnLRow,
   type MonthlyBalanceRow, type BalanceOverrideKey,
 } from '../../services/monthly-forecast.service';
 import { evaluateArithmeticExpression } from '../../utils/arithmetic';
+import { PercentInput } from '../../components/ui/PercentInput';
+import { formatRateReference } from '../../utils/percent';
 import {
   CalendarDays, RefreshCw, Save, ChevronDown, ChevronUp, AlertCircle, CheckCircle2,
 } from 'lucide-react';
@@ -225,28 +228,13 @@ const RateInput: React.FC<{
   onChange: (v: number) => void;
   disabled?: boolean;
 }> = ({ value, onChange, disabled }) => {
-  const pct = (value * 100).toFixed(1);
-  const [local, setLocal] = useState(pct);
-
-  useEffect(() => { setLocal((value * 100).toFixed(1)); }, [value]);
-
   return (
-    <input
-      type="text"
-      inputMode="decimal"
+    <PercentInput
+      value={value * 100}
+      onCommit={v => onChange((v ?? 0) / 100)}
       disabled={disabled}
-      value={local}
-      onChange={e => setLocal(e.target.value)}
-      onFocus={caretToEnd}
-      onMouseUp={caretToEnd}
-      onBlur={() => {
-        const parsed = evaluateArithmeticExpression(local);
-        onChange((parsed ?? 0) / 100);
-      }}
-      className="w-full text-center text-xs border border-slate-200 rounded px-0.5 py-0.5
-                 focus:outline-none focus:ring-1 focus:ring-amber-400
-                 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed
-                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      size="xs"
+      align="center"
     />
   );
 };
@@ -383,10 +371,18 @@ const MonthlyForecastContent: React.FC<{
     setError(null);
     try {
       const stored = await monthlyForecastService.get(companyId, year);
-      setConfig(mergeConfig(stored));
-      const calc = await monthlyForecastService.calculate(companyId, year, mode);
+      let calc: MonthlyForecastResult | null = null;
+      let calcError: any = null;
+      try {
+        calc = await monthlyForecastService.calculate(companyId, year, mode);
+      } catch (e) {
+        calcError = e;
+      }
+      // Unsaved rate rows start with the recommended (3-year average) rates
+      setConfig(mergeConfig(stored, calc?.suggestedRates));
       setResult(calc);
-      setBaseYear(calc.baseYear ?? null);
+      setBaseYear(calc?.baseYear ?? null);
+      if (calcError) throw calcError;
     } catch (e: any) {
       setError(e?.response?.data?.error || e.message || 'Error al cargar datos');
     } finally {
@@ -466,7 +462,7 @@ const MonthlyForecastContent: React.FC<{
     const effectiveConfig = isBudget
       ? { ...config, closedMonths: 0 }
       : ((noBaseData && closedMonths === 0) ? { ...config, closedMonths: 12 } : config);
-    return calcPnLClient(effectiveConfig, base);
+    return calcPnLClient(effectiveConfig, base, isBudget ? result?.basePnL : undefined);
   }, [config, result, noBaseData, isBudget, closedMonths]);
 
   // Live Balance computed client-side from the live P&G + current overrides,
@@ -574,7 +570,7 @@ const MonthlyForecastContent: React.FC<{
                 {isNoData && (
                   <p className="text-xs mt-1 opacity-80">
                     {isBudget
-                      ? `Completa primero el Forecast ${year - 1} (con sus meses cerrados y tasas de crecimiento) — el Budget ${year} se construye a partir de su resultado anual.`
+                      ? `Completa primero el Forecast ${year - 1} (con sus meses cerrados y tasas de crecimiento) — cada mes del Budget ${year} se construye a partir del mismo mes del Forecast.`
                       : 'Introduce los datos reales en la tabla y usa «Meses cerrados» para indicar hasta qué mes tienes datos — los meses siguientes se proyectarán automáticamente usando los porcentajes de crecimiento de cada celda.'}
                   </p>
                 )}
@@ -749,7 +745,7 @@ const MonthlyForecastContent: React.FC<{
 
             <p className="text-xs text-slate-400 -mt-2">
               {isBudget
-                ? `Todos los meses se calculan a partir del resultado anual del Forecast ${baseYear ?? year - 1} aplicando las tasas de crecimiento de la sección de abajo.`
+                ? `Cada mes se calcula a partir del mismo mes del Forecast ${baseYear ?? year - 1} aplicando las tasas de crecimiento de la sección de abajo.`
                 : 'Los meses cerrados muestran el dato real introducido (verde). Los meses proyectados calculan el valor a partir del último mes real usando las tasas de la sección FORECAST.'}
               {' '}Ajusta las tasas abajo y pulsa «Guardar y recalcular» para persistir y actualizar el balance.
             </p>
@@ -774,6 +770,12 @@ const MonthlyForecastContent: React.FC<{
                       <tr className="bg-slate-700 text-white">
                         <th className="text-left px-3 py-2 w-52 sticky left-0 bg-slate-700 z-10 font-medium">
                           Concepto
+                        </th>
+                        <th
+                          className="px-2 py-2 text-center font-medium text-amber-200 whitespace-nowrap"
+                          title="Crecimiento anual promedio de los últimos 3 años de Datos anuales (valor sugerido)"
+                        >
+                          Prom. 3 años
                         </th>
                         {MONTHS.map((m, i) => (
                           <th
@@ -800,6 +802,11 @@ const MonthlyForecastContent: React.FC<{
                             <td className="px-3 py-1.5 sticky left-0 bg-white z-10 text-slate-700">
                               {concept.label}
                             </td>
+                            <td className="px-2 py-1.5 text-center font-mono text-slate-500 bg-amber-50/60 whitespace-nowrap">
+                              {formatRateReference(
+                                result?.suggestedRates?.[RATE_SUGGESTION_KEYS[concept.rateKey!]],
+                              )}
+                            </td>
 
                             {rateArr.map((rate, i) => {
                               // January has no prior month to grow from, so when it isn't
@@ -813,14 +820,11 @@ const MonthlyForecastContent: React.FC<{
                                   key={i}
                                   className={`px-1 py-1 ${inert ? 'bg-slate-50' : 'bg-blue-50/40'}`}
                                 >
-                                  <div className="flex items-center gap-0.5">
-                                    <RateInput
-                                      value={rate}
-                                      onChange={v => setRate(concept.rateKey!, i, v)}
-                                      disabled={inert}
-                                    />
-                                    <span className="text-[10px] text-slate-400 shrink-0">%</span>
-                                  </div>
+                                  <RateInput
+                                    value={rate}
+                                    onChange={v => setRate(concept.rateKey!, i, v)}
+                                    disabled={inert}
+                                  />
                                 </td>
                               );
                             })}
@@ -833,9 +837,19 @@ const MonthlyForecastContent: React.FC<{
               )}
 
               <p className="text-xs text-slate-400 mt-2">
-                {!isBudget && 'Los meses cerrados (en gris) ignoran la tasa — usa el dato real introducido arriba. '}
-                Los meses proyectados aplican: <code className="bg-slate-100 px-1 rounded">Mes N = Mes (N−1) × (1 + tasa)</code>.{' '}
-                Enero no tiene mes anterior del cual crecer, así que parte del promedio anual (Total base ÷ 12) y aplica su propia tasa de crecimiento sobre ese promedio.
+                {isBudget ? (
+                  <>
+                    Cada mes crece sobre el mismo mes del Forecast {baseYear ?? year - 1}:{' '}
+                    <code className="bg-slate-100 px-1 rounded">Budget Mes N = Forecast Mes N × (1 + tasa)</code>.{' '}
+                  </>
+                ) : (
+                  <>
+                    Los meses cerrados (en gris) ignoran la tasa — usa el dato real introducido arriba.{' '}
+                    Los meses proyectados aplican: <code className="bg-slate-100 px-1 rounded">Mes N = Mes (N−1) × (1 + tasa)</code>.{' '}
+                    Enero no tiene mes anterior del cual crecer, así que parte del promedio anual (Total base ÷ 12) y aplica su propia tasa de crecimiento sobre ese promedio.{' '}
+                  </>
+                )}
+                «Prom. 3 años» es el crecimiento anual promedio de los últimos 3 años de Datos anuales: es el valor inicial sugerido de cada mes y puedes editarlo libremente.
               </p>
             </div>
           </div>

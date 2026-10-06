@@ -13,6 +13,8 @@ import { toast } from 'sonner';
 import { ArrowLeft, Plus, Calculator } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { AmountInput } from '../../components/ui/AmountInput';
+import { PercentInput } from '../../components/ui/PercentInput';
 
 interface Projection41PageProps {
   tabsHeader?: React.ReactNode;
@@ -30,8 +32,6 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
   const [company, setCompany] = useState<any>(null);
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
   const [projections, setProjections] = useState<any[]>([]);
-  // Key para forzar remount de inputs no-controlados tras guardar
-  const [tableKey, setTableKey] = useState(0);
 
   useEffect(() => {
     console.log('[EFFECT] companyId:', companyId, 'scenarioId:', scenarioId);
@@ -117,18 +117,8 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
     if (value === null || value === undefined || value === '') return '';
     const num = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(num)) return '';
-    return num.toLocaleString('es-ES', { maximumFractionDigits: 2 });
-  };
-
-  const parseFormattedNumber = (value: string): number => {
-    if (!value || value.trim() === '') return 0;
-    // Eliminar todo excepto números, punto, coma y signo negativo
-    const cleaned = value
-      .replace(/[^\d.,-]/g, '') // Mantener solo dígitos, punto, coma y signo
-      .replace(/\./g, '') // Eliminar puntos (separadores de miles)
-      .replace(',', '.'); // Convertir coma decimal a punto
-    const num = parseFloat(cleaned);
-    return isNaN(num) ? 0 : num;
+    // Montos sin decimales (solo visual; el valor interno conserva los decimales)
+    return Math.round(num).toLocaleString('es-ES', { maximumFractionDigits: 0 });
   };
 
   // Actualiza el estado local
@@ -146,7 +136,6 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
       await projectionsService.updateProjection(projectionId, { [field]: value });
       const refreshed = await projectionsService.getScenario(scenarioId!);
       setProjections(refreshed.projections || []);
-      setTableKey((k) => k + 1);
     } catch (error: any) {
       toast.error('Error al guardar');
     } finally {
@@ -283,18 +272,12 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                         const isBaseYear = index === 0;
                         return (
                           <td key={proj.id} className="px-2 py-2">
-                            <Input
-                              type="text"
-                              value={formatNumber(proj.totalAssets)}
-                              onChange={(e) => {
-                                const numValue = parseFormattedNumber(e.target.value);
-                                handleUpdateProjection(proj.id, 'totalAssets', numValue);
+                            <AmountInput
+                              value={proj.totalAssets !== null && proj.totalAssets !== undefined ? Number(proj.totalAssets) : null}
+                              onCommit={(v) => {
+                                handleUpdateProjection(proj.id, 'totalAssets', v ?? 0);
+                                autoSaveProjection(proj.id, 'totalAssets', v ?? 0);
                               }}
-                              onBlur={(e) => {
-                                const numValue = parseFormattedNumber(e.target.value);
-                                autoSaveProjection(proj.id, 'totalAssets', numValue);
-                              }}
-                              className="text-right text-sm"
                               title={isBaseYear ? 'Editable - Año base' : 'Editable - Se calcula tasa de crecimiento automáticamente'}
                             />
                           </td>
@@ -307,18 +290,12 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                         const isBaseYear = index === 0;
                         return (
                           <td key={proj.id} className="px-2 py-2">
-                            <Input
-                              type="text"
-                              value={formatNumber(proj.equity)}
-                              onChange={(e) => {
-                                const numValue = parseFormattedNumber(e.target.value);
-                                handleUpdateProjection(proj.id, 'equity', numValue);
+                            <AmountInput
+                              value={proj.equity !== null && proj.equity !== undefined ? Number(proj.equity) : null}
+                              onCommit={(v) => {
+                                handleUpdateProjection(proj.id, 'equity', v ?? 0);
+                                autoSaveProjection(proj.id, 'equity', v ?? 0);
                               }}
-                              onBlur={(e) => {
-                                const numValue = parseFormattedNumber(e.target.value);
-                                autoSaveProjection(proj.id, 'equity', numValue);
-                              }}
-                              className="text-right text-sm"
                               title={isBaseYear ? 'Editable - Año base' : 'Editable - Se calcula tasa de crecimiento automáticamente'}
                             />
                           </td>
@@ -331,18 +308,12 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                         const isBaseYear = index === 0;
                         return (
                           <td key={proj.id} className="px-2 py-2">
-                            <Input
-                              type="text"
-                              value={formatNumber(proj.totalLiabilities)}
-                              onChange={(e) => {
-                                const numValue = parseFormattedNumber(e.target.value);
-                                handleUpdateProjection(proj.id, 'totalLiabilities', numValue);
+                            <AmountInput
+                              value={proj.totalLiabilities !== null && proj.totalLiabilities !== undefined ? Number(proj.totalLiabilities) : null}
+                              onCommit={(v) => {
+                                handleUpdateProjection(proj.id, 'totalLiabilities', v ?? 0);
+                                autoSaveProjection(proj.id, 'totalLiabilities', v ?? 0);
                               }}
-                              onBlur={(e) => {
-                                const numValue = parseFormattedNumber(e.target.value);
-                                autoSaveProjection(proj.id, 'totalLiabilities', numValue);
-                              }}
-                              className="text-right text-sm"
                               title={isBaseYear ? 'Editable - Año base' : 'Editable - Se calcula tasa de crecimiento automáticamente'}
                             />
                           </td>
@@ -361,18 +332,12 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                         const isBaseYear = index === 0;
                         return (
                           <td key={proj.id} className="px-2 py-2">
-                            <Input
-                              type="text"
-                              value={formatNumber(proj.revenue)}
-                              onChange={(e) => {
-                                const numValue = parseFormattedNumber(e.target.value);
-                                handleUpdateProjection(proj.id, 'revenue', numValue);
+                            <AmountInput
+                              value={proj.revenue !== null && proj.revenue !== undefined ? Number(proj.revenue) : null}
+                              onCommit={(v) => {
+                                handleUpdateProjection(proj.id, 'revenue', v ?? 0);
+                                autoSaveProjection(proj.id, 'revenue', v ?? 0);
                               }}
-                              onBlur={(e) => {
-                                const numValue = parseFormattedNumber(e.target.value);
-                                autoSaveProjection(proj.id, 'revenue', numValue);
-                              }}
-                              className="text-right text-sm"
                               title={isBaseYear ? 'Editable' : 'Editable - Al cambiar se calcula la tasa de crecimiento'}
                             />
                           </td>
@@ -555,22 +520,12 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                       <td className="px-4 py-2 text-xs italic text-gray-600">Ingresos por VENTAS</td>
                       {projections.map((proj) => (
                         <td key={proj.id} className="px-2 py-2">
-                          <div className="relative">
-                            <Input
-                              key={`rev-${proj.id}-${tableKey}`}
-                              type="text"
-                              defaultValue={proj.revenueGrowthRate !== null ? (Number(proj.revenueGrowthRate) * 100).toFixed(2) : ''}
-                              onBlur={(e) => {
-                                const value = e.target.value.replace(/[^0-9.,-]/g, '');
-                                const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                autoSaveProjection(proj.id, 'revenueGrowthRate', numValue);
-                              }}
-                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                              className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
-                              placeholder="0.00"
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">%</span>
-                          </div>
+                          <PercentInput
+                            size="sm"
+                            allowEmpty
+                            value={proj.revenueGrowthRate !== null && proj.revenueGrowthRate !== undefined ? Number(proj.revenueGrowthRate) * 100 : null}
+                            onCommit={(v) => autoSaveProjection(proj.id, 'revenueGrowthRate', v === null ? null : v / 100)}
+                          />
                         </td>
                       ))}
                     </tr>
@@ -578,22 +533,12 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                       <td className="px-4 py-2 text-xs italic text-gray-600">Coste de las ventas</td>
                       {projections.map((proj) => (
                         <td key={proj.id} className="px-2 py-2">
-                          <div className="relative">
-                            <Input
-                              key={`cos-${proj.id}-${tableKey}`}
-                              type="text"
-                              defaultValue={proj.costOfSalesGrowthRate !== null ? (Number(proj.costOfSalesGrowthRate) * 100).toFixed(2) : ''}
-                              onBlur={(e) => {
-                                const value = e.target.value.replace(/[^0-9.,-]/g, '');
-                                const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                autoSaveProjection(proj.id, 'costOfSalesGrowthRate', numValue);
-                              }}
-                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                              className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
-                              placeholder="0.00"
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">%</span>
-                          </div>
+                          <PercentInput
+                            size="sm"
+                            allowEmpty
+                            value={proj.costOfSalesGrowthRate !== null && proj.costOfSalesGrowthRate !== undefined ? Number(proj.costOfSalesGrowthRate) * 100 : null}
+                            onCommit={(v) => autoSaveProjection(proj.id, 'costOfSalesGrowthRate', v === null ? null : v / 100)}
+                          />
                         </td>
                       ))}
                     </tr>
@@ -601,22 +546,12 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                       <td className="px-4 py-2 text-xs italic text-gray-600">Otros gastos explotación</td>
                       {projections.map((proj) => (
                         <td key={proj.id} className="px-2 py-2">
-                          <div className="relative">
-                            <Input
-                              key={`ope-${proj.id}-${tableKey}`}
-                              type="text"
-                              defaultValue={proj.otherOperatingExpensesGrowthRate !== null ? (Number(proj.otherOperatingExpensesGrowthRate) * 100).toFixed(2) : ''}
-                              onBlur={(e) => {
-                                const value = e.target.value.replace(/[^0-9.,-]/g, '');
-                                const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                autoSaveProjection(proj.id, 'otherOperatingExpensesGrowthRate', numValue);
-                              }}
-                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                              className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
-                              placeholder="0.00"
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">%</span>
-                          </div>
+                          <PercentInput
+                            size="sm"
+                            allowEmpty
+                            value={proj.otherOperatingExpensesGrowthRate !== null && proj.otherOperatingExpensesGrowthRate !== undefined ? Number(proj.otherOperatingExpensesGrowthRate) * 100 : null}
+                            onCommit={(v) => autoSaveProjection(proj.id, 'otherOperatingExpensesGrowthRate', v === null ? null : v / 100)}
+                          />
                         </td>
                       ))}
                     </tr>
@@ -624,22 +559,12 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                       <td className="px-4 py-2 text-xs italic text-gray-600">Depreciaciones - Amort</td>
                       {projections.map((proj) => (
                         <td key={proj.id} className="px-2 py-2">
-                          <div className="relative">
-                            <Input
-                              key={`dep-${proj.id}-${tableKey}`}
-                              type="text"
-                              defaultValue={proj.depreciationGrowthRate !== null ? (Number(proj.depreciationGrowthRate) * 100).toFixed(2) : ''}
-                              onBlur={(e) => {
-                                const value = e.target.value.replace(/[^0-9.,-]/g, '');
-                                const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                autoSaveProjection(proj.id, 'depreciationGrowthRate', numValue);
-                              }}
-                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                              className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
-                              placeholder="0.00"
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">%</span>
-                          </div>
+                          <PercentInput
+                            size="sm"
+                            allowEmpty
+                            value={proj.depreciationGrowthRate !== null && proj.depreciationGrowthRate !== undefined ? Number(proj.depreciationGrowthRate) * 100 : null}
+                            onCommit={(v) => autoSaveProjection(proj.id, 'depreciationGrowthRate', v === null ? null : v / 100)}
+                          />
                         </td>
                       ))}
                     </tr>
@@ -647,22 +572,12 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                       <td className="px-4 py-2 text-xs italic text-gray-600">Excepcionales Netos (+ -)</td>
                       {projections.map((proj) => (
                         <td key={proj.id} className="px-2 py-2">
-                          <div className="relative">
-                            <Input
-                              key={`exc-${proj.id}-${tableKey}`}
-                              type="text"
-                              defaultValue={proj.exceptionalNetGrowthRate !== null ? (Number(proj.exceptionalNetGrowthRate) * 100).toFixed(2) : ''}
-                              onBlur={(e) => {
-                                const value = e.target.value.replace(/[^0-9.,-]/g, '');
-                                const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                autoSaveProjection(proj.id, 'exceptionalNetGrowthRate', numValue);
-                              }}
-                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                              className="text-right text-xs bg-orange-50 border-orange-200 pr-6"
-                              placeholder="0.00"
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">%</span>
-                          </div>
+                          <PercentInput
+                            size="sm"
+                            allowEmpty
+                            value={proj.exceptionalNetGrowthRate !== null && proj.exceptionalNetGrowthRate !== undefined ? Number(proj.exceptionalNetGrowthRate) * 100 : null}
+                            onCommit={(v) => autoSaveProjection(proj.id, 'exceptionalNetGrowthRate', v === null ? null : v / 100)}
+                          />
                         </td>
                       ))}
                     </tr>
@@ -670,25 +585,14 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                       <td className="px-4 py-2 text-xs italic text-gray-600">Financieros Netos (+ -)</td>
                       {projections.map((proj, index) => (
                         <td key={proj.id} className="px-2 py-2">
-                          <div className="relative">
-                            <Input
-                              key={`fin-${proj.id}-${tableKey}`}
-                              type="text"
-                              defaultValue={proj.financialIncomeGrowthRate !== null ? (Number(proj.financialIncomeGrowthRate) * 100).toFixed(2) : ''}
-                              readOnly={index === 0}
-                              onBlur={(e) => {
-                                if (index === 0) return;
-                                const value = e.target.value.replace(/[^0-9.,-]/g, '');
-                                const numValue = value && value.trim() !== '' ? parseFloat(value.replace(',', '.')) / 100 : null;
-                                autoSaveProjection(proj.id, 'financialIncomeGrowthRate', numValue);
-                              }}
-                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                              className={`text-right text-xs border-orange-200 pr-6 ${index === 0 ? 'bg-gray-50 text-gray-500' : 'bg-orange-50'}`}
-                              placeholder={index === 0 ? '' : '0.00'}
-                              title={index === 0 ? 'Año base: cifra calculada automáticamente' : 'Tasa de variación anual de Financieros Netos (%)'}
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">%</span>
-                          </div>
+                          <PercentInput
+                            size="sm"
+                            allowEmpty
+                            value={proj.financialIncomeGrowthRate !== null && proj.financialIncomeGrowthRate !== undefined ? Number(proj.financialIncomeGrowthRate) * 100 : null}
+                            onCommit={(v) => autoSaveProjection(proj.id, 'financialIncomeGrowthRate', v === null ? null : v / 100)}
+                            disabled={index === 0}
+                            title={index === 0 ? 'Año base: cifra calculada automáticamente' : 'Tasa de variación anual de Financieros Netos (%)'}
+                          />
                         </td>
                       ))}
                     </tr>

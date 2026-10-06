@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { PercentInput } from '../../components/ui/PercentInput';
 import { Save, Building2, Plus, Trash2, Lock, Upload, Download, X } from 'lucide-react';
 import api from '../../services/api';
 import { companyService } from '../../services/company.service';
@@ -1207,8 +1208,8 @@ const AdditionalDataTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onR
     { label: 'Compras', field: 'purchases', indent: true },
 
     { section: 'IMPUESTOS (IVA)', isBold: true, bgClass: 'bg-yellow-100' },
-    { label: '% IVA promedio aplicado a las ventas', field: 'averageVatSales', indent: true },
-    { label: '% IVA promedio aplicado a las compras', field: 'averageVatPurchases', indent: true },
+    { label: '% IVA promedio aplicado a las ventas', field: 'averageVatSales', indent: true, isPercent: true },
+    { label: '% IVA promedio aplicado a las compras', field: 'averageVatPurchases', indent: true, isPercent: true },
 
     { section: 'FINANCIACIÓN', isBold: true, bgClass: 'bg-pink-100' },
     { label: 'Amortizaciones préstamos', field: 'loanAmortization', indent: true },
@@ -1252,10 +1253,24 @@ const AdditionalDataTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onR
             ) : (
               yearDataList.map((yearData) => (
                 <td key={yearData.year} className="px-4 py-2">
-                  <ExpressionInput
-                    value={yearData.additional[row.field as keyof CreateAdditionalDataData]}
-                    onChange={(val) => onUpdate(yearData.year, 'additional', row.field!, val)}
-                  />
+                  {row.isPercent ? (
+                    <PercentInput
+                      size="sm"
+                      allowEmpty
+                      value={(() => {
+                        const v = yearData.additional[row.field as keyof CreateAdditionalDataData];
+                        return v === undefined || v === null || v === '' ? null : Number(v);
+                      })()}
+                      onCommit={(v) =>
+                        onUpdate(yearData.year, 'additional', row.field!, v === null ? '' : String(v))
+                      }
+                    />
+                  ) : (
+                    <ExpressionInput
+                      value={yearData.additional[row.field as keyof CreateAdditionalDataData]}
+                      onChange={(val) => onUpdate(yearData.year, 'additional', row.field!, val)}
+                    />
+                  )}
                 </td>
               ))
             )}

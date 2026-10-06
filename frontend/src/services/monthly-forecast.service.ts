@@ -1,4 +1,5 @@
 import api from './api';
+import type { MonthlySuggestedRates } from './projections.service';
 
 // Leaf balance line items the user can manually override (excludes computed
 // totals/subtotals and the "imbalance" check row, which are always derived).
@@ -90,6 +91,10 @@ export interface MonthlyForecastResult {
   };
   annualBalance: AnnualBalanceBase;
   baseYear: number;
+  // Budget only: prior-year Forecast months each Budget month grows over
+  basePnL?: MonthlyPnLRow[];
+  // Recommended rates (avg growth of the last 3 annual years), decimal
+  suggestedRates: MonthlySuggestedRates;
 }
 
 export const monthlyForecastService = {
@@ -131,9 +136,12 @@ export interface AnnualPnLBase {
   financialIncome: number; financialExpenses: number; incomeTax: number;
 }
 
+// Budget passes `monthlyBase` (the prior-year Forecast months): each month then
+// grows over the SAME month of the Forecast — Month N = forecast[N] × (1 + rate[N]).
 export function calcPnLClient(
   cfg: MonthlyForecastConfig,
   base: AnnualPnLBase,
+  monthlyBase?: MonthlyPnLRow[],
 ): MonthlyPnLRow[] {
   const rows: MonthlyPnLRow[] = [];
   const { closedMonths } = cfg;
@@ -145,7 +153,17 @@ export function calcPnLClient(
     let exceptionalIncome: number, exceptionalExpenses: number;
     let financialIncome: number, financialExpenses: number, incomeTax: number;
 
-    if (isClosed) {
+    if (monthlyBase && !isClosed) {
+      const b = monthlyBase[m];
+      revenue            = b.revenue            * (1 + (cfg.rateRevenue[m]            ?? 0));
+      costOfSales        = b.costOfSales        * (1 + (cfg.rateCostOfSales[m]        ?? 0));
+      adminExpenses      = b.adminExpenses      * (1 + (cfg.rateAdminExpenses[m]      ?? 0));
+      exceptionalIncome  = b.exceptionalIncome  * (1 + (cfg.rateExceptionalIncome[m]  ?? 0));
+      exceptionalExpenses= b.exceptionalExpenses* (1 + (cfg.rateExceptionalExpenses[m]?? 0));
+      financialIncome    = b.financialIncome    * (1 + (cfg.rateFinancialIncome[m]    ?? 0));
+      financialExpenses  = b.financialExpenses  * (1 + (cfg.rateFinancialExpenses[m]  ?? 0));
+      incomeTax          = b.incomeTax          * (1 + (cfg.rateIncomeTax[m]          ?? 0));
+    } else if (isClosed) {
       revenue            = cfg.actualRevenue[m]            ?? 0;
       costOfSales        = cfg.actualCostOfSales[m]        ?? 0;
       adminExpenses      = cfg.actualAdminExpenses[m]      ?? 0;
@@ -342,8 +360,36 @@ export function buildDefaultConfig(): MonthlyForecastConfig {
   };
 }
 
-export function mergeConfig(stored: any | null): MonthlyForecastConfig {
+// Rate config key → concept key of the suggested (historical average) rates
+export const RATE_SUGGESTION_KEYS: Record<string, keyof MonthlySuggestedRates> = {
+  rateRevenue: 'revenue',
+  rateCostOfSales: 'costOfSales',
+  rateAdminExpenses: 'adminExpenses',
+  rateExceptionalIncome: 'exceptionalIncome',
+  rateExceptionalExpenses: 'exceptionalExpenses',
+  rateFinancialIncome: 'financialIncome',
+  rateFinancialExpenses: 'financialExpenses',
+  rateIncomeTax: 'incomeTax',
+};
+
+/**
+ * Merges the stored config with defaults. Any rate row that was never saved
+ * starts with the recommended (historical average) rate in all 12 months —
+ * same rule the backend applies in calculate(). Saved rates always win.
+ */
+export function mergeConfig(
+  stored: any | null,
+  suggested?: MonthlySuggestedRates,
+): MonthlyForecastConfig {
   const def = buildDefaultConfig();
+  if (suggested) {
+    for (const [rateKey, conceptKey] of Object.entries(RATE_SUGGESTION_KEYS)) {
+      const rate = suggested[conceptKey];
+      if (rate !== null && rate !== undefined) {
+        (def as any)[rateKey] = Array(12).fill(rate);
+      }
+    }
+  }
   if (!stored) return def;
   const arr = (v: any, fallback: number[]) =>
     Array.isArray(v) && v.length === 12 ? v : fallback;

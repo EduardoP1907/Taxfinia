@@ -18,6 +18,9 @@ router.post('/', projectionsController.createProjectionScenario);
 // Obtener todos los escenarios de una empresa
 router.get('/company/:companyId', projectionsController.getCompanyScenarios);
 
+// Tasas recomendadas: promedio de crecimiento de los últimos 3 años de "Datos anuales"
+router.get('/historical-rates/:companyId', projectionsController.getHistoricalRates);
+
 // Actualizar una proyección específica (debe estar antes de /:scenarioId)
 router.put('/projection/:projectionId', projectionsController.updateProjection);
 

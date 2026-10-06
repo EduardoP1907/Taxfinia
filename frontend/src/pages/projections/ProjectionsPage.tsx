@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { ArrowLeft, Save, TrendingUp, Settings, Calculator } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { AmountInput } from '../../components/ui/AmountInput';
+import { PercentInput } from '../../components/ui/PercentInput';
 import { Modal } from '../../components/ui/Modal';
 
 interface ProjectionsPageProps {
@@ -38,22 +40,6 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
     depreciationGrowthRate: 0,
     exceptionalNetGrowthRate: 0,
   });
-
-  // Funciones de formateo de números
-  const formatNumber = (value: number | string | null | undefined): string => {
-    if (value === null || value === undefined || value === '') return '';
-    const num = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(num)) return '';
-    return num.toLocaleString('es-ES', { maximumFractionDigits: 2 });
-  };
-
-  const parseFormattedNumber = (value: string): number => {
-    if (!value) return 0;
-    // Remover puntos de miles y reemplazar coma decimal por punto
-    const cleaned = value.replace(/\./g, '').replace(',', '.');
-    const num = parseFloat(cleaned);
-    return isNaN(num) ? 0 : num;
-  };
 
   useEffect(() => {
     if (companyId) {
@@ -310,14 +296,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="text"
-                        value={formatNumber(proj.revenue)}
-                        onChange={(e) => {
-                          const numValue = parseFormattedNumber(e.target.value);
-                          handleUpdateProjection(proj.id, 'revenue', numValue);
-                        }}
-                        className="text-right text-sm"
+                      <AmountInput
+                        value={proj.revenue}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'revenue', v ?? 0)}
                       />
                     </td>
                   ))}
@@ -328,17 +309,10 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={proj.revenueGrowthRate ? (Number(proj.revenueGrowthRate) * 100).toFixed(2) : ''}
-                        onChange={(e) => {
-                          const percentValue = parseFloat(e.target.value) || 0;
-                          const decimalValue = percentValue / 100;
-                          handleUpdateProjection(proj.id, 'revenueGrowthRate', decimalValue);
-                        }}
-                        placeholder="0.00"
-                        className="text-right text-sm"
+                      <PercentInput
+                        size="sm"
+                        value={proj.revenueGrowthRate !== null && proj.revenueGrowthRate !== undefined ? Number(proj.revenueGrowthRate) * 100 : null}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'revenueGrowthRate', (v ?? 0) / 100)}
                       />
                     </td>
                   ))}
@@ -351,14 +325,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="text"
-                        value={formatNumber(proj.costOfSales)}
-                        onChange={(e) => {
-                          const numValue = parseFormattedNumber(e.target.value);
-                          handleUpdateProjection(proj.id, 'costOfSales', numValue);
-                        }}
-                        className="text-right text-sm"
+                      <AmountInput
+                        value={proj.costOfSales}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'costOfSales', v ?? 0)}
                       />
                     </td>
                   ))}
@@ -369,17 +338,10 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={proj.costOfSalesGrowthRate ? (Number(proj.costOfSalesGrowthRate) * 100).toFixed(2) : ''}
-                        onChange={(e) => {
-                          const percentValue = parseFloat(e.target.value) || 0;
-                          const decimalValue = percentValue / 100;
-                          handleUpdateProjection(proj.id, 'costOfSalesGrowthRate', decimalValue);
-                        }}
-                        placeholder="0.00"
-                        className="text-right text-sm"
+                      <PercentInput
+                        size="sm"
+                        value={proj.costOfSalesGrowthRate !== null && proj.costOfSalesGrowthRate !== undefined ? Number(proj.costOfSalesGrowthRate) * 100 : null}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'costOfSalesGrowthRate', (v ?? 0) / 100)}
                       />
                     </td>
                   ))}
@@ -392,14 +354,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="text"
-                        value={formatNumber(proj.otherOperatingExpenses)}
-                        onChange={(e) => {
-                          const numValue = parseFormattedNumber(e.target.value);
-                          handleUpdateProjection(proj.id, 'otherOperatingExpenses', numValue);
-                        }}
-                        className="text-right text-sm"
+                      <AmountInput
+                        value={proj.otherOperatingExpenses}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'otherOperatingExpenses', v ?? 0)}
                       />
                     </td>
                   ))}
@@ -410,17 +367,10 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={proj.otherOperatingExpensesGrowthRate ? (Number(proj.otherOperatingExpensesGrowthRate) * 100).toFixed(2) : ''}
-                        onChange={(e) => {
-                          const percentValue = parseFloat(e.target.value) || 0;
-                          const decimalValue = percentValue / 100;
-                          handleUpdateProjection(proj.id, 'otherOperatingExpensesGrowthRate', decimalValue);
-                        }}
-                        placeholder="0.00"
-                        className="text-right text-sm"
+                      <PercentInput
+                        size="sm"
+                        value={proj.otherOperatingExpensesGrowthRate !== null && proj.otherOperatingExpensesGrowthRate !== undefined ? Number(proj.otherOperatingExpensesGrowthRate) * 100 : null}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'otherOperatingExpensesGrowthRate', (v ?? 0) / 100)}
                       />
                     </td>
                   ))}
@@ -433,14 +383,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="text"
-                        value={formatNumber(proj.depreciation)}
-                        onChange={(e) => {
-                          const numValue = parseFormattedNumber(e.target.value);
-                          handleUpdateProjection(proj.id, 'depreciation', numValue);
-                        }}
-                        className="text-right text-sm"
+                      <AmountInput
+                        value={proj.depreciation}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'depreciation', v ?? 0)}
                       />
                     </td>
                   ))}
@@ -451,17 +396,10 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={proj.depreciationGrowthRate ? (Number(proj.depreciationGrowthRate) * 100).toFixed(2) : ''}
-                        onChange={(e) => {
-                          const percentValue = parseFloat(e.target.value) || 0;
-                          const decimalValue = percentValue / 100;
-                          handleUpdateProjection(proj.id, 'depreciationGrowthRate', decimalValue);
-                        }}
-                        placeholder="0.00"
-                        className="text-right text-sm"
+                      <PercentInput
+                        size="sm"
+                        value={proj.depreciationGrowthRate !== null && proj.depreciationGrowthRate !== undefined ? Number(proj.depreciationGrowthRate) * 100 : null}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'depreciationGrowthRate', (v ?? 0) / 100)}
                       />
                     </td>
                   ))}
@@ -474,14 +412,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="text"
-                        value={formatNumber(proj.exceptionalNet)}
-                        onChange={(e) => {
-                          const numValue = parseFormattedNumber(e.target.value);
-                          handleUpdateProjection(proj.id, 'exceptionalNet', numValue);
-                        }}
-                        className="text-right text-sm"
+                      <AmountInput
+                        value={proj.exceptionalNet}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'exceptionalNet', v ?? 0)}
                       />
                     </td>
                   ))}
@@ -492,17 +425,10 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={proj.exceptionalNetGrowthRate ? (Number(proj.exceptionalNetGrowthRate) * 100).toFixed(2) : ''}
-                        onChange={(e) => {
-                          const percentValue = parseFloat(e.target.value) || 0;
-                          const decimalValue = percentValue / 100;
-                          handleUpdateProjection(proj.id, 'exceptionalNetGrowthRate', decimalValue);
-                        }}
-                        placeholder="0.00"
-                        className="text-right text-sm"
+                      <PercentInput
+                        size="sm"
+                        value={proj.exceptionalNetGrowthRate !== null && proj.exceptionalNetGrowthRate !== undefined ? Number(proj.exceptionalNetGrowthRate) * 100 : null}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'exceptionalNetGrowthRate', (v ?? 0) / 100)}
                       />
                     </td>
                   ))}
@@ -555,14 +481,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="text"
-                        value={formatNumber(proj.workingCapitalInvestment)}
-                        onChange={(e) => {
-                          const numValue = parseFormattedNumber(e.target.value);
-                          handleUpdateProjection(proj.id, 'workingCapitalInvestment', numValue);
-                        }}
-                        className="text-right text-sm"
+                      <AmountInput
+                        value={proj.workingCapitalInvestment}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'workingCapitalInvestment', v ?? 0)}
                       />
                     </td>
                   ))}
@@ -574,14 +495,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
                   </td>
                   {projections.map((proj) => (
                     <td key={proj.id} className="px-2 py-2">
-                      <Input
-                        type="text"
-                        value={formatNumber(proj.fixedAssetsInvestment)}
-                        onChange={(e) => {
-                          const numValue = parseFormattedNumber(e.target.value);
-                          handleUpdateProjection(proj.id, 'fixedAssetsInvestment', numValue);
-                        }}
-                        className="text-right text-sm"
+                      <AmountInput
+                        value={proj.fixedAssetsInvestment}
+                        onCommit={(v) => handleUpdateProjection(proj.id, 'fixedAssetsInvestment', v ?? 0)}
                       />
                     </td>
                   ))}
@@ -624,13 +540,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Tasa de crecimiento de Ingresos (%)
             </label>
-            <Input
-              type="number"
-              step="0.1"
+            <PercentInput
               value={growthRates.revenueGrowthRate}
-              onChange={(e) =>
-                setGrowthRates({ ...growthRates, revenueGrowthRate: parseFloat(e.target.value) || 0 })
-              }
+              onCommit={(v) => setGrowthRates((prev) => ({ ...prev, revenueGrowthRate: v ?? 0 }))}
             />
           </div>
 
@@ -638,13 +550,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Tasa de crecimiento de Coste de Ventas (%)
             </label>
-            <Input
-              type="number"
-              step="0.1"
+            <PercentInput
               value={growthRates.costOfSalesGrowthRate}
-              onChange={(e) =>
-                setGrowthRates({ ...growthRates, costOfSalesGrowthRate: parseFloat(e.target.value) || 0 })
-              }
+              onCommit={(v) => setGrowthRates((prev) => ({ ...prev, costOfSalesGrowthRate: v ?? 0 }))}
             />
           </div>
 
@@ -652,16 +560,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Tasa de crecimiento de Gastos Explotación (%)
             </label>
-            <Input
-              type="number"
-              step="0.1"
+            <PercentInput
               value={growthRates.otherOperatingExpensesGrowthRate}
-              onChange={(e) =>
-                setGrowthRates({
-                  ...growthRates,
-                  otherOperatingExpensesGrowthRate: parseFloat(e.target.value) || 0,
-                })
-              }
+              onCommit={(v) => setGrowthRates((prev) => ({ ...prev, otherOperatingExpensesGrowthRate: v ?? 0 }))}
             />
           </div>
 
@@ -669,13 +570,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Tasa de crecimiento de Depreciaciones (%)
             </label>
-            <Input
-              type="number"
-              step="0.1"
+            <PercentInput
               value={growthRates.depreciationGrowthRate}
-              onChange={(e) =>
-                setGrowthRates({ ...growthRates, depreciationGrowthRate: parseFloat(e.target.value) || 0 })
-              }
+              onCommit={(v) => setGrowthRates((prev) => ({ ...prev, depreciationGrowthRate: v ?? 0 }))}
             />
           </div>
 
@@ -683,13 +580,9 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Tasa de crecimiento de Excepcionales (%)
             </label>
-            <Input
-              type="number"
-              step="0.1"
+            <PercentInput
               value={growthRates.exceptionalNetGrowthRate}
-              onChange={(e) =>
-                setGrowthRates({ ...growthRates, exceptionalNetGrowthRate: parseFloat(e.target.value) || 0 })
-              }
+              onCommit={(v) => setGrowthRates((prev) => ({ ...prev, exceptionalNetGrowthRate: v ?? 0 }))}
             />
           </div>
 

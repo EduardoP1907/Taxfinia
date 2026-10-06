@@ -141,6 +141,37 @@ export interface DCFResults {
   }>;
 }
 
+// Tasas en decimal (0.05 = 5%); null = sin datos históricos suficientes
+export interface AnnualSuggestedRates {
+  revenueGrowthRate: number | null;
+  costOfSalesGrowthRate: number | null;
+  otherOperatingExpensesGrowthRate: number | null;
+  depreciationGrowthRate: number | null;
+  exceptionalNetGrowthRate: number | null;
+  financialNetGrowthRate: number | null;
+  totalAssetsGrowthRate: number | null;
+  equityGrowthRate: number | null;
+  totalLiabilitiesGrowthRate: number | null;
+  taxRate: number | null;
+}
+
+export interface MonthlySuggestedRates {
+  revenue: number | null;
+  costOfSales: number | null;
+  adminExpenses: number | null;
+  exceptionalIncome: number | null;
+  exceptionalExpenses: number | null;
+  financialIncome: number | null;
+  financialExpenses: number | null;
+  incomeTax: number | null;
+}
+
+export interface HistoricalRates {
+  yearsUsed: number[];
+  annual: AnnualSuggestedRates;
+  monthly: MonthlySuggestedRates;
+}
+
 export const projectionsService = {
   /**
    * Crear nuevo escenario de proyección
@@ -160,6 +191,16 @@ export const projectionsService = {
    */
   async getCompanyScenarios(companyId: string): Promise<ProjectionScenarioWithData[]> {
     const response = await api.get(`/projections/company/${companyId}`);
+    return response.data;
+  },
+
+  /**
+   * Tasas recomendadas: promedio de crecimiento de los últimos 3 años de "Datos anuales"
+   */
+  async getHistoricalRates(companyId: string, upToYear?: number): Promise<HistoricalRates> {
+    const response = await api.get(`/projections/historical-rates/${companyId}`, {
+      params: upToYear !== undefined ? { upToYear } : undefined,
+    });
     return response.data;
   },
 
