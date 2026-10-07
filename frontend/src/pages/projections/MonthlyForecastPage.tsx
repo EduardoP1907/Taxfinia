@@ -793,6 +793,9 @@ const MonthlyForecastContent: React.FC<{
                           >
                             <td className="px-3 py-1.5 sticky left-0 bg-white z-10 text-slate-700">
                               {concept.label}
+                              {concept.resultKey === 'incomeTax' && (
+                                <span className="block text-[10px] text-slate-400">% s/ Resultado antes de impuestos</span>
+                              )}
                             </td>
 
                             {rateArr.map((rate, i) => {
@@ -835,7 +838,10 @@ const MonthlyForecastContent: React.FC<{
                     Los meses proyectados aplican: <code className="bg-slate-100 px-1 rounded">Mes N = Mes (N−1) × (1 + tasa)</code>.{' '}
                     Enero no tiene mes anterior del cual crecer, así que parte del promedio anual (Total base ÷ 12) y aplica su propia tasa de crecimiento sobre ese promedio.{' '}
                   </>
-                )}              </p>
+                )}
+                Impuestos no crece: en cada mes proyectado es{' '}
+                <code className="bg-slate-100 px-1 rounded">Resultado antes de impuestos del mes × tasa</code>.
+              </p>
             </div>
           </div>
         )}

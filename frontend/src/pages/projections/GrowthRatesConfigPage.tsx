@@ -33,13 +33,19 @@ const DEFAULT_TAX_RATE = 0.27;
 const toPct = (rate: number | string | null | undefined): number =>
   rate === null || rate === undefined || rate === '' ? 0 : Number(rate) * 100;
 
+// Tasas por defecto de la Cuenta de P&G (en %). El promedio de los últimos
+// 3 años se sigue mostrando al lado de cada campo como referencia.
+const DEFAULT_PL_RATES = {
+  revenueGrowthRate: 4.5,
+  costOfSalesGrowthRate: 4,
+  otherOperatingExpensesGrowthRate: 2,
+  depreciationGrowthRate: 2,
+  exceptionalNetGrowthRate: 2,
+  financialNetGrowthRate: 2,
+} as const;
+
 const ratesFromSuggestions = (s: AnnualSuggestedRates | null): UniformRates => ({
-  revenueGrowthRate: toPct(s?.revenueGrowthRate),
-  costOfSalesGrowthRate: toPct(s?.costOfSalesGrowthRate),
-  otherOperatingExpensesGrowthRate: toPct(s?.otherOperatingExpensesGrowthRate),
-  depreciationGrowthRate: toPct(s?.depreciationGrowthRate),
-  exceptionalNetGrowthRate: toPct(s?.exceptionalNetGrowthRate),
-  financialNetGrowthRate: toPct(s?.financialNetGrowthRate),
+  ...DEFAULT_PL_RATES,
   totalAssetsGrowthRate: toPct(s?.totalAssetsGrowthRate),
   equityGrowthRate: toPct(s?.equityGrowthRate),
   totalLiabilitiesGrowthRate: toPct(s?.totalLiabilitiesGrowthRate),
@@ -188,7 +194,7 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
     { key: 'revenueGrowthRate', label: 'Crecimiento Ventas', color: 'text-green-700', section: 'P&G' },
     { key: 'costOfSalesGrowthRate', label: 'Crecimiento Coste de Ventas', color: 'text-green-700', section: 'P&G' },
     { key: 'otherOperatingExpensesGrowthRate', label: 'Crecimiento Otros Gastos Operativos', color: 'text-green-700', section: 'P&G' },
-    { key: 'depreciationGrowthRate', label: 'Crecimiento Depreciaciones', color: 'text-green-700', section: 'P&G' },
+    { key: 'depreciationGrowthRate', label: 'Crecimiento Gastos de Administración', color: 'text-green-700', section: 'P&G' },
     { key: 'exceptionalNetGrowthRate', label: 'Crecimiento Excepcionales Netos (+ -)', color: 'text-green-700', section: 'P&G' },
     { key: 'financialNetGrowthRate', label: 'Crecimiento Financieros Netos (+ -)', color: 'text-green-700', section: 'P&G' },
     { key: 'totalAssetsGrowthRate', label: 'Crecimiento Total Activos', color: 'text-blue-700', section: 'Balance' },
@@ -269,11 +275,13 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
                   Para tasas diferentes por año, edite directamente en la Hoja 4.2.
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Valores sugeridos: promedio del crecimiento de los últimos 3 años de Datos anuales
+                  Valores por defecto: P&amp;G con tasas fijas (Ventas 4,5%, Coste de ventas 4%, resto 2%); Balance con el
+                  promedio del crecimiento de los últimos 3 años de Datos anuales
                   {historical && historical.yearsUsed.length > 1
                     ? ` (${historical.yearsUsed[0]}–${historical.yearsUsed[historical.yearsUsed.length - 1]})`
                     : ''}
-                  ; la tasa impositiva es el promedio de Impuestos / Resultado antes de impuestos. Todos son editables.
+                  ; la tasa impositiva es el promedio de Impuestos / Resultado antes de impuestos. Junto a cada campo se
+                  muestra el promedio de 3 años como referencia. Todos son editables.
                 </p>
               </div>
 
@@ -301,7 +309,7 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
                               />
                               <span
                                 className="w-32 shrink-0 text-xs text-gray-500 leading-tight"
-                                title="Valor sugerido: promedio de los últimos 3 años de Datos anuales"
+                                title="Referencia: promedio de los últimos 3 años de Datos anuales"
                               >
                                 Prom. 3 años:{' '}
                                 <span className="font-mono text-gray-700">

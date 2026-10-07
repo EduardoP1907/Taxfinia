@@ -93,7 +93,7 @@ export interface MonthlyForecastResult {
   baseYear: number;
   // Budget only: prior-year Forecast months each Budget month grows over
   basePnL?: MonthlyPnLRow[];
-  // Recommended rates (avg growth of the last 3 annual years), decimal
+  // Default rates (decimal); incomeTax is a % of EBT, not a growth rate
   suggestedRates: MonthlySuggestedRates;
 }
 
@@ -151,7 +151,8 @@ export function calcPnLClient(
 
     let revenue: number, costOfSales: number, adminExpenses: number;
     let exceptionalIncome: number, exceptionalExpenses: number;
-    let financialIncome: number, financialExpenses: number, incomeTax: number;
+    let financialIncome: number, financialExpenses: number;
+    let incomeTax: number | null = null;
 
     if (monthlyBase && !isClosed) {
       const b = monthlyBase[m];
@@ -162,7 +163,6 @@ export function calcPnLClient(
       exceptionalExpenses= b.exceptionalExpenses* (1 + (cfg.rateExceptionalExpenses[m]?? 0));
       financialIncome    = b.financialIncome    * (1 + (cfg.rateFinancialIncome[m]    ?? 0));
       financialExpenses  = b.financialExpenses  * (1 + (cfg.rateFinancialExpenses[m]  ?? 0));
-      incomeTax          = b.incomeTax          * (1 + (cfg.rateIncomeTax[m]          ?? 0));
     } else if (isClosed) {
       revenue            = cfg.actualRevenue[m]            ?? 0;
       costOfSales        = cfg.actualCostOfSales[m]        ?? 0;
@@ -183,7 +183,6 @@ export function calcPnLClient(
       exceptionalExpenses= (base.exceptionalExpenses/ 12) * jf(cfg.rateExceptionalExpenses);
       financialIncome    = (base.financialIncome    / 12) * jf(cfg.rateFinancialIncome);
       financialExpenses  = (base.financialExpenses  / 12) * jf(cfg.rateFinancialExpenses);
-      incomeTax          = (base.incomeTax          / 12) * jf(cfg.rateIncomeTax);
     } else {
       const prev = rows[m - 1];
       revenue            = prev.revenue            * (1 + (cfg.rateRevenue[m]            ?? 0));
@@ -193,7 +192,6 @@ export function calcPnLClient(
       exceptionalExpenses= prev.exceptionalExpenses* (1 + (cfg.rateExceptionalExpenses[m]?? 0));
       financialIncome    = prev.financialIncome    * (1 + (cfg.rateFinancialIncome[m]    ?? 0));
       financialExpenses  = prev.financialExpenses  * (1 + (cfg.rateFinancialExpenses[m]  ?? 0));
-      incomeTax          = prev.incomeTax          * (1 + (cfg.rateIncomeTax[m]          ?? 0));
     }
 
     const grossMargin       = revenue - costOfSales;
@@ -201,6 +199,8 @@ export function calcPnLClient(
     const exceptionalResult = exceptionalIncome - exceptionalExpenses;
     const financialResult   = financialIncome - financialExpenses;
     const ebt               = operatingResult + exceptionalResult + financialResult;
+    // Meses proyectados: impuesto = Resultado antes de impuestos del mes × tasa
+    if (incomeTax === null) incomeTax = ebt * (cfg.rateIncomeTax[m] ?? 0);
     const netIncome         = ebt - incomeTax;
 
     rows.push({
@@ -360,7 +360,7 @@ export function buildDefaultConfig(): MonthlyForecastConfig {
   };
 }
 
-// Rate config key → concept key of the suggested (historical average) rates
+// Rate config key → concept key of the suggested (default) rates
 export const RATE_SUGGESTION_KEYS: Record<string, keyof MonthlySuggestedRates> = {
   rateRevenue: 'revenue',
   rateCostOfSales: 'costOfSales',
@@ -374,7 +374,7 @@ export const RATE_SUGGESTION_KEYS: Record<string, keyof MonthlySuggestedRates> =
 
 /**
  * Merges the stored config with defaults. Any rate row that was never saved
- * starts with the recommended (historical average) rate in all 12 months —
+ * starts with the default rate in all 12 months —
  * same rule the backend applies in calculate(). Saved rates always win.
  */
 export function mergeConfig(

@@ -1,14 +1,16 @@
 /**
- * Reaplica las tasas recomendadas (promedio de crecimiento de los últimos 3
- * años de "Datos anuales") a TODAS las empresas activas:
- *   - Hoja 4.0: todos los escenarios de proyección (recalcula 4.1/4.2/4.3)
- *   - Forecast y Budget: las 8 filas de tasas mensuales guardadas
+ * Reaplica las tasas por defecto a TODAS las empresas activas:
+ *   - Hoja 4.0: todos los escenarios de proyección (recalcula 4.1/4.2/4.3).
+ *     P&G con las tasas fijas por defecto; Balance y tasa impositiva con el
+ *     promedio de los últimos 3 años de "Datos anuales" (igual que la Hoja 4.0).
+ *   - Forecast y Budget: las 8 filas de tasas mensuales guardadas, con las
+ *     tasas fijas por defecto (Impuestos = % sobre el Resultado antes de impuestos).
  * Sobrescribe las tasas existentes; antes guarda un respaldo JSON.
  *
  * Uso (desde backend/):
- *   node dist/scripts/apply-historical-rates.js            → simulación, no escribe
- *   node dist/scripts/apply-historical-rates.js --apply    → respalda y aplica
- * En desarrollo: npx ts-node --transpile-only src/scripts/apply-historical-rates.ts [--apply]
+ *   node dist/scripts/apply-default-rates.js            → simulación, no escribe
+ *   node dist/scripts/apply-default-rates.js --apply    → respalda y aplica
+ * En desarrollo: npx ts-node --transpile-only src/scripts/apply-default-rates.ts [--apply]
  */
 
 import fs from 'fs';
@@ -16,10 +18,21 @@ import path from 'path';
 import prisma from '../config/database';
 import { ProjectionsService } from '../services/projections.service';
 import { getHistoricalRates, type MonthlySuggestedRates } from '../services/historical-rates.service';
+import { DEFAULT_MONTHLY_RATES } from '../services/monthly-forecast.service';
 
 const APPLY = process.argv.includes('--apply');
 // Misma tasa por defecto que la Hoja 4.0 cuando no hay años con EBT positivo
 const DEFAULT_TAX_RATE = 0.27;
+
+// Tasas por defecto de la Cuenta de P&G de la Hoja 4.0 (mismas que GrowthRatesConfigPage)
+const DEFAULT_PL_RATES = {
+  revenueGrowthRate: 0.045,
+  costOfSalesGrowthRate: 0.04,
+  otherOperatingExpensesGrowthRate: 0.02,
+  depreciationGrowthRate: 0.02,
+  exceptionalNetGrowthRate: 0.02,
+  financialIncomeGrowthRate: 0.02,
+};
 
 const MONTHLY_RATE_FIELDS: Record<string, keyof MonthlySuggestedRates> = {
   rateRevenue: 'revenue',
@@ -36,7 +49,6 @@ const pct = (r: number | null) => (r === null ? 'sin datos' : `${(r * 100).toFix
 
 async function main() {
   const projectionsService = new ProjectionsService();
-  const currentYear = new Date().getFullYear();
 
   const companies = await prisma.company.findMany({
     where: { deletedAt: null },
@@ -67,6 +79,12 @@ async function main() {
     console.log(`Respaldo: ${file}\n`);
   }
 
+  // Las 8 filas de Forecast/Budget llevan la misma tasa en los 12 meses
+  const monthlyData: Record<string, number[]> = {};
+  for (const [field, concept] of Object.entries(MONTHLY_RATE_FIELDS)) {
+    monthlyData[field] = Array(12).fill(DEFAULT_MONTHLY_RATES[concept] ?? 0);
+  }
+
   let scenariosDone = 0;
   let forecastsDone = 0;
   const failures: string[] = [];
@@ -86,20 +104,15 @@ async function main() {
           .filter((p) => p.year > scenario.baseYear)
           .map((p) => ({
             year: p.year,
-            revenueGrowthRate: a.revenueGrowthRate ?? 0,
-            costOfSalesGrowthRate: a.costOfSalesGrowthRate ?? 0,
-            otherOperatingExpensesGrowthRate: a.otherOperatingExpensesGrowthRate ?? 0,
-            depreciationGrowthRate: a.depreciationGrowthRate ?? 0,
-            exceptionalNetGrowthRate: a.exceptionalNetGrowthRate ?? 0,
-            financialIncomeGrowthRate: a.financialNetGrowthRate ?? 0,
+            ...DEFAULT_PL_RATES,
             financialExpensesGrowthRate: 0,
             totalAssetsGrowthRate: a.totalAssetsGrowthRate ?? 0,
             equityGrowthRate: a.equityGrowthRate ?? 0,
             totalLiabilitiesGrowthRate: a.totalLiabilitiesGrowthRate ?? 0,
             incomeTaxRate: a.taxRate ?? DEFAULT_TAX_RATE,
           }));
-        console.log(`   4.0 escenario base ${scenario.baseYear} (${growthRatesByYear.length} años, datos ${hist.yearsUsed.join('-') || 'ninguno'}): ` +
-          `ventas ${pct(a.revenueGrowthRate)}, coste ${pct(a.costOfSalesGrowthRate)}, impuesto ${pct(a.taxRate ?? DEFAULT_TAX_RATE)}`);
+        console.log(`   4.0 escenario base ${scenario.baseYear} (${growthRatesByYear.length} años): P&G por defecto, ` +
+          `activos ${pct(a.totalAssetsGrowthRate)}, impuesto ${pct(a.taxRate ?? DEFAULT_TAX_RATE)}`);
         if (APPLY && growthRatesByYear.length > 0) {
           await projectionsService.applyGrowthRatesToScenario(scenario.id, growthRatesByYear);
         }
@@ -112,17 +125,9 @@ async function main() {
     // ── Forecast / Budget mensual ──
     for (const record of companyForecasts) {
       try {
-        // Budget = año siguiente al actual; se basa en los mismos años que su Forecast
-        const isBudget = record.year > currentYear;
-        const hist = await getHistoricalRates(company.id, isBudget ? record.year - 1 : record.year);
-        const data: Record<string, number[]> = {};
-        for (const [field, concept] of Object.entries(MONTHLY_RATE_FIELDS)) {
-          data[field] = Array(12).fill(hist.monthly[concept] ?? 0);
-        }
-        console.log(`   ${isBudget ? 'Budget' : 'Forecast'} ${record.year}: ventas ${pct(hist.monthly.revenue)}, ` +
-          `coste ${pct(hist.monthly.costOfSales)}, gastos adm. ${pct(hist.monthly.adminExpenses)}`);
+        console.log(`   Forecast/Budget ${record.year}: tasas por defecto`);
         if (APPLY) {
-          await prisma.monthlyForecast.update({ where: { id: record.id }, data });
+          await prisma.monthlyForecast.update({ where: { id: record.id }, data: monthlyData });
         }
         forecastsDone++;
       } catch (err: any) {

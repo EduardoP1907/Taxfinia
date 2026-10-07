@@ -543,7 +543,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                       ))}
                     </tr>
                     <tr className="bg-orange-50">
-                      <td className="px-4 py-2 text-xs italic text-gray-600">Otros gastos explotación</td>
+                      <td className="px-4 py-2 text-xs italic text-gray-600">Otros gastos operativos</td>
                       {projections.map((proj) => (
                         <td key={proj.id} className="px-2 py-2">
                           <PercentInput
@@ -556,7 +556,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
                       ))}
                     </tr>
                     <tr className="bg-orange-50">
-                      <td className="px-4 py-2 text-xs italic text-gray-600">Depreciaciones - Amort</td>
+                      <td className="px-4 py-2 text-xs italic text-gray-600">Gastos de administración</td>
                       {projections.map((proj) => (
                         <td key={proj.id} className="px-2 py-2">
                           <PercentInput

@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { getHistoricalRates, type MonthlySuggestedRates } from './historical-rates.service';
+import type { MonthlySuggestedRates } from './historical-rates.service';
 
 const prisma = new PrismaClient();
 
@@ -108,6 +108,20 @@ export type BalanceOverrideKey = typeof BALANCE_OVERRIDE_KEYS[number];
 // { [fieldKey]: (number|null)[12] } — null means "use the calculated value".
 export type BalanceOverrides = Partial<Record<BalanceOverrideKey, (number | null)[]>>;
 
+// Tasas por defecto de Forecast y Budget (decimal), usadas en cada mes de las
+// filas cuyas tasas nunca se guardaron. incomeTax NO es una tasa de crecimiento:
+// es el % que se aplica sobre el Resultado antes de impuestos del mismo mes.
+export const DEFAULT_MONTHLY_RATES: MonthlySuggestedRates = {
+  revenue: 0.045,
+  costOfSales: 0.04,
+  adminExpenses: 0.02,
+  exceptionalIncome: 0.02,
+  exceptionalExpenses: 0.02,
+  financialIncome: 0.02,
+  financialExpenses: 0.02,
+  incomeTax: 0.25,
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toNum(v: any): number {
@@ -182,6 +196,7 @@ function buildAnnualBalance(bs: any): AnnualBalance {
 // Budget — when `monthlyBase` (the prior-year Forecast months) is given, every
 // month grows over the SAME month of the Forecast:
 //   Month N = forecast[N] * (1 + rate[N])
+// Impuestos (meses proyectados, en ambos modos) = EBT del mismo mes × tasa[N]
 
 function calcMonthlyPnL(
   base: AnnualPnL,
@@ -196,7 +211,8 @@ function calcMonthlyPnL(
     const isClosed = m < closedMonths;
     let revenue: number, costOfSales: number, adminExpenses: number;
     let exceptionalIncome: number, exceptionalExpenses: number;
-    let financialIncome: number, financialExpenses: number, incomeTax: number;
+    let financialIncome: number, financialExpenses: number;
+    let incomeTax: number | null = null;
 
     if (monthlyBase && !isClosed) {
       const b = monthlyBase[m];
@@ -207,7 +223,6 @@ function calcMonthlyPnL(
       exceptionalExpenses = b.exceptionalExpenses * (1 + rates.exceptionalExpenses[m]);
       financialIncome = b.financialIncome * (1 + rates.financialIncome[m]);
       financialExpenses = b.financialExpenses * (1 + rates.financialExpenses[m]);
-      incomeTax = b.incomeTax * (1 + rates.incomeTax[m]);
     } else if (isClosed) {
       revenue = actual.revenue[m];
       costOfSales = actual.costOfSales[m];
@@ -228,7 +243,6 @@ function calcMonthlyPnL(
       exceptionalExpenses = (base.exceptionalExpenses / 12) * jf(rates.exceptionalExpenses);
       financialIncome = (base.financialIncome / 12) * jf(rates.financialIncome);
       financialExpenses = (base.financialExpenses / 12) * jf(rates.financialExpenses);
-      incomeTax = (base.incomeTax / 12) * jf(rates.incomeTax);
     } else {
       const prev = rows[m - 1];
       revenue = prev.revenue * (1 + rates.revenue[m]);
@@ -238,7 +252,6 @@ function calcMonthlyPnL(
       exceptionalExpenses = prev.exceptionalExpenses * (1 + rates.exceptionalExpenses[m]);
       financialIncome = prev.financialIncome * (1 + rates.financialIncome[m]);
       financialExpenses = prev.financialExpenses * (1 + rates.financialExpenses[m]);
-      incomeTax = prev.incomeTax * (1 + rates.incomeTax[m]);
     }
 
     const grossMargin = revenue - costOfSales;
@@ -246,6 +259,9 @@ function calcMonthlyPnL(
     const exceptionalResult = exceptionalIncome - exceptionalExpenses;
     const financialResult = financialIncome - financialExpenses;
     const ebt = operatingResult + exceptionalResult + financialResult;
+    // Meses proyectados: el impuesto es la tasa de la fila de Impuestos aplicada
+    // directamente sobre el Resultado antes de impuestos del mismo mes.
+    if (incomeTax === null) incomeTax = ebt * rates.incomeTax[m];
     const netIncome = ebt - incomeTax;
 
     rows.push({
@@ -413,8 +429,6 @@ export const monthlyForecastService = {
     let annualBalance: AnnualBalance;
     let baseYear: number;
     let basePnL: MonthlyPnLRow[] | undefined;
-    // Last annual ("Datos anuales") year the recommended rates are averaged up to
-    let historicalUpToYear: number;
 
     if (mode === 'budget') {
       // Budget bases itself on this company's own Forecast for the prior year
@@ -471,7 +485,6 @@ export const monthlyForecastService = {
       };
       baseYear = forecastYear;
       basePnL = forecastResult.pnl;
-      historicalUpToYear = forecastResult.baseYear;
     } else {
       // Load base annual data: most recent year BEFORE the forecast year that has
       // both statements (a 2026 forecast is based on 2025, never on an annual
@@ -499,7 +512,6 @@ export const monthlyForecastService = {
       annualPnL = buildAnnualPnL(fiscalYear.incomeStatement);
       annualBalance = buildAnnualBalance(fiscalYear.balanceSheet);
       baseYear = fiscalYear.year;
-      historicalUpToYear = fiscalYear.year;
     }
 
     // Load stored forecast/budget config for the requested year
@@ -522,10 +534,9 @@ export const monthlyForecastService = {
       incomeTax: jsonToArray(stored?.actualIncomeTax),
     };
 
-    // Recommended rates: average growth of the last 3 annual years. Used for
-    // every month of any concept whose rates were never saved; saved rates
-    // (even 0%) always win.
-    const suggestedRates = (await getHistoricalRates(companyId, historicalUpToYear)).monthly;
+    // Default rates for every month of any concept whose rates were never
+    // saved; saved rates (even 0%) always win.
+    const suggestedRates = DEFAULT_MONTHLY_RATES;
     const rateArray = (json: any, suggested: number | null) =>
       Array.isArray(json) ? jsonToArray(json, 0) : Array(12).fill(suggested ?? 0);
 
