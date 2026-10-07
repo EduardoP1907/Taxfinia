@@ -1,8 +1,7 @@
 /**
  * Reaplica las tasas por defecto a TODAS las empresas activas:
- *   - Hoja 4.0: todos los escenarios de proyección (recalcula 4.1/4.2/4.3).
- *     P&G con las tasas fijas por defecto; Balance y tasa impositiva con el
- *     promedio de los últimos 3 años de "Datos anuales" (igual que la Hoja 4.0).
+ *   - Hoja 4.0: todos los escenarios de proyección (recalcula 4.1/4.2/4.3),
+ *     con las tasas por defecto de la pantalla (Balance 5%, impuesto 27,74%).
  *   - Forecast y Budget: las 8 filas de tasas mensuales guardadas, con las
  *     tasas fijas por defecto (Impuestos = % sobre el Resultado antes de impuestos).
  * Sobrescribe las tasas existentes; antes guarda un respaldo JSON.
@@ -17,21 +16,23 @@ import fs from 'fs';
 import path from 'path';
 import prisma from '../config/database';
 import { ProjectionsService } from '../services/projections.service';
-import { getHistoricalRates, type MonthlySuggestedRates } from '../services/historical-rates.service';
+import type { MonthlySuggestedRates } from '../services/historical-rates.service';
 import { DEFAULT_MONTHLY_RATES } from '../services/monthly-forecast.service';
 
 const APPLY = process.argv.includes('--apply');
-// Misma tasa por defecto que la Hoja 4.0 cuando no hay años con EBT positivo
-const DEFAULT_TAX_RATE = 0.27;
-
-// Tasas por defecto de la Cuenta de P&G de la Hoja 4.0 (mismas que GrowthRatesConfigPage)
-const DEFAULT_PL_RATES = {
+// Tasas por defecto de la Hoja 4.0 (mismas que GrowthRatesConfigPage)
+const DEFAULT_SCENARIO_RATES = {
   revenueGrowthRate: 0.045,
   costOfSalesGrowthRate: 0.04,
   otherOperatingExpensesGrowthRate: 0.02,
   depreciationGrowthRate: 0.02,
   exceptionalNetGrowthRate: 0.02,
   financialIncomeGrowthRate: 0.02,
+  financialExpensesGrowthRate: 0,
+  totalAssetsGrowthRate: 0.05,
+  equityGrowthRate: 0.05,
+  totalLiabilitiesGrowthRate: 0.05,
+  incomeTaxRate: 0.2774,
 };
 
 const MONTHLY_RATE_FIELDS: Record<string, keyof MonthlySuggestedRates> = {
@@ -45,7 +46,6 @@ const MONTHLY_RATE_FIELDS: Record<string, keyof MonthlySuggestedRates> = {
   rateIncomeTax: 'incomeTax',
 };
 
-const pct = (r: number | null) => (r === null ? 'sin datos' : `${(r * 100).toFixed(2)}%`);
 
 async function main() {
   const projectionsService = new ProjectionsService();
@@ -98,21 +98,10 @@ async function main() {
     // ── Hoja 4.0: escenarios ──
     for (const scenario of companyScenarios) {
       try {
-        const hist = await getHistoricalRates(company.id, scenario.baseYear);
-        const a = hist.annual;
         const growthRatesByYear = scenario.projections
           .filter((p) => p.year > scenario.baseYear)
-          .map((p) => ({
-            year: p.year,
-            ...DEFAULT_PL_RATES,
-            financialExpensesGrowthRate: 0,
-            totalAssetsGrowthRate: a.totalAssetsGrowthRate ?? 0,
-            equityGrowthRate: a.equityGrowthRate ?? 0,
-            totalLiabilitiesGrowthRate: a.totalLiabilitiesGrowthRate ?? 0,
-            incomeTaxRate: a.taxRate ?? DEFAULT_TAX_RATE,
-          }));
-        console.log(`   4.0 escenario base ${scenario.baseYear} (${growthRatesByYear.length} años): P&G por defecto, ` +
-          `activos ${pct(a.totalAssetsGrowthRate)}, impuesto ${pct(a.taxRate ?? DEFAULT_TAX_RATE)}`);
+          .map((p) => ({ year: p.year, ...DEFAULT_SCENARIO_RATES }));
+        console.log(`   4.0 escenario base ${scenario.baseYear} (${growthRatesByYear.length} años): tasas por defecto`);
         if (APPLY && growthRatesByYear.length > 0) {
           await projectionsService.applyGrowthRatesToScenario(scenario.id, growthRatesByYear);
         }

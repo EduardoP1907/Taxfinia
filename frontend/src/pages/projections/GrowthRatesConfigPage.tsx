@@ -27,30 +27,26 @@ interface GrowthRatesConfigPageProps {
 
 type UniformRates = Record<keyof AnnualSuggestedRates, number>;
 
-// Tasa impositiva si no hay ningún año histórico con EBT positivo
-const DEFAULT_TAX_RATE = 0.27;
+// Tasa impositiva por defecto de la Hoja 4.0 (y respaldo de tasas guardadas vacías)
+const DEFAULT_TAX_RATE = 0.2774;
 
 const toPct = (rate: number | string | null | undefined): number =>
   rate === null || rate === undefined || rate === '' ? 0 : Number(rate) * 100;
 
-// Tasas por defecto de la Cuenta de P&G (en %). El promedio de los últimos
+// Tasas por defecto de la Hoja 4.0 (en %). El promedio de los últimos
 // 3 años se sigue mostrando al lado de cada campo como referencia.
-const DEFAULT_PL_RATES = {
+const DEFAULT_RATES: UniformRates = {
   revenueGrowthRate: 4.5,
   costOfSalesGrowthRate: 4,
   otherOperatingExpensesGrowthRate: 2,
   depreciationGrowthRate: 2,
   exceptionalNetGrowthRate: 2,
   financialNetGrowthRate: 2,
-} as const;
-
-const ratesFromSuggestions = (s: AnnualSuggestedRates | null): UniformRates => ({
-  ...DEFAULT_PL_RATES,
-  totalAssetsGrowthRate: toPct(s?.totalAssetsGrowthRate),
-  equityGrowthRate: toPct(s?.equityGrowthRate),
-  totalLiabilitiesGrowthRate: toPct(s?.totalLiabilitiesGrowthRate),
-  taxRate: toPct(s?.taxRate ?? DEFAULT_TAX_RATE),
-});
+  totalAssetsGrowthRate: 5,
+  equityGrowthRate: 5,
+  totalLiabilitiesGrowthRate: 5,
+  taxRate: DEFAULT_TAX_RATE * 100,
+};
 
 const ratesFromProjection = (p: FinancialProjection): UniformRates => ({
   revenueGrowthRate: toPct(p.revenueGrowthRate),
@@ -76,7 +72,7 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
 
   // Tasas uniformes (se aplican a todos los años), en puntos porcentuales (5 = 5%)
-  const [uniformRates, setUniformRates] = useState<UniformRates>(() => ratesFromSuggestions(null));
+  const [uniformRates, setUniformRates] = useState<UniformRates>(DEFAULT_RATES);
   // Promedio histórico de los últimos 3 años de "Datos anuales" (referencia)
   const [historical, setHistorical] = useState<HistoricalRates | null>(null);
 
@@ -87,7 +83,7 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
   }, [companyId]);
 
   // Valores iniciales: las tasas ya guardadas en el escenario; si aún no se
-  // aplicaron, el promedio histórico de los últimos 3 años.
+  // aplicaron, las tasas por defecto. El promedio histórico queda como referencia.
   const initRates = async (sc: ProjectionScenarioWithData | null) => {
     let hist: HistoricalRates | null = null;
     try {
@@ -101,7 +97,7 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
     const hasSavedRates =
       firstProjected?.revenueGrowthRate !== null && firstProjected?.revenueGrowthRate !== undefined;
     setUniformRates(
-      hasSavedRates ? ratesFromProjection(firstProjected!) : ratesFromSuggestions(hist?.annual ?? null),
+      hasSavedRates ? ratesFromProjection(firstProjected!) : DEFAULT_RATES,
     );
   };
 
@@ -275,13 +271,13 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
                   Para tasas diferentes por año, edite directamente en la Hoja 4.2.
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Valores por defecto: P&amp;G con tasas fijas (Ventas 4,5%, Coste de ventas 4%, resto 2%); Balance con el
-                  promedio del crecimiento de los últimos 3 años de Datos anuales
+                  Valores por defecto: Ventas 4,5%, Coste de ventas 4%, resto del P&amp;G 2%, Balance 5% y tasa
+                  impositiva 27,74%. Junto a cada campo se muestra como referencia el promedio de los últimos 3 años
+                  de Datos anuales
                   {historical && historical.yearsUsed.length > 1
                     ? ` (${historical.yearsUsed[0]}–${historical.yearsUsed[historical.yearsUsed.length - 1]})`
                     : ''}
-                  ; la tasa impositiva es el promedio de Impuestos / Resultado antes de impuestos. Junto a cada campo se
-                  muestra el promedio de 3 años como referencia. Todos son editables.
+                  . Todos son editables.
                 </p>
               </div>
 
