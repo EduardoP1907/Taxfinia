@@ -24,6 +24,9 @@ router.post('/:id/generate-code', comparisonReportController.generateCode.bind(c
 // POST /api/comparison-reports/:id/validate-code
 router.post('/:id/validate-code', comparisonReportController.validateCode.bind(comparisonReportController));
 
+// GET /api/comparison-reports/:id/download/executive — resumen ejecutivo PDF (antes de /:format)
+router.get('/:id/download/executive', comparisonReportController.downloadExecutive.bind(comparisonReportController));
+
 // GET /api/comparison-reports/:id/download/:format   format: pdf | docx
 router.get('/:id/download/:format', comparisonReportController.download.bind(comparisonReportController));
 

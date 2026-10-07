@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Sparkles, RefreshCw, XCircle, CheckCircle2, Clock, FileText, Download, AlertTriangle,
+  Sparkles, RefreshCw, XCircle, CheckCircle2, Clock, FileText, Download, AlertTriangle, Star,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import {
@@ -101,6 +101,19 @@ export const ComparisonAIReportPanel: React.FC<ComparisonAIReportPanelProps> = (
     }
   };
 
+  const handleDownloadExecutive = async (report: ComparisonReport) => {
+    const key = `${report.id}-executive`;
+    setDownloading(prev => ({ ...prev, [key]: true }));
+    try {
+      const year = type === 'FORECAST_BUDGET_VS_ANNUAL' && report.budgetYear ? report.budgetYear : report.forecastYear;
+      await comparisonReportService.downloadExecutiveSummary(report.id, type, companyName, year);
+    } catch {
+      alert('Error al generar el resumen ejecutivo');
+    } finally {
+      setDownloading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
   return (
     <>
       <div className="bg-gradient-to-br from-amber-50 to-slate-50 border border-amber-200 rounded-xl p-6">
@@ -186,6 +199,17 @@ export const ComparisonAIReportPanel: React.FC<ComparisonAIReportPanelProps> = (
                             ? <RefreshCw className="w-3 h-3 animate-spin" />
                             : <Download className="w-3 h-3" />}
                           Descargar (PDF)
+                        </button>
+                        <button
+                          onClick={() => handleDownloadExecutive(report)}
+                          disabled={downloading[`${report.id}-executive`]}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 disabled:opacity-50 transition-colors"
+                          title="Descargar resumen ejecutivo para directorio (dashboard, semáforo, alertas y recomendaciones)"
+                        >
+                          {downloading[`${report.id}-executive`]
+                            ? <RefreshCw className="w-3 h-3 animate-spin" />
+                            : <Star className="w-3 h-3" />}
+                          Ejecutivo
                         </button>
                       </div>
                     )}

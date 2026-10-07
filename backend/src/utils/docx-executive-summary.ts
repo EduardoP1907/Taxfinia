@@ -656,7 +656,7 @@ function buildKpiDashboard(data: PDFReportData, years: number[], cur: string): T
 }
 
 // ─── Semáforo Estratégico table ───────────────────────────────────────────────
-function buildSemaforoTable(data: PDFReportData, years: number[]): Table {
+function buildSemaforoTable(data: PDFReportData, years: number[], label: (y: number) => string = String): Table {
   const ly = years[years.length - 1];
   const py = years[years.length - 2] ?? null;
 
@@ -712,8 +712,8 @@ function buildSemaforoTable(data: PDFReportData, years: number[]): Table {
       tableHeader: true,
       children: [
         hCell('Indicador', AlignmentType.LEFT),
-        hCell(String(ly)),
-        hCell(py ? String(py) : 'Ant.'),
+        hCell(label(ly)),
+        hCell(py ? label(py) : 'Ant.'),
         hCell('Referencia'),
         hCell('Estado'),
         hCell('Tendencia'),
@@ -762,7 +762,7 @@ function buildSemaforoTable(data: PDFReportData, years: number[]): Table {
         const better = row.higherIsBetter ? currVal > firstVal : currVal < firstVal;
         const arrow = better ? '▲' : '▼';
         const desc = better ? 'Mejora' : 'Deterioro';
-        tendencia = `${arrow} ${desc} desde ${firstYear}`;
+        tendencia = `${arrow} ${desc} desde ${label(firstYear)}`;
       }
 
       tableRows.push(new TableRow({
@@ -802,11 +802,14 @@ export async function generateExecutiveSummaryDocx(
   data: PDFReportData,
   aiAnalysis: AIAnalysisResult,
   outputPath: string,
+  // Optional per-year labels, e.g. { 2026: '2026 (Forecast)' } for the comparison reports
+  periodLabels?: Record<number, string>,
 ): Promise<void> {
+  const label = (y: number) => periodLabels?.[y] ?? String(y);
   const cur = data.company.currency || 'CLP';
   const years = data.years.slice().sort((a, b) => a - b);
   const latestYear = years[years.length - 1];
-  const yearLabels = years.map(String);
+  const yearLabels = years.map(label);
   const today = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const revenueChart = await barChart(
@@ -830,7 +833,7 @@ export async function generateExecutiveSummaryDocx(
   );
 
   const kpiTables = buildKpiDashboard(data, years, cur);
-  const semaforoTable = buildSemaforoTable(data, years);
+  const semaforoTable = buildSemaforoTable(data, years, label);
 
   const doc = new Document({
     sections: [
@@ -885,7 +888,7 @@ export async function generateExecutiveSummaryDocx(
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { after: 40 },
-            children: [new TextRun({ text: `Análisis financiero · Período ${years[0]}–${latestYear}`, size: 20, color: TEXT_S, font: 'Calibri' })],
+            children: [new TextRun({ text: `Análisis financiero · Período ${label(years[0])}–${label(latestYear)}`, size: 20, color: TEXT_S, font: 'Calibri' })],
           }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
@@ -894,15 +897,15 @@ export async function generateExecutiveSummaryDocx(
           }),
 
           // ── SECTION 1: DASHBOARD EJECUTIVO ─────────────────────────────────
-          sectionTitle(1, `DASHBOARD EJECUTIVO — AÑO BASE ${latestYear}`),
+          sectionTitle(1, `DASHBOARD EJECUTIVO — ${periodLabels ? label(latestYear).toUpperCase() : `AÑO BASE ${latestYear}`}`),
           spacer(80),
-          para(`Resumen de los indicadores financieros clave del ejercicio ${latestYear}. El semáforo superior de cada tarjeta indica el estado del indicador: rojo = zona crítica o de alerta, verde = saludable.`),
+          para(`Resumen de los indicadores financieros clave del ejercicio ${label(latestYear)}. El semáforo superior de cada tarjeta indica el estado del indicador: rojo = zona crítica o de alerta, verde = saludable.`),
           spacer(80),
           ...kpiTables.map(t => t as any),
           spacer(80),
 
           // ── SECTION 2: SEMÁFORO ESTRATÉGICO ────────────────────────────────
-          sectionTitle(2, `SEMÁFORO ESTRATÉGICO ${latestYear}`),
+          sectionTitle(2, `SEMÁFORO ESTRATÉGICO ${label(latestYear).toUpperCase()}`),
           spacer(80),
           semaforoTable,
           spacer(80),

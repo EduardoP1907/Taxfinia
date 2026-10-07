@@ -84,4 +84,26 @@ export const comparisonReportService = {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   },
+
+  // Resumen ejecutivo (dashboard, semáforo, gráficos, alertas y recomendaciones) en PDF
+  async downloadExecutiveSummary(
+    reportId: string,
+    type: ComparisonReportType,
+    companyName: string,
+    year: number,
+  ): Promise<void> {
+    const response = await api.get(`/comparison-reports/${reportId}/download/executive`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const typeSuffix = type === 'FORECAST_BUDGET_VS_ANNUAL' ? 'budget' : 'forecast';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TAXFIN_${companyName.replace(/\s+/g, '_')}_${year}_${typeSuffix}_resumen_ejecutivo.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
 };

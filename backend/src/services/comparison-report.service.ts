@@ -9,7 +9,11 @@
 
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import prisma from '../config/database';
+import type { FinancialDataForAI, AIAnalysisResult } from './ai-analysis.service';
+import type { PDFReportData } from '../utils/pdf-generator';
+import { generateExecutiveSummaryDocx } from '../utils/docx-executive-summary';
 import {
   buildComparisonFinancialData, checkEligibility, type ComparisonReportType, type EligibilityResult,
 } from './comparison-financial-data.service';
@@ -26,6 +30,52 @@ function ensureReportsDir() {
 
 export { checkEligibility };
 export type { ComparisonReportType, EligibilityResult };
+
+// Stored files share the DOCX's base name (DB only keeps docxPath, either a
+// local filename or an S3 key): <base>.pdf and <base>_ejecutivo.pdf
+export const comparisonPdfName = (docxPath: string) => docxPath.replace(/\.docx$/i, '.pdf');
+export const comparisonExecutivePdfName = (docxPath: string) => docxPath.replace(/\.docx$/i, '_ejecutivo.pdf');
+
+// Builds the executive summary DOCX and converts it to PDF at `pdfPath`.
+async function renderComparisonExecutivePdf(
+  financialData: FinancialDataForAI,
+  periodLabels: Record<number, string>,
+  aiAnalysis: AIAnalysisResult,
+  pdfPath: string,
+): Promise<void> {
+  const pdfData: PDFReportData = {
+    company: financialData.company,
+    years: financialData.years,
+    incomeData: financialData.incomeData,
+    balanceData: financialData.balanceData,
+    ratiosData: financialData.ratiosData,
+  };
+  const execDocxPath = pdfPath.replace(/\.pdf$/i, '.docx');
+  await generateExecutiveSummaryDocx(pdfData, aiAnalysis, execDocxPath, periodLabels);
+  try {
+    await convertDocxToPdf(execDocxPath, pdfPath);
+  } finally {
+    try { fs.unlinkSync(execDocxPath); } catch {}
+  }
+}
+
+/**
+ * Executive summary PDF for an existing report (download fallback for reports
+ * generated before it was pre-rendered). Rebuilds the periods with current
+ * Forecast/Budget data and reuses the report's stored AI analysis.
+ */
+export async function generateComparisonExecutivePdfOnDemand(reportId: string): Promise<{
+  pdfPath: string; cleanup: () => void;
+}> {
+  const report = await prisma.comparisonReport.findUnique({ where: { id: reportId } });
+  if (!report) throw new Error('Informe no encontrado');
+  if (report.status !== 'COMPLETED' || !report.aiAnalysis) throw new Error('El informe aún no está completado');
+
+  const { financialData, periodLabels } = await buildComparisonFinancialData(report.companyId, report.userId, report.type);
+  const pdfPath = path.join(os.tmpdir(), `comparison_exec_${reportId}.pdf`);
+  await renderComparisonExecutivePdf(financialData, periodLabels, report.aiAnalysis as unknown as AIAnalysisResult, pdfPath);
+  return { pdfPath, cleanup: () => { try { fs.unlinkSync(pdfPath); } catch {} } };
+}
 
 // A GENERATING record older than this is considered abandoned (e.g. the server
 // restarted mid-generation) and may be started again.
@@ -100,7 +150,7 @@ export async function runComparisonReport(reportId: string): Promise<void> {
     // Pre-render the PDF now (same base name, .pdf) so the first PDF download is
     // instant instead of converting on demand — a cold LibreOffice start could
     // exceed the request timeout. Non-fatal: download falls back to converting.
-    const pdfFilename = docxFilename.replace(/\.docx$/i, '.pdf');
+    const pdfFilename = comparisonPdfName(docxFilename);
     const pdfPath = path.join(REPORTS_DIR, pdfFilename);
     let pdfReady = false;
     try {
@@ -109,6 +159,20 @@ export async function runComparisonReport(reportId: string): Promise<void> {
       pdfReady = fs.existsSync(pdfPath);
     } catch (err) {
       console.warn('[COMPARISON-REPORT] PDF pre-render failed (will convert on download):', err);
+    }
+
+    // Executive summary (dashboard, semáforo, charts, alerts, recommendations) —
+    // same document as the annual report's "Ejecutivo", built from this report's
+    // AI analysis and periods, pre-rendered for an instant download. Non-fatal.
+    const execPdfFilename = comparisonExecutivePdfName(docxFilename);
+    const execPdfPath = path.join(REPORTS_DIR, execPdfFilename);
+    let execReady = false;
+    try {
+      console.log('[COMPARISON-REPORT] Generating executive summary...');
+      await renderComparisonExecutivePdf(financialData, periodLabels, aiAnalysis, execPdfPath);
+      execReady = fs.existsSync(execPdfPath);
+    } catch (err) {
+      console.warn('[COMPARISON-REPORT] Executive summary pre-render failed (will render on download):', err);
     }
 
     let storedDocxPath = docxFilename;
@@ -121,6 +185,9 @@ export async function runComparisonReport(reportId: string): Promise<void> {
       );
       if (pdfReady) {
         await uploadToS3(pdfPath, `${s3Prefix}/${pdfFilename}`, 'application/pdf');
+      }
+      if (execReady) {
+        await uploadToS3(execPdfPath, `${s3Prefix}/${execPdfFilename}`, 'application/pdf');
       }
     }
 

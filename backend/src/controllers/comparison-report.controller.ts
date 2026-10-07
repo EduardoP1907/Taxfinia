@@ -5,7 +5,8 @@ import {
   generateComparisonReport, startComparisonReport, runComparisonReport,
   getCompanyComparisonReports, getComparisonReport,
   getComparisonReportFilePath, setComparisonReportDownloadCode, convertDocxToPdf,
-  checkEligibility, type ComparisonReportType,
+  checkEligibility, comparisonPdfName, comparisonExecutivePdfName, generateComparisonExecutivePdfOnDemand,
+  type ComparisonReportType,
 } from '../services/comparison-report.service';
 import { sendAdminReportCodeEmail } from '../utils/email';
 import { isS3Enabled } from '../utils/s3';
@@ -218,6 +219,49 @@ export class ComparisonReportController {
     }
   }
 
+  /**
+   * GET /api/comparison-reports/:id/download/executive
+   * Executive summary PDF (dashboard, semáforo, charts, alerts, recommendations),
+   * pre-rendered at generation time; older reports render it on demand.
+   */
+  async downloadExecutive(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const report = await getComparisonReport(id);
+      if (!report) { res.status(404).json({ error: 'Informe no encontrado' }); return; }
+      if (report.status !== 'COMPLETED' || !report.docxPath) {
+        res.status(400).json({ error: 'El informe aún no está listo', status: report.status });
+        return;
+      }
+
+      const companyName = (report as any).company?.name || 'empresa';
+      const sanitizedName = companyName.replace(/[^a-zA-Z0-9_\- ]/g, '').trim().replace(/ /g, '_');
+      const typeSuffix = report.type === 'FORECAST_BUDGET_VS_ANNUAL' ? 'budget' : 'forecast';
+      const year = report.type === 'FORECAST_BUDGET_VS_ANNUAL' && report.budgetYear ? report.budgetYear : report.forecastYear;
+      const downloadName = `TAXFIN_${sanitizedName}_${year}_${typeSuffix}_resumen_ejecutivo.pdf`;
+
+      let pdf: { localDocxPath: string; cleanup: () => void } | null = null;
+      try {
+        pdf = await resolveDocxLocally(comparisonExecutivePdfName(report.docxPath));
+        if (!fs.existsSync(pdf.localDocxPath)) { pdf.cleanup(); pdf = null; }
+      } catch {
+        pdf = null; // Not pre-rendered (report generated before this feature)
+      }
+      if (!pdf) {
+        const onDemand = await generateComparisonExecutivePdfOnDemand(id);
+        pdf = { localDocxPath: onDemand.pdfPath, cleanup: onDemand.cleanup };
+      }
+
+      const { localDocxPath, cleanup } = pdf;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+      res.sendFile(localDocxPath, () => cleanup());
+    } catch (error) {
+      console.error('[COMPARISON-REPORT] Download executive error:', error);
+      res.status(500).json({ error: 'Error al generar el resumen ejecutivo' });
+    }
+  }
+
   /** GET /api/comparison-reports/:id/download/:format  format: pdf | docx */
   async download(req: Request, res: Response): Promise<void> {
     try {
@@ -262,7 +306,7 @@ export class ComparisonReportController {
       // format === 'pdf' — serve the PDF pre-rendered at generation time (same
       // base name as the DOCX); reports generated before that fall back to
       // converting on the fly.
-      const preRenderedPdf = filename.replace(/\.docx$/i, '.pdf');
+      const preRenderedPdf = comparisonPdfName(filename);
       try {
         const { localDocxPath: localPdfPath, cleanup: cleanupPdf } = await resolveDocxLocally(preRenderedPdf);
         if (fs.existsSync(localPdfPath)) {
