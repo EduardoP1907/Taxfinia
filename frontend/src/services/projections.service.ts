@@ -49,6 +49,7 @@ export interface FinancialProjection {
 
   // Tax
   taxRate: number;
+  incomeTaxRate: number | null; // tasa aplicada desde la Hoja 4.0 (decimal)
 
   // Calculated Metrics (Auto-calculated by backend)
   ebitda: number;
@@ -272,8 +273,8 @@ export const projectionsService = {
     exceptionalNetGrowthRate?: number;
     financialIncomeGrowthRate?: number;
     financialExpensesGrowthRate?: number;
-    // Tax Rate
-    taxRate?: number;
+    // Tax Rate (el backend lee incomeTaxRate)
+    incomeTaxRate?: number;
     // Investments and Cash Flow
     workingCapitalInvestmentGrowthRate?: number;
     fixedAssetsInvestmentGrowthRate?: number;

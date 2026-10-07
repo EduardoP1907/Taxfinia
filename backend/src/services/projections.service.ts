@@ -385,9 +385,15 @@ export class ProjectionsService {
     // Fórmula: -Resultado Financiero / Pasivo Corto Plazo
     const financialResult = data.financialIncome - data.financialExpenses;
     const liabilitiesForCostRate = data.currentLiabilities ?? data.totalLiabilities; // Usar Pasivo CP si está disponible
-    const financialCostRate =
+    const rawFinancialCostRate =
       liabilitiesForCostRate > 0
         ? -financialResult / liabilitiesForCostRate
+        : null;
+    // Columna Decimal(8,4): con un pasivo cercano a 0 el ratio se dispara y no
+    // cabe (ni tiene sentido); se guarda como n/d en vez de fallar el escenario
+    const financialCostRate =
+      rawFinancialCostRate !== null && Math.abs(rawFinancialCostRate) < 10000
+        ? rawFinancialCostRate
         : null;
 
     return {

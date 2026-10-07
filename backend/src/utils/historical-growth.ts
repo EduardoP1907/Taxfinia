@@ -13,6 +13,11 @@ export interface YearValue {
 
 export const HISTORICAL_GROWTH_YEARS = 3;
 
+// Límite de la tasa recomendada: promedios extremos (p.ej. +193% en conceptos
+// pequeños y volátiles) compuestos durante 10 años desbordan los montos.
+export const MAX_SUGGESTED_GROWTH = 0.5;
+export const MIN_SUGGESTED_GROWTH = -0.5;
+
 /**
  * Crecimiento interanual: actual / anterior − 1.
  * Devuelve null cuando no es interpretable: año anterior en 0, o cambio de
@@ -29,7 +34,7 @@ export function yearOverYearGrowth(prev: number, curr: number): number | null {
 /**
  * Promedio del crecimiento interanual de los últimos `years` años. Pares de
  * años no consecutivos o no interpretables se descartan del promedio.
- * Devuelve null si no hay ningún crecimiento calculable.
+ * El resultado se limita a [−50%, +50%]. Null si no hay ningún crecimiento calculable.
  */
 export function averageHistoricalGrowth(
   series: YearValue[],
@@ -46,7 +51,8 @@ export function averageHistoricalGrowth(
     if (g !== null) growths.push(g);
   }
   if (growths.length === 0) return null;
-  return growths.reduce((s, g) => s + g, 0) / growths.length;
+  const average = growths.reduce((s, g) => s + g, 0) / growths.length;
+  return Math.min(MAX_SUGGESTED_GROWTH, Math.max(MIN_SUGGESTED_GROWTH, average));
 }
 
 /**

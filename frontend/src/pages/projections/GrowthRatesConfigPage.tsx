@@ -56,7 +56,7 @@ const ratesFromProjection = (p: FinancialProjection): UniformRates => ({
   totalAssetsGrowthRate: toPct(p.totalAssetsGrowthRate),
   equityGrowthRate: toPct(p.equityGrowthRate),
   totalLiabilitiesGrowthRate: toPct(p.totalLiabilitiesGrowthRate),
-  taxRate: toPct(p.taxRate ?? DEFAULT_TAX_RATE),
+  taxRate: toPct(p.incomeTaxRate ?? DEFAULT_TAX_RATE),
 });
 
 export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ tabsHeader }) => {
@@ -165,7 +165,7 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
         totalAssetsGrowthRate: uniformRates.totalAssetsGrowthRate / 100,
         equityGrowthRate: uniformRates.equityGrowthRate / 100,
         totalLiabilitiesGrowthRate: uniformRates.totalLiabilitiesGrowthRate / 100,
-        taxRate: uniformRates.taxRate / 100,
+        incomeTaxRate: uniformRates.taxRate / 100,
         workingCapitalInvestmentGrowthRate: uniformRates.totalAssetsGrowthRate / 100,
         fixedAssetsInvestmentGrowthRate: uniformRates.totalAssetsGrowthRate / 100,
       }));
