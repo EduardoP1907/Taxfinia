@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Sparkles, RefreshCw, XCircle, CheckCircle2, Clock, FileText, Lock, KeyRound, AlertTriangle,
+  Sparkles, RefreshCw, XCircle, CheckCircle2, Clock, FileText, Download, AlertTriangle,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import {
   comparisonReportService, type ComparisonReport, type ComparisonReportType,
 } from '../../services/comparison-report.service';
-import { DownloadCodeModal } from './DownloadCodeModal';
 
 const StatusBadge: React.FC<{ status: ComparisonReport['status'] }> = ({ status }) => {
   const config = {
@@ -24,6 +23,8 @@ const StatusBadge: React.FC<{ status: ComparisonReport['status'] }> = ({ status 
   );
 };
 
+const POLL_INTERVAL_MS = 4000;
+
 interface ComparisonAIReportPanelProps {
   companyId: string;
   companyName: string;
@@ -39,14 +40,9 @@ export const ComparisonAIReportPanel: React.FC<ComparisonAIReportPanelProps> = (
   const [eligible, setEligible] = useState<boolean | null>(null);
   const [ineligibleReason, setIneligibleReason] = useState<string | null>(null);
   const [checkingEligibility, setCheckingEligibility] = useState(true);
-  const [generating, setGenerating] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
-  const [generatingCode, setGeneratingCode] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
-
-  const [codeModal, setCodeModal] = useState<{ reportId: string; format: 'pdf' | 'docx' } | null>(null);
-  const [codeError, setCodeError] = useState<string | undefined>();
-  const [codeLoading, setCodeLoading] = useState(false);
 
   const loadReports = useCallback(async () => {
     try {
@@ -71,8 +67,17 @@ export const ComparisonAIReportPanel: React.FC<ComparisonAIReportPanelProps> = (
 
   useEffect(() => { loadReports(); loadEligibility(); }, [loadReports, loadEligibility]);
 
+  // Generation runs in the background on the server (~1 min); while any report
+  // is GENERATING, refresh the list until it turns COMPLETED or FAILED.
+  const generating = starting || reports.some(r => r.status === 'GENERATING');
+  useEffect(() => {
+    if (!reports.some(r => r.status === 'GENERATING')) return;
+    const timer = setInterval(loadReports, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [reports, loadReports]);
+
   const handleGenerate = async () => {
-    setGenerating(true);
+    setStarting(true);
     setError(null);
     try {
       const { report } = await comparisonReportService.generateReport(companyId, type);
@@ -80,83 +85,24 @@ export const ComparisonAIReportPanel: React.FC<ComparisonAIReportPanelProps> = (
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Error al generar el informe comparativo.');
     } finally {
-      setGenerating(false);
+      setStarting(false);
     }
   };
 
-  const reportCodeKey = (reportId: string) => `comparison_report_code_${reportId}`;
-
-  const doDownload = async (reportId: string, format: 'pdf' | 'docx', forecastYear: number, code?: string) => {
+  const handleDownloadClick = async (reportId: string, format: 'pdf' | 'docx', forecastYear: number) => {
     const key = `${reportId}-${format}`;
     setDownloading(prev => ({ ...prev, [key]: true }));
     try {
-      await comparisonReportService.downloadReport(reportId, type, format, companyName, forecastYear, code);
-      if (code) localStorage.setItem(reportCodeKey(reportId), code);
-      setCodeModal(null);
-    } catch (err: any) {
-      let requiresCode = false;
-      if (err?.response?.data instanceof Blob) {
-        try { const json = JSON.parse(await err.response.data.text()); requiresCode = !!json.requiresCode; } catch {}
-      } else {
-        requiresCode = !!err?.response?.data?.requiresCode;
-      }
-      if (requiresCode) {
-        localStorage.removeItem(reportCodeKey(reportId));
-        setCodeError(undefined);
-        setCodeModal({ reportId, format });
-      } else {
-        alert('Error al descargar el archivo');
-      }
+      await comparisonReportService.downloadReport(reportId, type, format, companyName, forecastYear);
+    } catch {
+      alert('Error al descargar el archivo');
     } finally {
       setDownloading(prev => ({ ...prev, [key]: false }));
     }
   };
 
-  const handleDownloadClick = (reportId: string, format: 'pdf' | 'docx', forecastYear: number) => {
-    const stored = localStorage.getItem(reportCodeKey(reportId));
-    doDownload(reportId, format, forecastYear, stored || undefined);
-  };
-
-  const handleCodeConfirm = async (code: string) => {
-    if (!codeModal) return;
-    const report = reports.find(r => r.id === codeModal.reportId);
-    if (!report) return;
-    setCodeLoading(true);
-    setCodeError(undefined);
-    try {
-      await doDownload(codeModal.reportId, codeModal.format, report.forecastYear, code);
-    } catch {
-      setCodeError('Código incorrecto');
-    } finally {
-      setCodeLoading(false);
-    }
-  };
-
-  const handleGenerateCode = async (reportId: string) => {
-    setGeneratingCode(prev => ({ ...prev, [reportId]: true }));
-    try {
-      await comparisonReportService.generateDownloadCode(reportId);
-      localStorage.removeItem(reportCodeKey(reportId));
-      await loadReports();
-      alert('Código solicitado. El administrador recibirá un correo con el código de descarga.');
-    } catch {
-      alert('Error al solicitar el código');
-    } finally {
-      setGeneratingCode(prev => ({ ...prev, [reportId]: false }));
-    }
-  };
-
   return (
     <>
-      {codeModal && (
-        <DownloadCodeModal
-          onConfirm={handleCodeConfirm}
-          onCancel={() => setCodeModal(null)}
-          loading={codeLoading}
-          error={codeError}
-        />
-      )}
-
       <div className="bg-gradient-to-br from-amber-50 to-slate-50 border border-amber-200 rounded-xl p-6">
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
           <div className="flex items-center gap-3">
@@ -230,31 +176,17 @@ export const ComparisonAIReportPanel: React.FC<ComparisonAIReportPanelProps> = (
 
                     {report.status === 'COMPLETED' && report.docxPath && (
                       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2 flex-wrap">
-                        {report.hasDownloadCode ? (
-                          <button
-                            onClick={() => handleDownloadClick(report.id, 'pdf', report.forecastYear)}
-                            disabled={downloading[`${report.id}-pdf`]}
-                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors"
-                            title="Descargar informe en PDF (requiere código)"
-                          >
-                            {downloading[`${report.id}-pdf`]
-                              ? <RefreshCw className="w-3 h-3 animate-spin" />
-                              : <Lock className="w-3 h-3" />}
-                            Descargar (PDF)
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleGenerateCode(report.id)}
-                            disabled={generatingCode[report.id]}
-                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition-colors"
-                            title="Solicitar código al administrador"
-                          >
-                            {generatingCode[report.id]
-                              ? <RefreshCw className="w-3 h-3 animate-spin" />
-                              : <KeyRound className="w-3 h-3" />}
-                            Solicitar código
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleDownloadClick(report.id, 'pdf', report.forecastYear)}
+                          disabled={downloading[`${report.id}-pdf`]}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+                          title="Descargar informe en PDF"
+                        >
+                          {downloading[`${report.id}-pdf`]
+                            ? <RefreshCw className="w-3 h-3 animate-spin" />
+                            : <Download className="w-3 h-3" />}
+                          Descargar (PDF)
+                        </button>
                       </div>
                     )}
 

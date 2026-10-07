@@ -27,23 +27,54 @@ function ensureReportsDir() {
 export { checkEligibility };
 export type { ComparisonReportType, EligibilityResult };
 
-// ─── Main: Generate Comparison Report ─────────────────────────────────────────
-export async function generateComparisonReport(
+// A GENERATING record older than this is considered abandoned (e.g. the server
+// restarted mid-generation) and may be started again.
+const STALE_GENERATION_MS = 10 * 60 * 1000;
+
+// ─── Start: validate + mark GENERATING (returns immediately) ─────────────────
+// Generation takes ~1 min (AI), longer than the proxy/CloudFront request timeout,
+// so the HTTP request only starts it; the client polls the report list.
+export async function startComparisonReport(
   companyId: string,
   userId: string,
   type: ComparisonReportType,
-): Promise<string> {
-  ensureReportsDir();
-
+): Promise<{ reportId: string; alreadyRunning: boolean }> {
   const elig = await checkEligibility(companyId, userId, type);
   if (!elig.eligible) throw new Error(elig.reason);
   const { forecastYear, budgetYear } = elig;
+
+  const existing = await prisma.comparisonReport.findUnique({
+    where: { companyId_type_forecastYear: { companyId, type, forecastYear } },
+  });
+  if (existing?.status === 'GENERATING' && Date.now() - existing.updatedAt.getTime() < STALE_GENERATION_MS) {
+    return { reportId: existing.id, alreadyRunning: true };
+  }
 
   const report = await prisma.comparisonReport.upsert({
     where: { companyId_type_forecastYear: { companyId, type, forecastYear } },
     update: { status: 'GENERATING', errorMessage: null, budgetYear: budgetYear ?? null },
     create: { companyId, userId, type, forecastYear, budgetYear: budgetYear ?? null, status: 'GENERATING' },
   });
+  return { reportId: report.id, alreadyRunning: false };
+}
+
+// ─── Main: Generate Comparison Report (synchronous, start → run) ──────────────
+export async function generateComparisonReport(
+  companyId: string,
+  userId: string,
+  type: ComparisonReportType,
+): Promise<string> {
+  const { reportId } = await startComparisonReport(companyId, userId, type);
+  await runComparisonReport(reportId);
+  return reportId;
+}
+
+// ─── Run: build data → AI → DOCX → S3 → COMPLETED / FAILED ────────────────────
+export async function runComparisonReport(reportId: string): Promise<void> {
+  ensureReportsDir();
+  const report = await prisma.comparisonReport.findUniqueOrThrow({ where: { id: reportId } });
+  const { companyId, userId, type, forecastYear, budgetYear } = report;
+  const startedAt = Date.now();
 
   try {
     console.log(`[COMPARISON-REPORT] Building financial data for company ${companyId} (${type})...`);
@@ -66,6 +97,20 @@ export async function generateComparisonReport(
     };
     await generateNarrativeDocx(docxData, docxPath);
 
+    // Pre-render the PDF now (same base name, .pdf) so the first PDF download is
+    // instant instead of converting on demand — a cold LibreOffice start could
+    // exceed the request timeout. Non-fatal: download falls back to converting.
+    const pdfFilename = docxFilename.replace(/\.docx$/i, '.pdf');
+    const pdfPath = path.join(REPORTS_DIR, pdfFilename);
+    let pdfReady = false;
+    try {
+      console.log('[COMPARISON-REPORT] Converting DOCX to PDF...');
+      await convertDocxToPdf(docxPath, pdfPath);
+      pdfReady = fs.existsSync(pdfPath);
+    } catch (err) {
+      console.warn('[COMPARISON-REPORT] PDF pre-render failed (will convert on download):', err);
+    }
+
     let storedDocxPath = docxFilename;
     if (isS3Enabled()) {
       console.log('[COMPARISON-REPORT] Uploading files to S3...');
@@ -74,6 +119,9 @@ export async function generateComparisonReport(
         docxPath, `${s3Prefix}/${docxFilename}`,
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       );
+      if (pdfReady) {
+        await uploadToS3(pdfPath, `${s3Prefix}/${pdfFilename}`, 'application/pdf');
+      }
     }
 
     await prisma.comparisonReport.update({
@@ -86,8 +134,7 @@ export async function generateComparisonReport(
       },
     });
 
-    console.log(`[COMPARISON-REPORT] Report ${report.id} generated successfully`);
-    return report.id;
+    console.log(`[COMPARISON-REPORT] Report ${report.id} generated successfully in ${Math.round((Date.now() - startedAt) / 1000)}s`);
   } catch (error) {
     await prisma.comparisonReport.update({
       where: { id: report.id },
@@ -102,6 +149,21 @@ export async function generateComparisonReport(
 
 // ─── Get reports for a company ────────────────────────────────────────────────
 export async function getCompanyComparisonReports(companyId: string) {
+  // A generation interrupted mid-way (server restart, crash) would otherwise stay
+  // GENERATING forever — the UI keeps polling and the button stays disabled.
+  // A normal run takes ~1-2 min, so anything past the threshold is abandoned.
+  await prisma.comparisonReport.updateMany({
+    where: {
+      companyId,
+      status: 'GENERATING',
+      updatedAt: { lt: new Date(Date.now() - STALE_GENERATION_MS) },
+    },
+    data: {
+      status: 'FAILED',
+      errorMessage: 'La generación se interrumpió. Vuelve a generar el informe.',
+    },
+  });
+
   const rows = await prisma.comparisonReport.findMany({
     where: { companyId },
     orderBy: { createdAt: 'desc' },

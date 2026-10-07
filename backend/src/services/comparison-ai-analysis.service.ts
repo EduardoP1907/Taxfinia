@@ -140,7 +140,7 @@ function buildComparisonPrompt(
   const comparisonTable = buildComparisonTable(data, periodLabels);
 
   const scopeExplanation = type === 'FORECAST_BUDGET_VS_ANNUAL'
-    ? `Este informe compara TRES tipos de período: (1) los últimos 3 ejercicios REALES cerrados, (2) el FORECAST ${forecastYear} (proyección del ejercicio en curso, combina meses reales cerrados con meses proyectados), y (3) el BUDGET ${budgetYear} (presupuesto del ejercicio siguiente, construido a partir del cierre proyectado del Forecast). Debes analizar explícitamente: la consistencia del Forecast frente a la tendencia histórica real, y la consistencia del Budget frente al Forecast (¿qué tasa de crecimiento implícita asume el Budget respecto al Forecast? ¿es razonable dada la tendencia histórica?).`
+    ? `Este informe compara TRES tipos de período: (1) los 2 últimos ejercicios REALES cerrados, (2) el FORECAST ${forecastYear} (proyección del ejercicio en curso, combina meses reales cerrados con meses proyectados), y (3) el BUDGET ${budgetYear} (presupuesto del ejercicio siguiente: cada mes se construye sobre el mismo mes del Forecast ${forecastYear}). Debes analizar explícitamente: la consistencia del Forecast frente a la tendencia histórica real, y la consistencia del Budget frente al Forecast (¿qué tasa de crecimiento implícita asume el Budget respecto al Forecast? ¿es razonable dada la tendencia histórica?).`
     : `Este informe compara los últimos 3 ejercicios REALES cerrados contra el FORECAST ${forecastYear} (proyección del ejercicio en curso, combina meses reales cerrados con meses proyectados). Debes analizar explícitamente si el Forecast es consistente con la tendencia histórica real: ¿qué tasa de crecimiento implícita asume respecto al último año real? ¿es razonable?`;
 
   return `Eres PROMETHEIA, un sistema experto de gestión y control financiero orientado a directorios. Tu rol es transformar estados financieros en inteligencia estratégica, no limitarte a describir cifras.
@@ -276,6 +276,63 @@ const comparisonTools: Anthropic.Tool[] = [
   },
 ];
 
+// The 13 sections are generated in parallel groups (same prompt and data, each
+// call restricted to its own keys): output length dominates latency, so one
+// 13-section call took ~3 min while 4 parallel calls finish in roughly a quarter.
+const SECTION_GROUPS: (keyof AIAnalysisResult)[][] = [
+  ['executiveSummary', 'incomeAnalysis', 'balanceAnalysis'],
+  ['financingAnalysis', 'investmentAnalysis', 'liquidityAnalysis', 'rotationAnalysis'],
+  ['solvencyAnalysis', 'valuationAnalysis', 'trendAnalysis', 'consistencyAlerts'],
+  ['strategicAlerts', 'prioritizedRecommendations'],
+];
+
+const SYSTEM_PROMPT = 'Eres PROMETHEIA, sistema experto de control de gestión para directorios, especializado en informes comparativos Forecast/Budget vs. años reales. Usa generate_comparison_financial_report. Textos en español, sin markdown ni asteriscos. Formato: párrafos breves + bullets + Conclusion + Accion recomendada. Prioriza el análisis de desviaciones entre lo proyectado y la tendencia real. Saltos de párrafo con \\n.';
+
+const MAX_ATTEMPTS = 2;
+
+async function generateSectionGroup(
+  prompt: string,
+  keys: (keyof AIAnalysisResult)[],
+): Promise<Partial<AIAnalysisResult>> {
+  const baseTool = comparisonTools[0];
+  const allProps = (baseTool.input_schema as { properties: Record<string, unknown> }).properties;
+  const tool: Anthropic.Tool = {
+    ...baseTool,
+    input_schema: {
+      type: 'object' as const,
+      properties: Object.fromEntries(keys.map(k => [k, allProps[k]])),
+      required: keys as string[],
+    },
+  };
+  const groupPrompt = `${prompt}\n\nIMPORTANTE: en esta respuesta genera ÚNICAMENTE estas secciones del JSON: ${keys.join(', ')}. Las demás secciones se generan por separado; no las incluyas.`;
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const message = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8000,
+        tools: [tool],
+        tool_choice: { type: 'tool', name: tool.name },
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: groupPrompt }],
+      });
+      const toolBlock = message.content.find(b => b.type === 'tool_use');
+      if (!toolBlock || toolBlock.type !== 'tool_use') {
+        throw new Error('La IA no generó el informe comparativo correctamente.');
+      }
+      return toolBlock.input as Partial<AIAnalysisResult>;
+    } catch (error) {
+      // A single transient API failure (overload, timeout) must not sink the whole report
+      lastError = error;
+      console.warn(`[COMPARISON-AI] Grupo ${keys.join(',')} falló (intento ${attempt}/${MAX_ATTEMPTS}):`, error);
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('La IA no generó el informe comparativo correctamente. Intenta nuevamente.');
+}
+
 export async function generateComparisonAnalysis(
   data: FinancialDataForAI,
   periodLabels: Record<number, string>,
@@ -283,21 +340,8 @@ export async function generateComparisonAnalysis(
 ): Promise<AIAnalysisResult> {
   const prompt = buildComparisonPrompt(data, periodLabels, type);
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 16000,
-    tools: comparisonTools,
-    tool_choice: { type: 'any' },
-    system: 'Eres PROMETHEIA, sistema experto de control de gestión para directorios, especializado en informes comparativos Forecast/Budget vs. años reales. Usa generate_comparison_financial_report. Textos en español, sin markdown ni asteriscos. Formato: párrafos breves + bullets + Conclusion + Accion recomendada. Prioriza el análisis de desviaciones entre lo proyectado y la tendencia real. Saltos de párrafo con \\n.',
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const toolBlock = message.content.find(b => b.type === 'tool_use');
-  if (!toolBlock || toolBlock.type !== 'tool_use') {
-    throw new Error('La IA no generó el informe comparativo correctamente. Intenta nuevamente.');
-  }
-
-  const parsed = toolBlock.input as AIAnalysisResult;
+  const groups = await Promise.all(SECTION_GROUPS.map(keys => generateSectionGroup(prompt, keys)));
+  const parsed = Object.assign({}, ...groups) as AIAnalysisResult;
   for (const key of RESULT_KEYS) {
     if (!parsed[key]) parsed[key] = 'Análisis no disponible para esta sección con los datos proporcionados.';
   }

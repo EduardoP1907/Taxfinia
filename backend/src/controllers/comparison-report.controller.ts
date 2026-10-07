@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import crypto from 'crypto';
 import {
-  generateComparisonReport, getCompanyComparisonReports, getComparisonReport,
+  generateComparisonReport, startComparisonReport, runComparisonReport,
+  getCompanyComparisonReports, getComparisonReport,
   getComparisonReportFilePath, setComparisonReportDownloadCode, convertDocxToPdf,
   checkEligibility, type ComparisonReportType,
 } from '../services/comparison-report.service';
@@ -55,6 +56,52 @@ export class ComparisonReportController {
     } catch (error) {
       console.error('[COMPARISON-REPORT] Eligibility error:', error);
       const message = error instanceof Error ? error.message : 'Error al verificar elegibilidad';
+      res.status(500).json({ error: message });
+    }
+  }
+
+  /**
+   * POST /api/comparison-reports/generate/:companyId  body: { type }
+   * Starts generation in the background and returns immediately (202) with the
+   * GENERATING report; the client polls GET /company/:companyId until it ends.
+   */
+  async generate(req: Request, res: Response): Promise<void> {
+    try {
+      const { companyId } = req.params;
+      const userId = (req as any).user?.userId;
+      const type = parseType(req.body.type);
+
+      if (!userId) { res.status(401).json({ error: 'No autorizado' }); return; }
+      if (!companyId) { res.status(400).json({ error: 'ID de empresa requerido' }); return; }
+      if (!type) { res.status(400).json({ error: 'Tipo de informe no válido' }); return; }
+
+      const { reportId, alreadyRunning } = await startComparisonReport(companyId, userId, type);
+      if (!alreadyRunning) {
+        runComparisonReport(reportId).catch(error =>
+          console.error(`[COMPARISON-REPORT] Background generation ${reportId} failed:`, error),
+        );
+      }
+
+      const report = await getComparisonReport(reportId);
+      res.status(202).json({
+        success: true,
+        reportId,
+        report: {
+          id: report!.id,
+          type: report!.type,
+          forecastYear: report!.forecastYear,
+          budgetYear: report!.budgetYear,
+          status: report!.status,
+          generatedAt: report!.generatedAt,
+          docxPath: report!.docxPath,
+          errorMessage: report!.errorMessage,
+          createdAt: report!.createdAt,
+          hasDownloadCode: !!report!.downloadCode,
+        },
+      });
+    } catch (error) {
+      console.error('[COMPARISON-REPORT] Generate error:', error);
+      const message = error instanceof Error ? error.message : 'Error al generar el informe comparativo';
       res.status(500).json({ error: message });
     }
   }
@@ -175,7 +222,6 @@ export class ComparisonReportController {
   async download(req: Request, res: Response): Promise<void> {
     try {
       const { id, format } = req.params;
-      const code = (req.query.code as string) || '';
 
       if (!['pdf', 'docx'].includes(format)) {
         res.status(400).json({ error: 'Formato no válido. Use pdf o docx' });
@@ -186,12 +232,6 @@ export class ComparisonReportController {
       if (!report) { res.status(404).json({ error: 'Informe no encontrado' }); return; }
       if (report.status !== 'COMPLETED') {
         res.status(400).json({ error: 'El informe aún no está listo', status: report.status });
-        return;
-      }
-
-      const storedCode = report.downloadCode;
-      if (storedCode && storedCode.toUpperCase() !== code.trim().toUpperCase()) {
-        res.status(403).json({ error: 'Código de descarga requerido', requiresCode: true });
         return;
       }
 
@@ -219,7 +259,22 @@ export class ComparisonReportController {
         return;
       }
 
-      // format === 'pdf' — convert DOCX to PDF on the fly
+      // format === 'pdf' — serve the PDF pre-rendered at generation time (same
+      // base name as the DOCX); reports generated before that fall back to
+      // converting on the fly.
+      const preRenderedPdf = filename.replace(/\.docx$/i, '.pdf');
+      try {
+        const { localDocxPath: localPdfPath, cleanup: cleanupPdf } = await resolveDocxLocally(preRenderedPdf);
+        if (fs.existsSync(localPdfPath)) {
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+          res.sendFile(localPdfPath, () => cleanupPdf());
+          return;
+        }
+      } catch {
+        // Not pre-rendered (older report) — convert below
+      }
+
       const { localDocxPath, cleanup } = await resolveDocxLocally(filename);
       try {
         if (!fs.existsSync(localDocxPath)) { res.status(404).json({ error: 'Archivo no encontrado en servidor' }); return; }

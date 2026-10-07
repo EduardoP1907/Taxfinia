@@ -299,7 +299,7 @@ export class ReportController {
 
   /**
    * GET /api/reports/:id/download/:format
-   * Download PDF or DOCX — validates download code if one has been set
+   * Download PDF or DOCX
    */
   async download(req: Request, res: Response): Promise<void> {
     try {
@@ -316,10 +316,6 @@ export class ReportController {
         res.status(400).json({ error: 'El informe aún no está listo', status: report.status });
         return;
       }
-
-      // TEMP: download code check disabled for testing
-      // const storedCode = (report as any).downloadCode as string | null;
-      // if (storedCode) { ... }
 
       const filename = format === 'pdf' ? report.pdfPath : report.docxPath;
       if (!filename) { res.status(404).json({ error: 'Archivo no disponible' }); return; }
@@ -395,10 +391,6 @@ export class ReportController {
         res.status(400).json({ error: 'El informe aún no está listo', status: report.status });
         return;
       }
-
-      // TEMP: download code check disabled for testing
-      // const storedCode = (report as any).downloadCode as string | null;
-      // if (storedCode) { ... }
 
       const { pdfPath, companyName, year, cleanup } = await generateExecutiveSummaryPdf(id);
       const sanitized = companyName.replace(/[^a-zA-Z0-9_\- ]/g, '').trim().replace(/ /g, '_');

@@ -40,17 +40,28 @@ function toNum(value: Decimal | number | null | undefined): number {
 
 // ─── Eligibility ────────────────────────────────────────────────────────────
 
-async function getLastThreeAnnualYears(companyId: string): Promise<number[]> {
+// Real (closed) years compared against the projection — always BEFORE the
+// Forecast year, so an annual record of the Forecast year itself never gets
+// compared with its own projection:
+//   Forecast Y          vs. Y-1, Y-2, Y-3
+//   Budget Y+1          vs. Forecast Y, Y-1, Y-2
+export const REAL_YEARS_BY_TYPE: Record<ComparisonReportType, number> = {
+  FORECAST_VS_ANNUAL: 3,
+  FORECAST_BUDGET_VS_ANNUAL: 2,
+};
+
+async function getRealYearsBefore(companyId: string, beforeYear: number, count: number): Promise<number[]> {
   const years = await prisma.fiscalYear.findMany({
     where: {
       companyId,
+      year: { lt: beforeYear },
       quarter: 0,
       month: 0,
       incomeStatement: { isNot: null },
       balanceSheet: { isNot: null },
     },
     orderBy: { year: 'desc' },
-    take: 3,
+    take: count,
     select: { year: true },
   });
   return years.map(y => y.year).sort((a, b) => a - b);
@@ -67,11 +78,12 @@ export async function checkEligibility(
   const forecastYear = new Date().getFullYear();
   const budgetYear = forecastYear + 1;
 
-  const annualYears = await getLastThreeAnnualYears(companyId);
-  if (annualYears.length < 3) {
+  const required = REAL_YEARS_BY_TYPE[type];
+  const annualYears = await getRealYearsBefore(companyId, forecastYear, required);
+  if (annualYears.length < required) {
     return {
       eligible: false,
-      reason: `Se requieren 3 años de datos anuales completos para este informe. Actualmente hay ${annualYears.length} registrado${annualYears.length === 1 ? '' : 's'}.`,
+      reason: `Se requieren ${required} años de datos anuales completos anteriores a ${forecastYear} para este informe. Actualmente hay ${annualYears.length} registrado${annualYears.length === 1 ? '' : 's'}.`,
       annualYears, forecastYear, budgetYear,
     };
   }
@@ -128,7 +140,27 @@ function buildPeriodStatements(
   calc: MonthlyForecastResult,
   base: PeriodBase,
 ): { income: IncomeStatementData; balance: BalanceSheetData } {
-  const { annualPnL, annualBalance } = calc;
+  // The period's own figures: P&G = sum of its 12 computed months, balance =
+  // its December close. (calc.annualPnL / calc.annualBalance are the engine's
+  // INPUT base — the prior real year for a Forecast, the Forecast for a Budget —
+  // so using them made every projected period repeat the year it starts from.)
+  const annualPnL = calc.pnl.reduce(
+    (acc, m) => ({
+      revenue: acc.revenue + m.revenue,
+      costOfSales: acc.costOfSales + m.costOfSales,
+      adminExpenses: acc.adminExpenses + m.adminExpenses,
+      exceptionalIncome: acc.exceptionalIncome + m.exceptionalIncome,
+      exceptionalExpenses: acc.exceptionalExpenses + m.exceptionalExpenses,
+      financialIncome: acc.financialIncome + m.financialIncome,
+      financialExpenses: acc.financialExpenses + m.financialExpenses,
+      incomeTax: acc.incomeTax + m.incomeTax,
+    }),
+    {
+      revenue: 0, costOfSales: 0, adminExpenses: 0, exceptionalIncome: 0, exceptionalExpenses: 0,
+      financialIncome: 0, financialExpenses: 0, incomeTax: 0,
+    },
+  );
+  const annualBalance = calc.balance[calc.balance.length - 1];
 
   const depreciation = base.baseRevenue !== 0
     ? base.baseDepreciation * (annualPnL.revenue / base.baseRevenue)
@@ -284,7 +316,7 @@ export async function buildComparisonFinancialData(
   const { annualYears, forecastYear, budgetYear } = elig;
 
   // Real years: reuse the same builder the annual Prometheia report uses, then
-  // keep only the last 3 years so both pipelines stay driven by one source of truth.
+  // keep only the compared years so both pipelines stay driven by one source of truth.
   const allReal = await buildFinancialData(companyId);
 
   const incomeData: FinancialDataForAI['incomeData'] = {};

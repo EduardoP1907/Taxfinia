@@ -159,7 +159,6 @@ export class MonthlyReportController {
     try {
       const { id, format } = req.params;
       const variant = req.params.variant as Variant;
-      const code = (req.query.code as string) || '';
 
       if (!['prometheia', 'ejecutivo'].includes(variant)) {
         res.status(400).json({ error: 'Variante no válida. Use prometheia o ejecutivo' });
@@ -174,12 +173,6 @@ export class MonthlyReportController {
       if (!report) { res.status(404).json({ error: 'Informe no encontrado' }); return; }
       if (report.status !== 'COMPLETED') {
         res.status(400).json({ error: 'El informe aún no está listo', status: report.status });
-        return;
-      }
-
-      const storedCode = report.downloadCode;
-      if (storedCode && storedCode.toUpperCase() !== code.trim().toUpperCase()) {
-        res.status(403).json({ error: 'Código de descarga requerido', requiresCode: true });
         return;
       }
 

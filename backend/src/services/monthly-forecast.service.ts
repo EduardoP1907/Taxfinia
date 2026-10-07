@@ -473,20 +473,23 @@ export const monthlyForecastService = {
       basePnL = forecastResult.pnl;
       historicalUpToYear = forecastResult.baseYear;
     } else {
-      // Load base annual data: most recent year ≤ forecastYear that has both statements.
-      // For a 2026 forecast the ideal base is 2025; falls back to whatever is newest available.
-      const fiscalYear = await prisma.fiscalYear.findFirst({
-        where: {
-          companyId,
-          year: { lte: year },
-          quarter: 0,
-          month: 0,
-          incomeStatement: { isNot: null },
-          balanceSheet:    { isNot: null },
-        },
-        include: { incomeStatement: true, balanceSheet: true },
-        orderBy: { year: 'desc' },
-      });
+      // Load base annual data: most recent year BEFORE the forecast year that has
+      // both statements (a 2026 forecast is based on 2025, never on an annual
+      // 2026 record). Only if no prior year exists, fall back to the year itself.
+      const findBase = (yearFilter: { lt: number } | { lte: number }) =>
+        prisma.fiscalYear.findFirst({
+          where: {
+            companyId,
+            year: yearFilter,
+            quarter: 0,
+            month: 0,
+            incomeStatement: { isNot: null },
+            balanceSheet:    { isNot: null },
+          },
+          include: { incomeStatement: true, balanceSheet: true },
+          orderBy: { year: 'desc' },
+        });
+      const fiscalYear = (await findBase({ lt: year })) ?? (await findBase({ lte: year }));
       if (!fiscalYear) {
         throw new Error(
           'No hay datos financieros anuales disponibles. Introduce primero los datos anuales de la empresa.',

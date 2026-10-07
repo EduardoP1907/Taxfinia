@@ -3,8 +3,8 @@
  *
  * Dos informes IA comparativos, con el mismo contenido narrativo (13 secciones)
  * que el Informe Anual Prometheia, pero comparando periodos:
- *  - Forecast del año en curso vs. los últimos 3 años anuales reales
- *  - Forecast vs. Budget del año siguiente vs. los últimos 3 años anuales reales
+ *  - Forecast del año en curso vs. los 3 años anuales reales anteriores
+ *  - Budget del año siguiente vs. Forecast del año en curso y los 2 años anuales reales anteriores
  */
 
 import React, { useState, useEffect } from 'react';
@@ -64,16 +64,16 @@ export const ComparisonReportsPage: React.FC = () => {
           companyId={companyId}
           companyName={companyName}
           type="FORECAST_VS_ANNUAL"
-          title={`Forecast ${forecastYear} vs. Últimos 3 Años`}
-          description={`Compara la proyección del ejercicio en curso contra los últimos 3 años anuales reales — mismo contenido que el Informe Anual Prometheia`}
+          title={`Forecast ${forecastYear} vs. ${forecastYear - 1}, ${forecastYear - 2} y ${forecastYear - 3}`}
+          description={`Compara la proyección del ejercicio en curso contra los 3 años anuales reales anteriores — mismo contenido que el Informe Anual Prometheia`}
         />
 
         <ComparisonAIReportPanel
           companyId={companyId}
           companyName={companyName}
           type="FORECAST_BUDGET_VS_ANNUAL"
-          title={`Forecast ${forecastYear} vs. Budget ${budgetYear} vs. Últimos 3 Años`}
-          description={`Compara la proyección del ejercicio en curso y el presupuesto del próximo año contra los últimos 3 años anuales reales`}
+          title={`Budget ${budgetYear} vs. Forecast ${forecastYear}, ${forecastYear - 1} y ${forecastYear - 2}`}
+          description={`Compara el presupuesto del próximo año contra el Forecast del ejercicio en curso y los 2 años anuales reales anteriores`}
         />
       </div>
     </DashboardLayout>

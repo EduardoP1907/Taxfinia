@@ -9,6 +9,9 @@ router.use(authMiddleware);
 // GET /api/comparison-reports/:companyId/eligibility?type=FORECAST_VS_ANNUAL|FORECAST_BUDGET_VS_ANNUAL
 router.get('/:companyId/eligibility', comparisonReportController.eligibility.bind(comparisonReportController));
 
+// POST /api/comparison-reports/generate/:companyId   body: { type } — async (202), client polls
+router.post('/generate/:companyId', comparisonReportController.generate.bind(comparisonReportController));
+
 // POST /api/comparison-reports/generate-sync/:companyId   body: { type }
 router.post('/generate-sync/:companyId', comparisonReportController.generateSync.bind(comparisonReportController));
 

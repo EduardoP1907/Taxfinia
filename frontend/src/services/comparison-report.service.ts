@@ -29,8 +29,9 @@ export const comparisonReportService = {
     return response.data;
   },
 
+  // Starts generation in the background (202) — poll getCompanyReports until it ends
   async generateReport(companyId: string, type: ComparisonReportType): Promise<{ reportId: string; report: ComparisonReport }> {
-    const response = await api.post(`/comparison-reports/generate-sync/${companyId}`, { type });
+    const response = await api.post(`/comparison-reports/generate/${companyId}`, { type });
     return response.data;
   },
 
