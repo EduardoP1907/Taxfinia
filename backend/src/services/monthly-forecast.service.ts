@@ -282,7 +282,9 @@ function calcMonthlyPnL(
 //   item_N = factor * item_base            (revenue-driver items)
 //   item_N = costsF * item_base            (costs-driver: inventory, accountsPayable)
 //   equity_N = equity_(N-1) + netIncome_N  (Sheet row 16: C16 = B16 + FCASTPPGG2026!C21)
-//   fixedAssets_N = factor*base  (sin la cuadratura C31 del Excel; el descuadre queda en "imbalance")
+//   fixedAssets_N = factor*base
+//   cash_N = factor*base + plug_N, where plug_N = TotalPasivoYPN_N - TotalActivoSinPlug_N
+//     (la cuadratura C31 del Excel va a Disponible en vez de a Activo Fijo)
 
 function calcMonthlyBalance(
   base: AnnualBalance,
@@ -325,8 +327,7 @@ function calcMonthlyBalance(
     const accountsReceivable = ov('accountsReceivable', m) ?? rf * base.accountsReceivable;
     const otherReceivables = ov('otherReceivables', m) ?? rf * base.otherReceivables;
     const taxReceivables = ov('taxReceivables', m) ?? rf * base.taxReceivables;
-    const cashEquivalents = ov('cashEquivalents', m) ?? rf * base.cashEquivalents;
-    const totalCurrentAssets = inventory + accountsReceivable + otherReceivables + taxReceivables + cashEquivalents;
+    const cashOverride = ov('cashEquivalents', m);
 
     const provisionsLp = ov('provisionsLp', m) ?? rf * base.provisionsLp;
     const bankDebtLp = ov('bankDebtLp', m) ?? rf * base.bankDebtLp;
@@ -343,11 +344,23 @@ function calcMonthlyBalance(
 
     const totalEquityAndLiabilities = equity + totalNoncurrentLiabilities + totalCurrentLiabilities;
 
-    // No balancing plug: Activo Fijo follows the revenue factor like the other
-    // items, and any mismatch shows up in the "Descuadratura" row.
     const fixedAssets = ov('fixedAssets', m) ?? rf * base.fixedAssets;
-
     const totalNoncurrentAssets = fixedAssets + otherNoncurrentAssets + financialInvestmentsLp;
+
+    // Balancing plug ("Descuadratura") absorbed into Disponible (tesorería) so
+    // Activo = Pasivo + PN every month, unless the user overrode Disponible —
+    // then the "Descuadratura" row may show a non-zero value.
+    let cashEquivalents: number;
+    if (cashOverride !== null) {
+      cashEquivalents = cashOverride;
+    } else {
+      const cashUnplugged = rf * base.cashEquivalents;
+      const totalAssetsUnplugged =
+        totalNoncurrentAssets + inventory + accountsReceivable + otherReceivables + taxReceivables + cashUnplugged;
+      cashEquivalents = cashUnplugged + (totalEquityAndLiabilities - totalAssetsUnplugged);
+    }
+    const totalCurrentAssets = inventory + accountsReceivable + otherReceivables + taxReceivables + cashEquivalents;
+
     const totalAssets = totalNoncurrentAssets + totalCurrentAssets;
     const imbalance = totalEquityAndLiabilities - totalAssets; // ~0 unless overridden
 

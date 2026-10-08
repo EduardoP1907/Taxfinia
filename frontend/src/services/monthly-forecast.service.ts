@@ -276,8 +276,7 @@ export function calcBalanceClient(
     const accountsReceivable = ov('accountsReceivable', m) ?? rf * base.accountsReceivable;
     const otherReceivables = ov('otherReceivables', m) ?? rf * base.otherReceivables;
     const taxReceivables = ov('taxReceivables', m) ?? rf * base.taxReceivables;
-    const cashEquivalents = ov('cashEquivalents', m) ?? rf * base.cashEquivalents;
-    const totalCurrentAssets = inventory + accountsReceivable + otherReceivables + taxReceivables + cashEquivalents;
+    const cashOverride = ov('cashEquivalents', m);
 
     const provisionsLp = ov('provisionsLp', m) ?? rf * base.provisionsLp;
     const bankDebtLp = ov('bankDebtLp', m) ?? rf * base.bankDebtLp;
@@ -294,11 +293,22 @@ export function calcBalanceClient(
 
     const totalEquityAndLiabilities = equity + totalNoncurrentLiabilities + totalCurrentLiabilities;
 
-    // Sin cuadratura: Activo Fijo sigue la evolución de ventas como el resto;
-    // cualquier descuadre queda visible en la fila «Descuadratura».
     const fixedAssets = ov('fixedAssets', m) ?? rf * base.fixedAssets;
-
     const totalNoncurrentAssets = fixedAssets + otherNoncurrentAssets + financialInvestmentsLp;
+
+    // La descuadratura se suma a Disponible (tesorería) para que Activo = Pasivo + PN,
+    // salvo que el usuario haya escrito Disponible a mano en ese mes.
+    let cashEquivalents: number;
+    if (cashOverride !== null) {
+      cashEquivalents = cashOverride;
+    } else {
+      const cashUnplugged = rf * base.cashEquivalents;
+      const totalAssetsUnplugged =
+        totalNoncurrentAssets + inventory + accountsReceivable + otherReceivables + taxReceivables + cashUnplugged;
+      cashEquivalents = cashUnplugged + (totalEquityAndLiabilities - totalAssetsUnplugged);
+    }
+    const totalCurrentAssets = inventory + accountsReceivable + otherReceivables + taxReceivables + cashEquivalents;
+
     const totalAssets = totalNoncurrentAssets + totalCurrentAssets;
     const imbalance = totalEquityAndLiabilities - totalAssets;
 
