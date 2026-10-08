@@ -219,8 +219,20 @@ export class CompanyService {
 
 export const companyService = new CompanyService();
 
+/**
+ * Cuentas cuyas empresas nunca se bloquean: mantienen acceso permanente a
+ * los datos anuales aunque hayan generado informes o usado el asistente.
+ */
+export const LOCK_EXEMPT_EMAILS = ['fmonroyfe@gmail.com'];
+
 /** Lock a company so its financial data can no longer be edited */
 export async function lockCompany(companyId: string): Promise<void> {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { user: { select: { email: true } } },
+  });
+  if (company && LOCK_EXEMPT_EMAILS.includes(company.user.email.toLowerCase())) return;
+
   await prisma.company.update({
     where: { id: companyId },
     data: { isLocked: true },
