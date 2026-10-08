@@ -294,17 +294,9 @@ export function calcBalanceClient(
 
     const totalEquityAndLiabilities = equity + totalNoncurrentLiabilities + totalCurrentLiabilities;
 
-    const fixedAssetsOverride = ov('fixedAssets', m);
-    let fixedAssets: number;
-    if (fixedAssetsOverride !== null) {
-      fixedAssets = fixedAssetsOverride;
-    } else {
-      const fixedAssetsUnplugged = rf * base.fixedAssets;
-      const totalAssetsUnplugged =
-        fixedAssetsUnplugged + otherNoncurrentAssets + financialInvestmentsLp + totalCurrentAssets;
-      const plug = totalEquityAndLiabilities - totalAssetsUnplugged;
-      fixedAssets = fixedAssetsUnplugged + plug;
-    }
+    // Sin cuadratura: Activo Fijo sigue la evolución de ventas como el resto;
+    // cualquier descuadre queda visible en la fila «Descuadratura».
+    const fixedAssets = ov('fixedAssets', m) ?? rf * base.fixedAssets;
 
     const totalNoncurrentAssets = fixedAssets + otherNoncurrentAssets + financialInvestmentsLp;
     const totalAssets = totalNoncurrentAssets + totalCurrentAssets;

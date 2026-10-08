@@ -1042,7 +1042,7 @@ const MonthlyForecastContent: React.FC<{
               {isBudget
                 ? 'El balance se calcula automáticamente a partir del cierre proyectado del Forecast y las tasas de crecimiento — no es editable directamente aquí. Ajusta las tasas en la pestaña Proyección P&G y pulsa «Guardar y recalcular».'
                 : 'Solo los meses cerrados (en verde) son editables: escribe un valor para sobrescribir el cálculo de ese mes, o deja la casilla vacía para usar el valor calculado. Los meses proyectados se calculan automáticamente según la evolución de ventas/costes y no se pueden editar directamente — ajusta «Meses cerrados» arriba para habilitar más meses. Pulsa «Guardar y recalcular» para aplicar los cambios.'}
-              El Activo Fijo absorbe automáticamente cualquier descuadre (igual que la fórmula CUADRATURA de la hoja FCASTBCE2026) mientras no lo sobrescribas manualmente, por lo que Total Activo = Total Pasivo + Patrimonio Neto todos los meses.
+              El Activo Fijo evoluciona según las ventas, igual que el resto de partidas; la diferencia entre Total Activo y Total Pasivo + Patrimonio Neto se muestra en la fila «Descuadratura».
             </p>
           </div>
         )}

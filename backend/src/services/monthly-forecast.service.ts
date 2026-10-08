@@ -282,9 +282,7 @@ function calcMonthlyPnL(
 //   item_N = factor * item_base            (revenue-driver items)
 //   item_N = costsF * item_base            (costs-driver: inventory, accountsPayable)
 //   equity_N = equity_(N-1) + netIncome_N  (Sheet row 16: C16 = B16 + FCASTPPGG2026!C21)
-//   fixedAssets_N = factor*base + plug_N   (Sheet row 4: C4 = ... + C31 "CUADRATURA")
-//     where plug_N = TotalPasivoYPN_N - TotalActivoSinPlug_N, forcing Activo = Pasivo+PN
-//     every month exactly like the Excel model's balancing plug.
+//   fixedAssets_N = factor*base  (sin la cuadratura C31 del Excel; el descuadre queda en "imbalance")
 
 function calcMonthlyBalance(
   base: AnnualBalance,
@@ -345,20 +343,9 @@ function calcMonthlyBalance(
 
     const totalEquityAndLiabilities = equity + totalNoncurrentLiabilities + totalCurrentLiabilities;
 
-    // Balancing plug ("CUADRATURA"): absorbed into Activo Fijo so the sheet always squares,
-    // unless the user overrode Activo Fijo directly — then the sheet may show a non-zero
-    // "Descuadratura" row, same as manually editing the Excel cell would.
-    const fixedAssetsOverride = ov('fixedAssets', m);
-    let fixedAssets: number;
-    if (fixedAssetsOverride !== null) {
-      fixedAssets = fixedAssetsOverride;
-    } else {
-      const fixedAssetsUnplugged = rf * base.fixedAssets;
-      const totalAssetsUnplugged =
-        fixedAssetsUnplugged + otherNoncurrentAssets + financialInvestmentsLp + totalCurrentAssets;
-      const plug = totalEquityAndLiabilities - totalAssetsUnplugged;
-      fixedAssets = fixedAssetsUnplugged + plug;
-    }
+    // No balancing plug: Activo Fijo follows the revenue factor like the other
+    // items, and any mismatch shows up in the "Descuadratura" row.
+    const fixedAssets = ov('fixedAssets', m) ?? rf * base.fixedAssets;
 
     const totalNoncurrentAssets = fixedAssets + otherNoncurrentAssets + financialInvestmentsLp;
     const totalAssets = totalNoncurrentAssets + totalCurrentAssets;
