@@ -15,6 +15,16 @@ export type BalanceOverrideKey = typeof BALANCE_OVERRIDE_KEYS[number];
 // { [fieldKey]: (number|null)[12] } — null means "use the calculated value".
 export type BalanceOverrides = Record<BalanceOverrideKey, (number | null)[]>;
 
+// P&G concepts whose projected Forecast months the user can overwrite by hand.
+export const PNL_OVERRIDE_KEYS = [
+  'exceptionalIncome', 'exceptionalExpenses', 'financialIncome', 'financialExpenses',
+] as const;
+
+export type PnlOverrideKey = typeof PNL_OVERRIDE_KEYS[number];
+
+// { [conceptKey]: (number|null)[12] } — null means "use the calculated value".
+export type PnlOverrides = Record<PnlOverrideKey, (number | null)[]>;
+
 export interface MonthlyForecastConfig {
   closedMonths: number;
   actualRevenue: number[];
@@ -34,6 +44,7 @@ export interface MonthlyForecastConfig {
   rateFinancialExpenses: number[];
   rateIncomeTax: number[];
   balanceOverrides: BalanceOverrides;
+  pnlOverrides: PnlOverrides;
 }
 
 export interface MonthlyPnLRow {
@@ -142,9 +153,16 @@ export function calcPnLClient(
   cfg: MonthlyForecastConfig,
   base: AnnualPnLBase,
   monthlyBase?: MonthlyPnLRow[],
+  applyPnlOverrides = true,
 ): MonthlyPnLRow[] {
   const rows: MonthlyPnLRow[] = [];
   const { closedMonths } = cfg;
+  // Manual value for a projected month, or null to keep the calculated one.
+  const ov = (key: PnlOverrideKey, m: number): number | null => {
+    if (!applyPnlOverrides) return null;
+    const v = cfg.pnlOverrides?.[key]?.[m];
+    return typeof v === 'number' && !isNaN(v) ? v : null;
+  };
 
   for (let m = 0; m < 12; m++) {
     const isClosed = m < closedMonths;
@@ -192,6 +210,16 @@ export function calcPnLClient(
       exceptionalExpenses= prev.exceptionalExpenses* (1 + (cfg.rateExceptionalExpenses[m]?? 0));
       financialIncome    = prev.financialIncome    * (1 + (cfg.rateFinancialIncome[m]    ?? 0));
       financialExpenses  = prev.financialExpenses  * (1 + (cfg.rateFinancialExpenses[m]  ?? 0));
+    }
+
+    // Projected months: a manual value replaces the calculated one and flows
+    // through the subtotals, EBT, taxes and net income below — and the next
+    // month grows over it (prev × (1 + rate)), like an overwritten Excel cell.
+    if (!isClosed) {
+      exceptionalIncome   = ov('exceptionalIncome', m)   ?? exceptionalIncome;
+      exceptionalExpenses = ov('exceptionalExpenses', m) ?? exceptionalExpenses;
+      financialIncome     = ov('financialIncome', m)     ?? financialIncome;
+      financialExpenses   = ov('financialExpenses', m)   ?? financialExpenses;
     }
 
     const grossMargin       = revenue - costOfSales;
@@ -339,6 +367,12 @@ export function defaultBalanceOverrides(): BalanceOverrides {
   return obj;
 }
 
+export function defaultPnlOverrides(): PnlOverrides {
+  const obj = {} as PnlOverrides;
+  for (const key of PNL_OVERRIDE_KEYS) obj[key] = Array(12).fill(null);
+  return obj;
+}
+
 export function buildDefaultConfig(): MonthlyForecastConfig {
   return {
     closedMonths: 0,
@@ -359,6 +393,7 @@ export function buildDefaultConfig(): MonthlyForecastConfig {
     rateFinancialExpenses: defaultRates(),
     rateIncomeTax: defaultRates(),
     balanceOverrides: defaultBalanceOverrides(),
+    pnlOverrides: defaultPnlOverrides(),
   };
 }
 
@@ -404,6 +439,10 @@ export function mergeConfig(
     acc[key] = overrideArr(stored.balanceOverrides?.[key]);
     return acc;
   }, {} as BalanceOverrides);
+  const pnlOverrides = PNL_OVERRIDE_KEYS.reduce((acc, key) => {
+    acc[key] = overrideArr(stored.pnlOverrides?.[key]);
+    return acc;
+  }, {} as PnlOverrides);
   return {
     closedMonths: stored.closedMonths ?? 0,
     actualRevenue: arr(stored.actualRevenue, def.actualRevenue),
@@ -423,5 +462,6 @@ export function mergeConfig(
     rateFinancialExpenses: arr(stored.rateFinancialExpenses, def.rateFinancialExpenses),
     rateIncomeTax: arr(stored.rateIncomeTax, def.rateIncomeTax),
     balanceOverrides,
+    pnlOverrides,
   };
 }

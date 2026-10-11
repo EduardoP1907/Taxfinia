@@ -5,9 +5,9 @@ import { CompanySelector } from '../../components/companies/CompanySelector';
 import { companyService } from '../../services/company.service';
 import type { Company } from '../../types/company';
 import {
-  monthlyForecastService, mergeConfig, MONTHS, calcPnLClient, calcBalanceClient,
+  monthlyForecastService, mergeConfig, MONTHS, calcPnLClient, calcBalanceClient, PNL_OVERRIDE_KEYS,
   type MonthlyForecastConfig, type MonthlyForecastResult, type MonthlyPnLRow,
-  type MonthlyBalanceRow, type BalanceOverrideKey,
+  type MonthlyBalanceRow, type BalanceOverrideKey, type PnlOverrideKey,
 } from '../../services/monthly-forecast.service';
 import { evaluateArithmeticExpression } from '../../utils/arithmetic';
 import { PercentInput } from '../../components/ui/PercentInput';
@@ -189,7 +189,8 @@ const BALANCE_LIABILITIES: BalanceLine[] = [
 const ActualInput: React.FC<{
   value: number;
   onChange: (v: number) => void;
-}> = ({ value, onChange }) => {
+  label?: string;
+}> = ({ value, onChange, label }) => {
   const [local, setLocal] = useState(value === 0 ? '' : String(value));
   const ref = useRef<HTMLInputElement>(null);
 
@@ -199,6 +200,7 @@ const ActualInput: React.FC<{
 
   return (
     <input
+      aria-label={label}
       ref={ref}
       type="text"
       inputMode="decimal"
@@ -243,7 +245,8 @@ const BalanceOverrideInput: React.FC<{
   value: number | null;
   computed: number;
   onChange: (v: number | null) => void;
-}> = ({ value, computed, onChange }) => {
+  label?: string;
+}> = ({ value, computed, onChange, label }) => {
   const [local, setLocal] = useState(value === null ? '' : String(value));
 
   useEffect(() => {
@@ -252,6 +255,7 @@ const BalanceOverrideInput: React.FC<{
 
   return (
     <input
+      aria-label={label}
       type="text"
       inputMode="decimal"
       value={local}
@@ -422,6 +426,13 @@ const MonthlyForecastContent: React.FC<{
     setConfig({ ...config, [key]: arr });
   };
 
+  const setPnlOverride = (key: PnlOverrideKey, m: number, v: number | null) => {
+    if (!config) return;
+    const arr = [...(config.pnlOverrides[key] ?? Array(12).fill(null))];
+    arr[m] = v;
+    setConfig({ ...config, pnlOverrides: { ...config.pnlOverrides, [key]: arr } });
+  };
+
   const setBalanceOverride = (key: BalanceOverrideKey, m: number, v: number | null) => {
     if (!config) return;
     const arr = [...(config.balanceOverrides[key] ?? Array(12).fill(null))];
@@ -460,7 +471,7 @@ const MonthlyForecastContent: React.FC<{
     const effectiveConfig = isBudget
       ? { ...config, closedMonths: 0 }
       : ((noBaseData && closedMonths === 0) ? { ...config, closedMonths: 12 } : config);
-    return calcPnLClient(effectiveConfig, base, isBudget ? result?.basePnL : undefined);
+    return calcPnLClient(effectiveConfig, base, isBudget ? result?.basePnL : undefined, !isBudget);
   }, [config, result, noBaseData, isBudget, closedMonths]);
 
   // Live Balance computed client-side from the live P&G + current overrides,
@@ -507,8 +518,10 @@ const MonthlyForecastContent: React.FC<{
                 Budget has no closed-month concept — it's always fully rate-driven. */}
             {config && !isBudget && (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500">Meses cerrados:</span>
+                <label htmlFor="closed-months" className="text-sm text-slate-500">Meses cerrados:</label>
                 <select
+                  id="closed-months"
+                  name="closedMonths"
                   value={closedMonths}
                   onChange={e => setConfig({ ...config, closedMonths: parseInt(e.target.value) })}
                   className="text-sm border border-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400"
@@ -692,8 +705,25 @@ const MonthlyForecastContent: React.FC<{
                                   return (
                                     <td key={i} className="px-1 py-1 bg-green-50">
                                       <ActualInput
+                                        label={`${concept.label} — ${MONTHS[i]}`}
                                         value={(config[concept.actualKey] as number[])[i]}
                                         onChange={v => setActual(concept.actualKey!, i, v)}
+                                      />
+                                    </td>
+                                  );
+                                }
+
+                                // Forecast, mes proyectado, excepcionales/financieros → valor
+                                // editable; vacío = valor calculado por la tasa (placeholder)
+                                const pnlKey = concept.resultKey as PnlOverrideKey;
+                                if (!isBudget && !isClosed && PNL_OVERRIDE_KEYS.includes(pnlKey)) {
+                                  return (
+                                    <td key={i} className="px-1 py-1">
+                                      <BalanceOverrideInput
+                                        label={`${concept.label} — ${MONTHS[i]}`}
+                                        value={config.pnlOverrides[pnlKey]?.[i] ?? null}
+                                        computed={val}
+                                        onChange={v => setPnlOverride(pnlKey, i, v)}
                                       />
                                     </td>
                                   );
@@ -937,6 +967,7 @@ const MonthlyForecastContent: React.FC<{
                               return (
                                 <td key={i} className="px-1 py-1 bg-green-50">
                                   <BalanceOverrideInput
+                                    label={`${line.label} — ${MONTHS[i]}`}
                                     value={config.balanceOverrides[key]?.[i] ?? null}
                                     computed={computed}
                                     onChange={v => setBalanceOverride(key, i, v)}
@@ -1007,6 +1038,7 @@ const MonthlyForecastContent: React.FC<{
                               return (
                                 <td key={i} className="px-1 py-1 bg-green-50">
                                   <BalanceOverrideInput
+                                    label={`${line.label} — ${MONTHS[i]}`}
                                     value={config.balanceOverrides[key]?.[i] ?? null}
                                     computed={val}
                                     onChange={v => setBalanceOverride(key, i, v)}

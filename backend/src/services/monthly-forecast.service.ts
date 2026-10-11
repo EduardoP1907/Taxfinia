@@ -141,6 +141,24 @@ function jsonToOverrideArray(json: any): (number | null)[] {
   return arr.slice(0, 12).map(v => (typeof v === 'number' && !isNaN(v) ? v : null));
 }
 
+// P&G concepts whose projected Forecast months the user can overwrite by hand.
+export const PNL_OVERRIDE_KEYS = [
+  'exceptionalIncome', 'exceptionalExpenses', 'financialIncome', 'financialExpenses',
+] as const;
+
+export type PnlOverrideKey = typeof PNL_OVERRIDE_KEYS[number];
+
+// { [conceptKey]: (number|null)[12] } — null means "use the calculated value".
+export type PnlOverrides = Partial<Record<PnlOverrideKey, (number | null)[]>>;
+
+function normalizePnlOverrides(stored: any): PnlOverrides {
+  const result: PnlOverrides = {};
+  for (const key of PNL_OVERRIDE_KEYS) {
+    result[key] = jsonToOverrideArray(stored?.[key]);
+  }
+  return result;
+}
+
 function normalizeBalanceOverrides(stored: any): BalanceOverrides {
   const result: BalanceOverrides = {};
   for (const key of BALANCE_OVERRIDE_KEYS) {
@@ -204,8 +222,14 @@ function calcMonthlyPnL(
   actual: Record<keyof AnnualPnL, number[]>,
   rates: Record<keyof AnnualPnL, number[]>,
   monthlyBase?: MonthlyPnLRow[],
+  overrides: PnlOverrides = {},
 ): MonthlyPnLRow[] {
   const rows: MonthlyPnLRow[] = [];
+  // Manual value for a projected month, or null to keep the calculated one.
+  const ov = (key: PnlOverrideKey, m: number): number | null => {
+    const v = overrides[key]?.[m];
+    return typeof v === 'number' && !isNaN(v) ? v : null;
+  };
 
   for (let m = 0; m < 12; m++) {
     const isClosed = m < closedMonths;
@@ -252,6 +276,16 @@ function calcMonthlyPnL(
       exceptionalExpenses = prev.exceptionalExpenses * (1 + rates.exceptionalExpenses[m]);
       financialIncome = prev.financialIncome * (1 + rates.financialIncome[m]);
       financialExpenses = prev.financialExpenses * (1 + rates.financialExpenses[m]);
+    }
+
+    // Projected months: a manual value replaces the calculated one and flows
+    // through the subtotals, EBT, taxes and net income below — and the next
+    // month grows over it (prev × (1 + rate)), like an overwritten Excel cell.
+    if (!isClosed) {
+      exceptionalIncome = ov('exceptionalIncome', m) ?? exceptionalIncome;
+      exceptionalExpenses = ov('exceptionalExpenses', m) ?? exceptionalExpenses;
+      financialIncome = ov('financialIncome', m) ?? financialIncome;
+      financialExpenses = ov('financialExpenses', m) ?? financialExpenses;
     }
 
     const grossMargin = revenue - costOfSales;
@@ -403,6 +437,7 @@ export const monthlyForecastService = {
     rateFinancialExpenses?: number[];
     rateIncomeTax?: number[];
     balanceOverrides?: BalanceOverrides;
+    pnlOverrides?: PnlOverrides;
   }) {
     return prisma.monthlyForecast.upsert({
       where: { companyId_year: { companyId, year } },
@@ -554,7 +589,11 @@ export const monthlyForecastService = {
     // Budget rows are never manually overridden — only their growth rates are editable.
     const balanceOverrides = mode === 'budget' ? {} : normalizeBalanceOverrides(stored?.balanceOverrides);
 
-    const pnl = calcMonthlyPnL(annualPnL, closedMonths, actual, rates, basePnL);
+    // Only the Forecast accepts manual P&G values; the Budget inherits them
+    // through its Forecast base months.
+    const pnlOverrides = mode === 'budget' ? {} : normalizePnlOverrides(stored?.pnlOverrides);
+
+    const pnl = calcMonthlyPnL(annualPnL, closedMonths, actual, rates, basePnL, pnlOverrides);
     const balance = calcMonthlyBalance(
       annualBalance, annualPnL.revenue, annualPnL.costOfSales, pnl, balanceOverrides,
     );

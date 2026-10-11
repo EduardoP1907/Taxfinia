@@ -405,6 +405,10 @@ model MonthlyForecast {
   // JSON shape: { [fieldKey]: (number|null)[12] } — null means "use the calculated value".
   balanceOverrides Json? @map("balance_overrides")
 
+  // Manual overrides for projected P&G months (Forecast only): ingresos/gastos
+  // excepcionales y financieros. Same shape as balanceOverrides.
+  pnlOverrides Json? @map("pnl_overrides")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
