@@ -35,8 +35,63 @@ function ensureReportsDir() {
   }
 }
 
+// ─── DCF data (Hoja 4.3) ─────────────────────────────────────────────────────
+// Devuelve el WACC y el valor de empresa tal como se presentan en la Hoja 4.3.
+// - Prefiere el escenario cuyo año base coincide con el año del informe.
+// - Si el escenario no tiene WACC guardado, lo estima con IA (igual que la Hoja 4.3).
+// - Si el valor de empresa no está persistido, lo calcula con la misma fórmula
+//   que la Hoja 4.3 (PV de FCFs a 5 años + PV del valor terminal).
+export async function getDcfData(companyId: string, preferredBaseYear?: number) {
+  const scenarios = await prisma.projectionScenario.findMany({
+    where: { companyId },
+    orderBy: { updatedAt: 'desc' },
+    include: { projections: { orderBy: { year: 'asc' } } },
+  });
+  if (scenarios.length === 0) return undefined;
+
+  const withWacc = scenarios.filter(s => s.wacc != null);
+  let scenario =
+    withWacc.find(s => s.baseYear === preferredBaseYear) ??
+    withWacc[0] ??
+    scenarios.find(s => s.baseYear === preferredBaseYear) ??
+    scenarios[0];
+
+  let wacc = toNumOpt(scenario.wacc);
+  let terminalGrowthRate = toNumOpt(scenario.terminalGrowthRate);
+
+  if (wacc == null) {
+    try {
+      const { refreshWaccForScenario } = await import('../controllers/projections.controller');
+      const estimate = await refreshWaccForScenario(scenario.id);
+      wacc = estimate.wacc;
+      terminalGrowthRate = terminalGrowthRate ?? estimate.terminalGrowthRate;
+    } catch (err) {
+      console.warn('[REPORT] No se pudo estimar el WACC para el informe:', err);
+      return undefined;
+    }
+  }
+
+  let equityValue = toNumOpt(scenario.equityValue);
+  if (equityValue == null && wacc != null && wacc > 0) {
+    const g = terminalGrowthRate ?? 0;
+    const flows = scenario.projections.slice(1, 6).map((p, i) => {
+      const fcf = toNum(p.freeCashFlow);
+      const discountFactor = 1 / Math.pow(1 + wacc!, i + 1);
+      return { fcf, discountFactor };
+    });
+    if (flows.length > 0 && wacc > g) {
+      const sumPv = flows.reduce((s, f) => s + f.fcf * f.discountFactor, 0);
+      const last = flows[flows.length - 1];
+      const terminalValue = (last.fcf * (1 + g)) / (wacc - g);
+      equityValue = sumPv + terminalValue * last.discountFactor;
+    }
+  }
+
+  return { wacc, equityValue, terminalGrowthRate };
+}
+
 // ─── Build financial data structures ─────────────────────────────────────────
-export async function buildFinancialData(companyId: string) {
+export async function buildFinancialData(companyId: string, preferredBaseYear?: number) {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     include: {
@@ -49,11 +104,6 @@ export async function buildFinancialData(companyId: string) {
           calculatedRatios: true,
         },
         orderBy: { year: 'asc' },
-      },
-      projections: {
-        where: { wacc: { not: null } }, // solo escenarios con DCF calculado
-        orderBy: { updatedAt: 'desc' },  // el más recientemente actualizado
-        take: 1,
       },
     },
   });
@@ -168,13 +218,8 @@ export async function buildFinancialData(companyId: string) {
     }
   }
 
-  // DCF data from projections
-  const projection = company.projections?.[0];
-  const dcfData = projection ? {
-    wacc: toNumOpt(projection.wacc),
-    equityValue: toNumOpt(projection.equityValue),
-    terminalGrowthRate: toNumOpt(projection.terminalGrowthRate),
-  } : undefined;
+  // DCF data from projections (Hoja 4.3)
+  const dcfData = await getDcfData(companyId, preferredBaseYear ?? latestYear);
 
   return {
     company: {
@@ -200,7 +245,7 @@ export async function generateReport(companyId: string, userId: string, year?: n
   ensureReportsDir();
 
   // Fetch financial data
-  const financialData = await buildFinancialData(companyId);
+  const financialData = await buildFinancialData(companyId, year);
   // Use requested year only if data exists for it; otherwise fall back to latest available
   const reportYear = (year && financialData.years.includes(year))
     ? year

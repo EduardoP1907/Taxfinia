@@ -139,6 +139,10 @@ function buildComparisonPrompt(
 
   const comparisonTable = buildComparisonTable(data, periodLabels);
 
+  const hasDcf = data.dcfData?.wacc != null;
+  const waccStr = hasDcf ? pct(data.dcfData!.wacc! * 100) : 'No disponible';
+  const equityStr = data.dcfData?.equityValue != null ? formatAmount(data.dcfData.equityValue, cur) : 'No calculado';
+
   const scopeExplanation = type === 'FORECAST_BUDGET_VS_ANNUAL'
     ? `Este informe compara TRES tipos de período: (1) los 2 últimos ejercicios REALES cerrados, (2) el FORECAST ${forecastYear} (proyección del ejercicio en curso, combina meses reales cerrados con meses proyectados), y (3) el BUDGET ${budgetYear} (presupuesto del ejercicio siguiente: cada mes se construye sobre el mismo mes del Forecast ${forecastYear}). Debes analizar explícitamente: la consistencia del Forecast frente a la tendencia histórica real, y la consistencia del Budget frente al Forecast (¿qué tasa de crecimiento implícita asume el Budget respecto al Forecast? ¿es razonable dada la tendencia histórica?).`
     : `Este informe compara los últimos 3 ejercicios REALES cerrados contra el FORECAST ${forecastYear} (proyección del ejercicio en curso, combina meses reales cerrados con meses proyectados). Debes analizar explícitamente si el Forecast es consistente con la tendencia histórica real: ¿qué tasa de crecimiento implícita asume respecto al último año real? ¿es razonable?`;
@@ -200,6 +204,11 @@ EFICIENCIA:
 - Rotación de Activo: ${nd(rat?.assetTurnover)} | DSO: ${nd(rat?.daysSalesOutstanding, 1)} días | DPO: ${nd(rat?.daysPayableOutstanding, 1)} días
 RIESGO:
 - Altman Z-Score (estimado): ${nd(rat?.altmanZScore)} ${rat?.altmanZScore != null ? (rat.altmanZScore > 2.9 ? '(Zona Segura)' : rat.altmanZScore > 1.23 ? '(Zona Gris)' : '(Zona de Alerta)') : ''}
+${hasDcf ? `
+=== VALORACIÓN DCF (Hoja 4.3) ===
+- WACC: ${waccStr}
+- Tasa Crecimiento Terminal: ${data.dcfData!.terminalGrowthRate != null ? pct(data.dcfData!.terminalGrowthRate * 100) : 'No disponible'}
+- Valor Empresa: ${equityStr}` : ''}
 
 ═══════════════════════════════════════════════════════════════════
 INSTRUCCIONES PARA EL INFORME — PROMETHEIA COMPARATIVO
@@ -236,7 +245,9 @@ Responde ÚNICAMENTE con este JSON válido (13 claves exactas):
 
   "solvencyAnalysis": "Capacidad de pago y apalancamiento proyectados.\\n- Deuda/EBITDA (estimado): [valor vs umbral 4x]\\n- Altman Z-Score (estimado): [valor e interpretación de zona]\\nConclusion: [veredicto]\\nAccion recomendada: [acción concreta]",
 
-  "valuationAnalysis": "Impacto de la proyección sobre el valor de la empresa (análisis cualitativo, no hay DCF disponible para este informe comparativo).\\n- Dirección de valor: [creación/destrucción de valor implícita en la tendencia proyectada]\\nConclusion: [veredicto]\\nAccion recomendada: [acción concreta]",
+  "valuationAnalysis": ${hasDcf
+    ? `"Impacto de la proyección sobre el valor de la empresa. Referenciar explícitamente el WACC (${waccStr}) y el valor empresa (${equityStr}) de la Hoja 4.3.\\n- Metodología: DCF\\n- WACC utilizado: ${waccStr}\\n- Valor estimado: ${equityStr}\\n- Dirección de valor: [creación/destrucción de valor implícita en la tendencia proyectada]\\nConclusion: [veredicto]\\nAccion recomendada: [acción concreta]"`
+    : `"Impacto de la proyección sobre el valor de la empresa (análisis cualitativo, no hay DCF disponible para este informe comparativo).\\n- Dirección de valor: [creación/destrucción de valor implícita en la tendencia proyectada]\\nConclusion: [veredicto]\\nAccion recomendada: [acción concreta]"`},
 
   "trendAnalysis": "Fase de ciclo del negocio según la proyección.\\n- Tasa de crecimiento del Forecast vs. CAGR histórico real: [valor]\\n- Dirección de márgenes: [expansión/contracción/estable]\\n- Tendencia de liquidez: [mejora/deterioro/estable]\\n- Tendencia de endeudamiento: [mejora/deterioro/estable]\\n- Fase empresarial proyectada: [crecimiento/estabilización/deterioro/recuperación]\\nConclusion: [veredicto de tendencia]\\nAccion recomendada: [acción concreta]",
 

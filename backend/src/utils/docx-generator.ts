@@ -309,7 +309,6 @@ export async function generateNarrativeDocx(data: DocxReportData, outputPath: st
             rows: [
               infoBox('Empresa', data.company.name),
               infoBox('NIF / RUT', data.company.taxId || 'No especificado'),
-              infoBox('Giro / Actividad', data.company.businessActivity || 'No especificado'),
               infoBox('Sector / Industria', data.company.industry || 'No especificado'),
               infoBox('País', data.company.country || 'No especificado'),
               infoBox('Moneda', currency),

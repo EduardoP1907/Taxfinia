@@ -176,7 +176,6 @@ export async function generateMonthlyNarrativeDocx(
           rows: [
             infoBox('Empresa', data.company.name),
             infoBox('Identificación fiscal', data.company.taxId || 'No especificado'),
-            infoBox('Giro / Actividad', data.company.businessActivity || 'No especificado'),
             infoBox('Sector / Industria', data.company.industry || 'No especificado'),
             infoBox('Moneda', data.company.currency || 'EUR'),
             infoBox('Año del Forecast', String(data.year)),

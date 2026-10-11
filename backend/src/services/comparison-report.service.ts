@@ -142,7 +142,7 @@ export async function runComparisonReport(reportId: string): Promise<void> {
       latestYear: type === 'FORECAST_BUDGET_VS_ANNUAL' && budgetYear ? budgetYear : forecastYear,
       years: financialData.years,
       periodLabels,
-      dcfData: undefined,
+      dcfData: financialData.dcfData,
       aiAnalysis,
     };
     await generateNarrativeDocx(docxData, docxPath);

@@ -373,7 +373,7 @@ export async function buildComparisonFinancialData(
     incomeData,
     balanceData,
     ratiosData,
-    dcfData: undefined,
+    dcfData: allReal.dcfData,
   };
 
   return { financialData, periodLabels, annualYears, forecastYear, budgetYear };
