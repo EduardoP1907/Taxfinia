@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
+import { AdminUsersSection } from '../../components/admin/AdminUsersSection';
 import {
   ShieldCheck,
   Link2,
@@ -34,6 +35,7 @@ interface AdminCompany {
   name: string;
   taxId: string | null;
   isLocked: boolean;
+  consolidatedYears?: number[];
   createdAt: string;
 }
 
@@ -49,6 +51,7 @@ export const AdminPage: React.FC = () => {
   const [allCompanies, setAllCompanies] = useState<AdminCompany[]>([]);
   const [companiesLoading, setCompaniesLoading] = useState(true);
   const [unlocking, setUnlocking] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.role !== 'ADMIN') {
@@ -85,11 +88,12 @@ export const AdminPage: React.FC = () => {
 
   const handleUnlock = async (companyId: string) => {
     setUnlocking(companyId);
+    setActionError(null);
     try {
       await api.post(`/companies/${companyId}/unlock`);
-      setAllCompanies(prev => prev.map(c => c.id === companyId ? { ...c, isLocked: false } : c));
+      setAllCompanies(prev => prev.map(c => c.id === companyId ? { ...c, isLocked: false, consolidatedYears: [] } : c));
     } catch {
-      alert('Error al desbloquear la empresa');
+      setActionError('No se pudo habilitar la edición de la empresa. Inténtalo de nuevo.');
     } finally {
       setUnlocking(null);
     }
@@ -102,7 +106,7 @@ export const AdminPage: React.FC = () => {
       setTokens(prev => [{ ...res.data, usedById: null, usedAt: null, createdAt: new Date().toISOString() }, ...prev]);
       setRecipientNote('');
     } catch {
-      alert('Error al generar el token');
+      setActionError('No se pudo generar el link de invitación. Inténtalo de nuevo.');
     } finally {
       setGenerating(false);
     }
@@ -137,7 +141,7 @@ export const AdminPage: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-slate-900 rounded-xl">
@@ -145,9 +149,15 @@ export const AdminPage: React.FC = () => {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Panel de Administración</h1>
-            <p className="text-sm text-slate-500">Gestión de invitaciones de prueba</p>
+            <p className="text-sm text-slate-500">Suscripciones, empresas e invitaciones de prueba</p>
           </div>
         </div>
+
+        {actionError && (
+          <p role="alert" className="mb-4 px-4 py-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">{actionError}</p>
+        )}
+
+        <AdminUsersSection />
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
@@ -182,12 +192,15 @@ export const AdminPage: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex-1">
-              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Para (destinatario)</label>
+              <label htmlFor="invite-recipient" className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Para (destinatario)</label>
               <input
+                id="invite-recipient"
+                name="recipient"
+                autoComplete="off"
                 type="text"
                 value={recipientNote}
                 onChange={e => setRecipientNote(e.target.value)}
-                placeholder="Nombre o email del destinatario"
+                placeholder="Nombre o email del destinatario…"
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
               />
             </div>
@@ -207,7 +220,7 @@ export const AdminPage: React.FC = () => {
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-slate-500" />
-              <p className="text-sm font-semibold text-slate-800">Gestión de Empresas</p>
+              <h2 className="text-sm font-semibold text-slate-800">Empresas y ejercicios consolidados</h2>
             </div>
             <button onClick={loadAllCompanies} className="text-xs text-amber-500 hover:text-amber-700 flex items-center gap-1">
               <RefreshCw className="w-3 h-3" /> Actualizar
@@ -233,6 +246,9 @@ export const AdminPage: React.FC = () => {
                     <div className="flex items-center gap-2 mt-0.5">
                       {company.taxId && <span className="text-xs text-slate-400 font-mono">{company.taxId}</span>}
                       <span className="text-xs text-slate-400">{new Date(company.createdAt).toLocaleDateString('es-CL')}</span>
+                      {company.consolidatedYears && company.consolidatedYears.length > 0 && (
+                        <span className="text-xs text-slate-500">· Solo lectura: {company.consolidatedYears.join(', ')}</span>
+                      )}
                     </div>
                   </div>
                   <div className="flex-shrink-0">
@@ -246,12 +262,12 @@ export const AdminPage: React.FC = () => {
                           ? <RefreshCw className="w-3 h-3 animate-spin" />
                           : <LockOpen className="w-3 h-3" />
                         }
-                        {unlocking === company.id ? 'Desbloqueando…' : 'Desbloquear'}
+                        {unlocking === company.id ? 'Habilitando…' : 'Habilitar edición'}
                       </button>
                     ) : (
                       <span className="flex items-center gap-1 text-xs text-emerald-600">
-                        <Lock className="w-3 h-3 opacity-30" />
-                        Libre
+                        <Lock className="w-3 h-3 opacity-30" aria-hidden="true" />
+                        Editable
                       </span>
                     )}
                   </div>

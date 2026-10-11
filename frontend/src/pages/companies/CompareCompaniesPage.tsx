@@ -202,7 +202,7 @@ export const CompareCompaniesPage: React.FC = () => {
                       onClick={() => toggleCompany(c.id)}
                       disabled={!sel && selectedIds.length >= 3}
                       className={[
-                        'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all',
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition',
                         sel
                           ? 'bg-amber-500/10 border-amber-400 text-amber-700'
                           : 'border-slate-200 text-slate-600 hover:border-slate-400 disabled:opacity-40 disabled:cursor-not-allowed',

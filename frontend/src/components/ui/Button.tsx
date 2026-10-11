@@ -17,7 +17,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const base =
-    'inline-flex items-center justify-center font-semibold rounded-lg transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed tracking-wide';
+    'inline-flex items-center justify-center font-semibold rounded-lg transition duration-150 disabled:opacity-40 disabled:cursor-not-allowed tracking-wide';
 
   const variants = {
     primary:   'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 shadow-sm',

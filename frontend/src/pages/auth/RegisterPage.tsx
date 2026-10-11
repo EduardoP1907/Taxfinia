@@ -123,44 +123,44 @@ export const RegisterPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Nombre</label>
+              <label htmlFor="register-firstName" className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Nombre</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input name="firstName" value={formData.firstName} onChange={handleChange} placeholder="Juan" autoComplete="given-name" className={inputCls} />
+                <input id="register-firstName" name="firstName" value={formData.firstName} onChange={handleChange} placeholder="Juan" autoComplete="given-name" className={inputCls} />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Apellido</label>
+              <label htmlFor="register-lastName" className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Apellido</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Pérez" autoComplete="family-name" className={inputCls} />
+                <input id="register-lastName" name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Pérez" autoComplete="family-name" className={inputCls} />
               </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Email</label>
+            <label htmlFor="register-email" className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Email</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="tu@email.com" autoComplete="email" required className={errors.email ? inputErrCls : inputCls} />
+              <input id="register-email" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="tu@email.com" autoComplete="email" required className={errors.email ? inputErrCls : inputCls} />
             </div>
             {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email}</p>}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Contraseña</label>
+            <label htmlFor="register-password" className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Contraseña</label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Mín. 10 caract., alfanumérica y 1 mayúscula" autoComplete="new-password" required className={errors.password ? inputErrCls : inputCls} />
+              <input id="register-password" type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Mín. 10 caract., alfanumérica y 1 mayúscula" autoComplete="new-password" required className={errors.password ? inputErrCls : inputCls} />
             </div>
             {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password}</p>}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Confirmar Contraseña</label>
+            <label htmlFor="register-confirmPassword" className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Confirmar Contraseña</label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} placeholder="••••••••" autoComplete="new-password" required className={errors.confirmPassword ? inputErrCls : inputCls} />
+              <input id="register-confirmPassword" type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} placeholder="••••••••" autoComplete="new-password" required className={errors.confirmPassword ? inputErrCls : inputCls} />
             </div>
             {errors.confirmPassword && <p className="mt-1 text-xs text-red-400">{errors.confirmPassword}</p>}
           </div>

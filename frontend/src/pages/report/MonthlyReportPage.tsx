@@ -97,7 +97,7 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ companyName, onSelect, onBack
                 <button
                   key={m}
                   onClick={() => onSelect(i + 1)}
-                  className="py-2.5 rounded-lg border border-slate-700 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all text-sm font-semibold text-slate-200 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
+                  className="py-2.5 rounded-lg border border-slate-700 hover:border-amber-500/50 hover:bg-amber-500/5 transition text-sm font-semibold text-slate-200 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
                 >
                   {m}
                 </button>
@@ -105,7 +105,7 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ companyName, onSelect, onBack
             </div>
             <button
               onClick={onBack}
-              className="w-full py-2.5 border border-slate-700 hover:border-slate-600 text-slate-400 hover:text-slate-200 text-sm rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
+              className="w-full py-2.5 border border-slate-700 hover:border-slate-600 text-slate-400 hover:text-slate-200 text-sm rounded-lg transition focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
             >
               Volver
             </button>

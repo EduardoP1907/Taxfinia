@@ -4,7 +4,8 @@ import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { PercentInput } from '../../components/ui/PercentInput';
-import { Save, Building2, Plus, Trash2, Lock, Upload, Download, X } from 'lucide-react';
+import { Save, Building2, Plus, Trash2, Lock, Upload, Download, X, Info } from 'lucide-react';
+import { useAccess } from '../../hooks/useAccess';
 import api from '../../services/api';
 import { companyService } from '../../services/company.service';
 import { financialService } from '../../services/financial.service';
@@ -18,9 +19,14 @@ import type {
   CreateAdditionalDataData,
 } from '../../types/financial';
 
+// Motivo por el que un ejercicio es solo lectura (null = editable)
+type LockReason = 'consolidated' | 'window' | 'subscription' | null;
+
 interface YearData {
   year: number;
   fiscalYearId: string;
+  consolidatedAt: string | null;
+  lockReason: LockReason;
   balance: CreateBalanceSheetData;
   income: CreateIncomeStatementData;
   cashflow: CreateCashFlowData;
@@ -105,6 +111,20 @@ export const MultiYearDataEntryPage: React.FC = () => {
   const [showRemoveYearModal, setShowRemoveYearModal] = useState(false);
   const [yearToRemove, setYearToRemove] = useState<number | null>(null);
   const [newYearInput, setNewYearInput] = useState('');
+  const [addYearError, setAddYearError] = useState('');
+
+  // Mensajes en línea (reemplazan los alert() del navegador)
+  const [notice, setNotice] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+
+  // Reglas de acceso: ejercicios consolidados, ventana de años y suscripción
+  const { privileged, readOnly, yearWindow } = useAccess();
+  const lockReasonFor = (year: number, consolidatedAt?: string | null): LockReason => {
+    if (privileged) return null;
+    if (readOnly) return 'subscription';
+    if (consolidatedAt) return 'consolidated';
+    if (year < yearWindow.min || year > yearWindow.max) return 'window';
+    return null;
+  };
 
   // Estados para importación CSV/Excel
   const [showImportModal, setShowImportModal] = useState(false);
@@ -116,6 +136,13 @@ export const MultiYearDataEntryPage: React.FC = () => {
   useEffect(() => {
     loadAvailableCompanies();
   }, []);
+
+  // Los permisos pueden llegar después de cargar (refresco de /auth/me):
+  // recalcular qué ejercicios son de solo lectura.
+  useEffect(() => {
+    setYearDataList(prev => prev.map(yd => ({ ...yd, lockReason: lockReasonFor(yd.year, yd.consolidatedAt) })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [privileged, readOnly, yearWindow.min, yearWindow.max]);
 
   useEffect(() => {
     if (companyId) {
@@ -146,9 +173,12 @@ export const MultiYearDataEntryPage: React.FC = () => {
       // Obtener solo años fiscales anuales (excluye registros mensuales)
       const fiscalYears = await financialService.getAnnualFiscalYears(companyId);
 
-      // Si no hay años, crear uno usando el año base de la empresa
-      if (fiscalYears.length === 0) {
-        const defaultYear = companyData.baseYear || new Date().getFullYear();
+      // Si no hay años, crear uno: el año base si es editable, si no el último cerrado
+      if (fiscalYears.length === 0 && !readOnly) {
+        const base = companyData.baseYear;
+        const defaultYear = privileged
+          ? (base || new Date().getFullYear())
+          : (base && base >= yearWindow.min && base <= yearWindow.max ? base : yearWindow.max);
         const newYear = await financialService.createFiscalYear(companyId, {
           year: defaultYear,
         });
@@ -170,6 +200,8 @@ export const MultiYearDataEntryPage: React.FC = () => {
         return {
           year: fy.year,
           fiscalYearId: fy.id,
+          consolidatedAt: (fy as { consolidatedAt?: string | null }).consolidatedAt ?? null,
+          lockReason: lockReasonFor(fy.year, (fy as { consolidatedAt?: string | null }).consolidatedAt),
           balance: balance || {},
           income: income || {},
           cashflow: cashflow || {},
@@ -182,22 +214,41 @@ export const MultiYearDataEntryPage: React.FC = () => {
       setAvailableYears(loadedData.map(d => d.year));
     } catch (error) {
       console.error('Error loading company:', error);
-      alert('Error al cargar la empresa');
+      setNotice({ type: 'error', text: 'No se pudo cargar la empresa. Recarga la página para intentarlo de nuevo.' });
     } finally {
       setLoading(false);
     }
   };
 
+  // Años que se pueden agregar: consecutivos a los existentes y, salvo
+  // usuarios privilegiados, dentro de la ventana de ejercicios cerrados.
+  const addableYears = (): number[] => {
+    if (availableYears.length === 0) return [yearWindow.max];
+    const minYear = Math.min(...availableYears);
+    const maxYear = Math.max(...availableYears);
+    return [maxYear + 1, minYear - 1].filter(y =>
+      privileged || (y >= yearWindow.min && y <= yearWindow.max));
+  };
+
+  // El máximo de 5 años cuenta solo los ejercicios de la ventana vigente
+  const yearsInWindow = availableYears.filter(y => privileged || (y >= yearWindow.min && y <= yearWindow.max));
+
   const handleAddYear = () => {
     if (!companyId) return;
+    setNotice(null);
 
-    // Validar máximo 5 años
-    if (availableYears.length >= 5) {
-      alert('Has alcanzado el máximo de 5 años permitidos.\nPara agregar un nuevo año, primero debes eliminar uno existente.');
+    if (yearsInWindow.length >= 5) {
+      setNotice({ type: 'error', text: 'Ya tienes los 5 ejercicios permitidos. Cuando cierre el próximo ejercicio podrás agregarlo.' });
+      return;
+    }
+    const options = addableYears();
+    if (options.length === 0) {
+      setNotice({ type: 'error', text: `No hay ejercicios nuevos para agregar. El próximo ejercicio cerrado (${yearWindow.max + 1}) se podrá cargar a partir del 1 de enero de ${yearWindow.max + 2}.` });
       return;
     }
 
-    setNewYearInput('');
+    setNewYearInput(String(options[0]));
+    setAddYearError('');
     setShowAddYearModal(true);
   };
 
@@ -208,25 +259,19 @@ export const MultiYearDataEntryPage: React.FC = () => {
 
     // Validaciones
     if (isNaN(newYear) || newYear < 1900 || newYear > 2100) {
-      alert('Por favor ingrese un año válido entre 1900 y 2100');
+      setAddYearError('Ingresa un año válido (ej. 2024).');
       return;
     }
 
     if (availableYears.includes(newYear)) {
-      alert(`El año ${newYear} ya existe.`);
+      setAddYearError(`El ejercicio ${newYear} ya existe.`);
       return;
     }
 
-    // Validar que sea consecutivo
-    if (availableYears.length > 0) {
-      const minYear = Math.min(...availableYears);
-      const maxYear = Math.max(...availableYears);
-      const validYears = [minYear - 1, maxYear + 1];
-
-      if (!validYears.includes(newYear)) {
-        alert(`El año debe ser consecutivo.\nSolo puede agregar: ${minYear - 1} o ${maxYear + 1}`);
-        return;
-      }
+    const options = addableYears();
+    if (!options.includes(newYear)) {
+      setAddYearError(`Solo puedes agregar ${options.join(' o ')}: los ejercicios deben ser consecutivos${privileged ? '' : ` y estar entre ${yearWindow.min} y ${yearWindow.max}`}.`);
+      return;
     }
 
     try {
@@ -240,6 +285,8 @@ export const MultiYearDataEntryPage: React.FC = () => {
       const newYearData: YearData = {
         year: newYear,
         fiscalYearId: fiscalYear.id,
+        consolidatedAt: null,
+        lockReason: lockReasonFor(newYear, null),
         balance: {},
         income: {},
         cashflow: {},
@@ -254,15 +301,21 @@ export const MultiYearDataEntryPage: React.FC = () => {
       setAvailableYears(updatedAvailableYears);
     } catch (error) {
       console.error('Error adding year:', error);
-      alert('Error al agregar año');
+      const msg = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setNotice({ type: 'error', text: msg || 'No se pudo agregar el ejercicio. Inténtalo de nuevo.' });
     } finally {
       setSaving(false);
     }
   };
 
   const handleRemoveYear = (year: number) => {
+    setNotice(null);
+    if (yearDataList.find(yd => yd.year === year)?.lockReason) {
+      setNotice({ type: 'error', text: `El ejercicio ${year} es de solo lectura y no se puede quitar.` });
+      return;
+    }
     if (yearDataList.length <= 1) {
-      alert('Debe mantener al menos un año');
+      setNotice({ type: 'error', text: 'Debes mantener al menos un ejercicio.' });
       return;
     }
 
@@ -271,7 +324,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
     const maxYear = Math.max(...availableYears);
 
     if (year !== minYear && year !== maxYear) {
-      alert(`Solo puede eliminar el primer (${minYear}) o último (${maxYear}) año de la secuencia.\nNo puede eliminar años intermedios para mantener la consecutividad.`);
+      setNotice({ type: 'error', text: `Solo puedes quitar el primer (${minYear}) o el último (${maxYear}) ejercicio, para mantener los años consecutivos.` });
       return;
     }
 
@@ -354,8 +407,9 @@ export const MultiYearDataEntryPage: React.FC = () => {
     try {
       setSaving(true);
 
-      // Guardar todos los años en paralelo
-      const savePromises = yearDataList.map(async (yearData) => {
+      setNotice(null);
+      // Guardar solo los ejercicios editables (los de solo lectura los rechaza el servidor)
+      const savePromises = yearDataList.filter(yd => !yd.lockReason).map(async (yearData) => {
         await Promise.all([
           financialService.createOrUpdateBalanceSheet(yearData.fiscalYearId, yearData.balance),
           financialService.createOrUpdateIncomeStatement(yearData.fiscalYearId, yearData.income),
@@ -365,10 +419,11 @@ export const MultiYearDataEntryPage: React.FC = () => {
       });
 
       await Promise.all(savePromises);
-      alert('Datos guardados exitosamente');
+      setNotice({ type: 'success', text: 'Datos guardados correctamente.' });
     } catch (error) {
       console.error('Error saving data:', error);
-      alert('Error al guardar los datos');
+      const msg = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setNotice({ type: 'error', text: msg || 'No se pudieron guardar los datos. Revisa tu conexión e inténtalo de nuevo.' });
     } finally {
       setSaving(false);
     }
@@ -384,7 +439,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert('Error al descargar la plantilla');
+      setImportError('No se pudo descargar la plantilla. Inténtalo de nuevo.');
     }
   };
 
@@ -409,6 +464,9 @@ export const MultiYearDataEntryPage: React.FC = () => {
     }
   };
 
+  const hasEditableYears = yearDataList.some(yd => !yd.lockReason);
+  const lockedYears = yearDataList.filter(yd => yd.lockReason).map(yd => yd.year).sort((x, y) => x - y);
+
   if (!companyId) {
     return (
       <CompanySelector
@@ -429,36 +487,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
           <Card>
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Cargando datos...</p>
-            </div>
-          </Card>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (company?.isLocked) {
-    return (
-      <DashboardLayout>
-        <div className="max-w-2xl mx-auto mt-16">
-          <Card>
-            <div className="text-center py-14 px-8">
-              <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                <Lock className="w-8 h-8 text-amber-400" />
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Empresa bloqueada</h2>
-              <p className="text-slate-600 text-sm max-w-md mx-auto mb-6">
-                Los datos financieros de <strong>{company.name}</strong> no pueden modificarse porque ya se ha generado un informe IA o se ha utilizado el asistente financiero.
-              </p>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                Para ingresar datos de una empresa diferente, crea una nueva empresa desde el panel de empresas.
-              </p>
-              <button
-                onClick={() => navigate('/empresas')}
-                className="mt-6 px-5 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-700 transition-colors"
-              >
-                Ir a Empresas
-              </button>
+              <p className="text-gray-600">Cargando datos…</p>
             </div>
           </Card>
         </div>
@@ -478,21 +507,51 @@ export const MultiYearDataEntryPage: React.FC = () => {
               </h1>
               <p className="text-gray-600">{company?.name}</p>
             </div>
-            <div className="flex gap-3">
+            {!readOnly && (
+            <div className="flex flex-wrap gap-3">
               <Button onClick={() => { setImportFile(null); setImportResult(null); setImportError(''); setShowImportModal(true); }} variant="outline" disabled={saving}>
-                <Upload className="w-4 h-4 mr-2" />
+                <Upload className="w-4 h-4 mr-2" aria-hidden="true" />
                 Importar
               </Button>
               <Button onClick={handleAddYear} variant="outline" disabled={saving}>
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-4 h-4 mr-2" aria-hidden="true" />
                 Agregar Año
               </Button>
-              <Button onClick={handleSaveAll} disabled={saving} isLoading={saving}>
-                <Save className="w-4 h-4 mr-2" />
-                Guardar Todo
-              </Button>
+              {hasEditableYears && (
+                <Button onClick={handleSaveAll} disabled={saving} isLoading={saving}>
+                  <Save className="w-4 h-4 mr-2" aria-hidden="true" />
+                  Guardar Todo
+                </Button>
+              )}
             </div>
+            )}
           </div>
+
+          {notice && (
+            <div
+              role={notice.type === 'error' ? 'alert' : 'status'}
+              className={`mb-4 flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${
+                notice.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              }`}
+            >
+              <span>{notice.text}</span>
+              <button type="button" onClick={() => setNotice(null)} aria-label="Cerrar mensaje" className="flex-shrink-0 opacity-70 hover:opacity-100">
+                <X className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+
+          {lockedYears.length > 0 && !readOnly && (
+            <div className="mb-4 flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <Info className="w-5 h-5 text-slate-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <p>
+                <strong>Ejercicios de solo lectura: {lockedYears.join(', ')}.</strong>{' '}
+                Los ejercicios incluidos en un informe o consultados con el asistente IA quedan fijos, igual que los
+                anteriores a {yearWindow.min}. Cada año podrás agregar el ejercicio recién cerrado
+                (hoy: hasta {yearWindow.max}).
+              </p>
+            </div>
+          )}
 
           {/* Advertencia sobre cantidad de años */}
           {yearDataList.length < 3 && (
@@ -628,26 +687,34 @@ export const MultiYearDataEntryPage: React.FC = () => {
               </h3>
 
               <p className="text-sm text-gray-600 text-center mb-4">
-                Los años deben ser consecutivos (máximo 5 años)
+                Los ejercicios deben ser consecutivos (máximo 5){privileged ? '' : `, entre ${yearWindow.min} y ${yearWindow.max}`}
               </p>
 
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="new-year-input" className="block text-sm font-medium text-gray-700 mb-2">
                   Año comercial
                 </label>
                 <input
                   type="number"
                   value={newYearInput}
-                  onChange={(e) => setNewYearInput(e.target.value)}
-                  onKeyPress={(e) => {
+                  onChange={(e) => { setNewYearInput(e.target.value); setAddYearError(''); }}
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       confirmAddYear();
                     }
                   }}
-                  placeholder="Ej: 2020"
+                  id="new-year-input"
+                  name="year"
+                  inputMode="numeric"
+                  aria-invalid={!!addYearError}
+                  aria-describedby={addYearError ? 'new-year-error' : undefined}
+                  placeholder={`Ej: ${yearWindow.max}`}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-center text-lg font-semibold"
                   autoFocus
                 />
+                {addYearError && (
+                  <p id="new-year-error" role="alert" className="mt-2 text-sm text-red-600 text-center">{addYearError}</p>
+                )}
               </div>
 
               <div className="flex gap-3">
@@ -679,14 +746,14 @@ export const MultiYearDataEntryPage: React.FC = () => {
                 <Trash2 className="w-6 h-6 text-red-600" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
-                Eliminar Año Fiscal
+                Quitar ejercicio de la tabla
               </h3>
               <p className="text-gray-600 text-center mb-6">
-                ¿Está seguro de eliminar los datos del año <span className="font-bold text-red-600">{yearToRemove}</span>?
+                ¿Quitar el ejercicio <span className="font-bold text-red-600">{yearToRemove}</span> de la tabla?
               </p>
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
                 <p className="text-sm text-yellow-800 text-center">
-                  ⚠️ Esta acción no se puede deshacer
+                  Los cambios sin guardar de ese ejercicio se perderán. Los datos que ya guardaste no se borran.
                 </p>
               </div>
               <div className="flex gap-3">
@@ -703,7 +770,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
                   onClick={confirmRemoveYear}
                   className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
                 >
-                  Eliminar
+                  Quitar
                 </button>
               </div>
             </div>
@@ -721,10 +788,12 @@ export const MultiYearDataEntryPage: React.FC = () => {
                 <h3 className="text-base font-bold text-slate-900">Importar datos financieros</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setShowImportModal(false)}
+                aria-label="Cerrar"
                 className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
 
@@ -822,8 +891,17 @@ export const MultiYearDataEntryPage: React.FC = () => {
 const ExpressionInput: React.FC<{
   value: number | string | undefined;
   onChange: (val: string) => void;
-}> = ({ value, onChange }) => {
+  readOnly?: boolean;
+  label?: string;
+}> = ({ value, onChange, readOnly, label }) => {
   const [raw, setRaw] = React.useState<string | null>(null);
+  if (readOnly) {
+    return (
+      <div className="w-full px-2 py-1 text-sm text-right text-slate-600 tabular-nums">
+        {formatNumber(value) || '—'}
+      </div>
+    );
+  }
   const isExpression = raw !== null && /\d[+\-]/.test(raw);
   const displayValue = raw !== null ? raw : formatNumber(value);
   const computedResult = isExpression ? evaluateExpression(raw!) : null;
@@ -831,6 +909,7 @@ const ExpressionInput: React.FC<{
   return (
     <div className="relative">
       <input
+        aria-label={label}
         type="text"
         value={displayValue}
         onFocus={() => {
@@ -959,14 +1038,25 @@ const BalanceSheetTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onRem
           {yearDataList.map((yearData) => (
             <th key={yearData.year} className="px-4 py-3 text-center min-w-[150px]">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500 uppercase">{yearData.year}</span>
-                {yearDataList.length > 1 && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 uppercase">
+                  {yearData.year}
+                  {yearData.lockReason && (
+                    <Lock
+                      className="w-3 h-3 text-slate-400"
+                      aria-label="Solo lectura"
+                      role="img"
+                    />
+                  )}
+                </span>
+                {yearDataList.length > 1 && !yearData.lockReason && (
                   <button
+                    type="button"
                     onClick={() => onRemoveYear(yearData.year)}
                     className="text-red-500 hover:text-red-700"
-                    title="Eliminar año"
+                    title="Quitar año de la tabla"
+                    aria-label={`Quitar el año ${yearData.year} de la tabla`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4" aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -1038,6 +1128,8 @@ const BalanceSheetTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onRem
                     <ExpressionInput
                       value={yearData.balance[row.field as keyof CreateBalanceSheetData]}
                       onChange={(val) => onUpdate(yearData.year, 'balance', row.field!, val)}
+                      readOnly={!!yearData.lockReason}
+                      label={`${row.label} — ${yearData.year}`}
                     />
                   </td>
                 ))
@@ -1143,14 +1235,25 @@ const IncomeStatementTable: React.FC<TableProps> = ({ yearDataList, onUpdate, on
           {yearDataList.map((yearData) => (
             <th key={yearData.year} className="px-4 py-3 text-center min-w-[150px]">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500 uppercase">{yearData.year}</span>
-                {yearDataList.length > 1 && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 uppercase">
+                  {yearData.year}
+                  {yearData.lockReason && (
+                    <Lock
+                      className="w-3 h-3 text-slate-400"
+                      aria-label="Solo lectura"
+                      role="img"
+                    />
+                  )}
+                </span>
+                {yearDataList.length > 1 && !yearData.lockReason && (
                   <button
+                    type="button"
                     onClick={() => onRemoveYear(yearData.year)}
                     className="text-red-500 hover:text-red-700"
-                    title="Eliminar año"
+                    title="Quitar año de la tabla"
+                    aria-label={`Quitar el año ${yearData.year} de la tabla`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4" aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -1179,6 +1282,8 @@ const IncomeStatementTable: React.FC<TableProps> = ({ yearDataList, onUpdate, on
                     <ExpressionInput
                       value={yearData.income[row.field as keyof CreateIncomeStatementData]}
                       onChange={(val) => onUpdate(yearData.year, 'income', row.field!, val)}
+                      readOnly={!!yearData.lockReason}
+                      label={`${row.label} — ${yearData.year}`}
                     />
                   </td>
                 ))
@@ -1225,14 +1330,25 @@ const AdditionalDataTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onR
           {yearDataList.map((yearData) => (
             <th key={yearData.year} className="px-4 py-3 text-center min-w-[150px]">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500 uppercase">{yearData.year}</span>
-                {yearDataList.length > 1 && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 uppercase">
+                  {yearData.year}
+                  {yearData.lockReason && (
+                    <Lock
+                      className="w-3 h-3 text-slate-400"
+                      aria-label="Solo lectura"
+                      role="img"
+                    />
+                  )}
+                </span>
+                {yearDataList.length > 1 && !yearData.lockReason && (
                   <button
+                    type="button"
                     onClick={() => onRemoveYear(yearData.year)}
                     className="text-red-500 hover:text-red-700"
-                    title="Eliminar año"
+                    title="Quitar año de la tabla"
+                    aria-label={`Quitar el año ${yearData.year} de la tabla`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4" aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -1269,6 +1385,8 @@ const AdditionalDataTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onR
                     <ExpressionInput
                       value={yearData.additional[row.field as keyof CreateAdditionalDataData]}
                       onChange={(val) => onUpdate(yearData.year, 'additional', row.field!, val)}
+                      readOnly={!!yearData.lockReason}
+                      label={`${row.label} — ${yearData.year}`}
                     />
                   )}
                 </td>

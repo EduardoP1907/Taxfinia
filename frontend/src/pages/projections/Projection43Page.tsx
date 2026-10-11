@@ -277,7 +277,7 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
               </Button>
               <Button onClick={handleCreateScenario} disabled={saving}>
                 <Calculator className="w-4 h-4 mr-2" />
-                {saving ? 'Creando...' : 'Crear Proyección DCF'}
+                {saving ? 'Creando…' : 'Crear Proyección DCF'}
               </Button>
             </div>
           </div>
@@ -490,11 +490,13 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
 
             {/* ── Periodo a considerar (único campo editable) ── */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label htmlFor="dcf-years" className="block text-sm font-medium text-gray-900 mb-2">
                 Periodo a Considerar (años de proyección para DCF)
               </label>
               <div className="flex items-center gap-6">
                 <select
+                  id="dcf-years"
+                  name="yearsToConsider"
                   value={yearsToConsider}
                   onChange={(e) => setYearsToConsider(parseInt(e.target.value))}
                   className="flex-1 max-w-xs px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"

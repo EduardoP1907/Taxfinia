@@ -102,7 +102,7 @@ export const VerifyOtpPage: React.FC = () => {
       </div>
 
       {error && (
-        <div className="mb-5 p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-sm text-center">
+        <div role="alert" className="mb-5 p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-sm text-center">
           {error}
         </div>
       )}

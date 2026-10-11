@@ -10,7 +10,10 @@ interface AuthState {
   setLoading: (loading: boolean) => void;
   logout: () => Promise<void>;
   initializeAuth: () => Promise<void>;
+  refreshUser: (force?: boolean) => Promise<void>;
 }
+
+let lastUserRefresh = 0;
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
@@ -26,8 +29,23 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setLoading: (loading) => set({ isLoading: loading }),
 
+  // Actualiza el usuario desde el servidor (vigencia, exención, ventana de años).
+  // El usuario restaurado de localStorage puede estar desactualizado.
+  refreshUser: async (force = false) => {
+    if (import.meta.env.VITE_DEV_BYPASS_AUTH === 'true') return;
+    if (!localStorage.getItem('accessToken')) return;
+    if (!force && Date.now() - lastUserRefresh < 60_000) return;
+    lastUserRefresh = Date.now();
+    try {
+      const user = await authService.getCurrentUser();
+      localStorage.setItem('user', JSON.stringify(user));
+      set({ user, isAuthenticated: true });
+    } catch { /* el interceptor de 401 ya gestiona sesiones inválidas */ }
+  },
+
   logout: async () => {
     await authService.logout();
+    lastUserRefresh = 0;
     set({ user: null, isAuthenticated: false });
   },
 
@@ -42,6 +60,8 @@ export const useAuthStore = create<AuthState>((set) => ({
           role: 'ADMIN',
           isVerified: true,
           createdAt: new Date().toISOString(),
+          privileged: true,
+          subscriptionActive: true,
         },
         isAuthenticated: true,
         isLoading: false,

@@ -186,20 +186,23 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
           />
 
           <Input
-            label="RUT de empresa"
+            label="RUT de empresa *"
             name="taxId"
             value={formData.taxId}
             onChange={handleChange}
-            placeholder="Ej: 12345678-9"
+            placeholder="Ej: 76.123.456-7"
+            autoComplete="off"
+            spellCheck={false}
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="company-industry" className="block text-sm font-medium text-gray-700 mb-1">
               Sector / Industria
             </label>
             <select
+              id="company-industry"
               name="industry"
               value={formData.industry}
               onChange={handleChange}
@@ -213,10 +216,11 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="company-companySize" className="block text-sm font-medium text-gray-700 mb-1">
               Tamaño de empresa
             </label>
             <select
+              id="company-companySize"
               name="companySize"
               value={formData.companySize}
               onChange={handleChange}
@@ -233,10 +237,11 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="company-country" className="block text-sm font-medium text-gray-700 mb-1">
               País
             </label>
             <select
+              id="company-country"
               name="country"
               value={formData.country}
               onChange={handleChange}
@@ -258,16 +263,17 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
 
         {/* Descripción */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="company-description" className="block text-sm font-medium text-gray-700 mb-1">
             Descripción
           </label>
           <textarea
+            id="company-description"
             name="description"
             value={formData.description}
             onChange={handleChange}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
-            placeholder="Breve descripción de la empresa..."
+            placeholder="Breve descripción de la empresa…"
           />
         </div>
 
@@ -317,10 +323,11 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
           />
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="company-currency" className="block text-sm font-medium text-gray-700 mb-1">
               Moneda *
             </label>
             <select
+              id="company-currency"
               name="currency"
               value={formData.currency}
               onChange={handleChange}
@@ -366,6 +373,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
                   onClick={handleRemoveDeed}
                   disabled={deedBusy}
                   className="text-gray-400 hover:text-red-600 disabled:opacity-50 flex-shrink-0"
+                  aria-label="Eliminar documento de escritura"
                   title="Eliminar documento"
                 >
                   <X className="w-4 h-4" />

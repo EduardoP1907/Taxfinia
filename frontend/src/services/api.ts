@@ -26,6 +26,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Suscripción vencida: refrescar el usuario para que la interfaz pase a
+    // modo solo lectura (import dinámico para evitar dependencia circular)
+    if (error.response?.status === 403 && error.response?.data?.subscriptionExpired) {
+      import('../store/authStore').then(m => m.useAuthStore.getState().refreshUser(true));
+    }
     if (error.response?.status === 401 && !error.response?.data?.requiresCode) {
       const publicRoutes = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password'];
       const isPublicRoute = publicRoutes.some(r => window.location.pathname.startsWith(r));

@@ -189,7 +189,7 @@ export const Projection41Page: React.FC<Projection41PageProps> = ({ tabsHeader }
               </Button>
               <Button onClick={handleCreateScenario} disabled={saving}>
                 <Plus className="w-4 h-4 mr-2" />
-                {saving ? 'Creando...' : 'Crear Proyección (10 años)'}
+                {saving ? 'Creando…' : 'Crear Proyección (10 años)'}
               </Button>
             </div>
           </div>

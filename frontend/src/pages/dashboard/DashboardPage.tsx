@@ -3,10 +3,31 @@ import { Link } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import {
   Building2, FileText, FileBarChart, TrendingUp,
-  ArrowRight, Layers, Activity,
+  ArrowRight, Layers, Activity, Bot, CalendarCheck,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { useCompanyStore } from '../../store/companyStore';
+import { useAccess, formatDateCL } from '../../hooks/useAccess';
 import { companyService } from '../../services/company.service';
+
+// Reloj aislado: solo este componente se vuelve a dibujar (antes era toda la página cada segundo)
+const Clock: React.FC = () => {
+  const [time, setTime] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setTime(new Date()), 15_000);
+    return () => clearInterval(t);
+  }, []);
+  const hh = time.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+  const dd = time.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return (
+    <div className="sm:text-right flex-shrink-0">
+      <p className="font-data text-2xl text-amber-400 tracking-wider tabular-nums">
+        <time dateTime={time.toISOString()}>{hh}</time>
+      </p>
+      <p className="text-slate-500 text-xs mt-1 capitalize">{dd}</p>
+    </div>
+  );
+};
 
 // ── Decorative spark line (simulated chart) ──────────────────────────────────
 const SparkLine: React.FC<{ points?: string; color?: string }> = ({
@@ -34,14 +55,14 @@ interface StatCardProps {
   sparkPoints?: string;
 }
 const StatCard: React.FC<StatCardProps> = ({ label, value, icon: Icon, sparkPoints }) => (
-  <div className="bg-white rounded-xl border border-slate-200 p-5 hover:border-amber-200 hover:shadow-md transition-all duration-200 group">
+  <div className="bg-white rounded-xl border border-slate-200 p-5 hover:border-amber-200 hover:shadow-md transition duration-200 group">
     <div className="flex items-start justify-between mb-3">
       <div className="w-8 h-8 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-center group-hover:bg-amber-50 group-hover:border-amber-100 transition-colors duration-200">
         <Icon className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors duration-200" />
       </div>
       <SparkLine points={sparkPoints} />
     </div>
-    <p className="font-data text-4xl font-medium text-slate-900 mb-1 tracking-tight">{value}</p>
+    <p className="font-data text-4xl font-medium text-slate-900 mb-1 tracking-tight tabular-nums">{value}</p>
     <p className="text-xs text-slate-500 uppercase tracking-wide">{label}</p>
   </div>
 );
@@ -55,8 +76,8 @@ interface ActionCardProps {
   tag: string;
 }
 const ActionCard: React.FC<ActionCardProps> = ({ title, description, icon: Icon, href, tag }) => (
-  <Link to={href} className="group block h-full">
-    <div className="relative overflow-hidden bg-slate-900 rounded-xl p-6 h-full border border-slate-800 hover:border-amber-500/40 hover:bg-slate-800 transition-all duration-200">
+  <Link to={href} className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400">
+    <div className="relative overflow-hidden bg-slate-900 rounded-xl p-6 h-full border border-slate-800 hover:border-amber-500/40 hover:bg-slate-800 transition duration-200">
       <span className="inline-block font-data text-[10px] tracking-widest text-amber-500/60 bg-amber-500/8 border border-amber-500/15 rounded px-2 py-0.5 mb-5">
         {tag}
       </span>
@@ -72,11 +93,11 @@ const ActionCard: React.FC<ActionCardProps> = ({ title, description, icon: Icon,
 
       <div className="flex items-center gap-1.5 font-data text-xs text-amber-400 tracking-wider">
         <span>ACCEDER</span>
-        <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform duration-150" />
+        <ArrowRight className="w-3 h-3 motion-safe:group-hover:translate-x-1 transition-transform duration-150" aria-hidden="true" />
       </div>
 
       {/* Decorative corner icon */}
-      <div className="absolute -bottom-2 -right-2 w-16 h-16 opacity-[0.04] group-hover:opacity-[0.08] transition-opacity duration-200">
+      <div className="absolute -bottom-2 -right-2 w-16 h-16 opacity-[0.04] group-hover:opacity-[0.08] transition-opacity duration-200" aria-hidden="true">
         <Icon className="w-full h-full text-amber-400" />
       </div>
     </div>
@@ -86,17 +107,20 @@ const ActionCard: React.FC<ActionCardProps> = ({ title, description, icon: Icon,
 // ── Main page ────────────────────────────────────────────────────────────────
 export const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
-  const [time, setTime] = useState(new Date());
-  const [stats, setStats] = useState({ companyCount: 0, reportCount: 0, analysisCount: 0 });
+  const { privileged, readOnly, endsAt } = useAccess();
+  const activeCompanyId = useCompanyStore(s => s.activeCompanyId);
+  const [stats, setStats] = useState<{ companyCount: number; reportCount: number; analysisCount: number } | null>(null);
+  // Estado real de la conexión (antes era un texto fijo "API CONECTADA")
+  const [apiStatus, setApiStatus] = useState<'checking' | 'ok' | 'error'>('checking');
 
   useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(t);
+    companyService.getDashboardStats()
+      .then(s => { setStats(s); setApiStatus('ok'); })
+      .catch(() => setApiStatus('error'));
   }, []);
 
-  useEffect(() => {
-    companyService.getDashboardStats().then(setStats).catch(() => {});
-  }, []);
+  // Los accesos llevan la empresa activa para no pedir la selección otra vez
+  const withCompany = (href: string) => (activeCompanyId ? `${href}?companyId=${activeCompanyId}` : href);
 
   const quickActions: ActionCardProps[] = [
     {
@@ -110,15 +134,22 @@ export const DashboardPage: React.FC = () => {
       title: 'Ingresar Datos',
       description: 'Añade información financiera',
       icon: FileText,
-      href: '/datos',
+      href: withCompany('/datos'),
       tag: 'INPUT',
     },
     {
       title: 'Ver Informe',
       description: 'Consulta el análisis completo',
       icon: FileBarChart,
-      href: '/informe',
+      href: withCompany('/informe'),
       tag: 'OUTPUT',
+    },
+    {
+      title: 'Asistente IA',
+      description: 'Pregunta sobre ratios, riesgos y valoración',
+      icon: Bot,
+      href: withCompany('/asistente'),
+      tag: 'CONSULTAS',
     },
   ];
 
@@ -126,36 +157,34 @@ export const DashboardPage: React.FC = () => {
     {
       key: 'empresas',
       label: 'Empresas Activas',
-      value: String(stats.companyCount),
+      value: stats ? String(stats.companyCount) : '—',
       icon: Building2,
       sparkPoints: '0,22 14,18 26,20 38,12 50,15 62,9 74,11 80,7',
     },
     {
       key: 'informes',
       label: 'Informes Generados',
-      value: String(stats.reportCount),
+      value: stats ? String(stats.reportCount) : '—',
       icon: FileBarChart,
       sparkPoints: '0,20 10,17 22,21 36,14 48,16 60,10 70,13 80,6',
     },
     {
       key: 'analisis',
       label: 'Años con Ratios',
-      value: String(stats.analysisCount),
+      value: stats ? String(stats.analysisCount) : '—',
       icon: TrendingUp,
       sparkPoints: '0,24 12,19 24,22 36,13 46,17 58,8 68,12 80,4',
     },
   ];
 
   const steps = [
-    { n: '01', short: 'Empresa',  text: 'Crea o selecciona una empresa en "Mis Empresas"' },
-    { n: '02', short: 'Datos',    text: 'Ingresa los datos financieros en "Ingresar Datos"' },
-    { n: '03', short: 'Cálculo',  text: 'El sistema calculará automáticamente los ratios financieros' },
-    { n: '04', short: 'Informe',  text: 'Visualiza el informe completo en "Ver Informe"' },
-    { n: '05', short: 'Exportar', text: 'Descarga el análisis en PDF o Word' },
+    { n: '01', short: 'Empresa',   text: 'Crea o selecciona una empresa en «Mis Empresas»' },
+    { n: '02', short: 'Datos',     text: 'Ingresa los estados financieros en «Datos Anuales»' },
+    { n: '03', short: 'Cálculo',   text: 'El sistema calcula automáticamente los ratios financieros' },
+    { n: '04', short: 'Informe',   text: 'Genera, revisa y descarga el informe en «Informe Anual»' },
+    { n: '05', short: 'Consultar', text: 'Resuelve dudas sobre la empresa en «Asistente Financiero»' },
   ];
 
-  const hh = time.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const dd = time.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <DashboardLayout>
@@ -180,9 +209,9 @@ export const DashboardPage: React.FC = () => {
           <div className="relative flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 motion-safe:animate-pulse" aria-hidden="true" />
                 <span className="font-data text-amber-400 text-[10px] tracking-[0.2em] uppercase">
-                  Sistema Activo
+                  {readOnly ? 'Modo solo lectura' : 'Cuenta activa'}
                 </span>
               </div>
               <h1 className="font-display text-4xl sm:text-5xl font-extrabold text-white mb-2 leading-[1.1]">
@@ -194,10 +223,7 @@ export const DashboardPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="sm:text-right flex-shrink-0">
-              <p className="font-data text-2xl text-amber-400 tracking-wider tabular-nums">{hh}</p>
-              <p className="text-slate-500 text-xs mt-1 capitalize">{dd}</p>
-            </div>
+            <Clock />
           </div>
         </div>
 
@@ -216,7 +242,7 @@ export const DashboardPage: React.FC = () => {
             </span>
             <div className="flex-1 h-px bg-slate-200" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {quickActions.map((a) => (
               <ActionCard key={a.href} {...a} />
             ))}
@@ -239,14 +265,14 @@ export const DashboardPage: React.FC = () => {
               title={`Forecast ${new Date().getFullYear()}`}
               description="Proyecta y edita el desglose mensual (enero a diciembre) a partir de los datos anuales"
               icon={TrendingUp}
-              href="/forecast-mensual"
+              href={withCompany('/forecast-mensual')}
               tag="INPUT MENSUAL"
             />
             <ActionCard
               title={`Budget ${new Date().getFullYear() + 1}`}
               description="Presupuesta el desglose mensual del próximo ejercicio (P&G y balance proyectado)"
               icon={TrendingUp}
-              href="/budget"
+              href={withCompany('/budget')}
               tag="PRESUPUESTO"
             />
           </div>
@@ -269,7 +295,7 @@ export const DashboardPage: React.FC = () => {
             {steps.map((step, i) => (
               <React.Fragment key={step.n}>
                 <div className="flex flex-col items-center flex-shrink-0 group cursor-default">
-                  <div className="w-9 h-9 rounded-full border-2 border-slate-200 bg-white flex items-center justify-center mb-3 group-hover:border-amber-400 group-hover:bg-amber-50 transition-all duration-200">
+                  <div className="w-9 h-9 rounded-full border-2 border-slate-200 bg-white flex items-center justify-center mb-3 group-hover:border-amber-400 group-hover:bg-amber-50 transition duration-200">
                     <span className="font-data text-[10px] font-medium text-slate-400 group-hover:text-amber-600 transition-colors">
                       {step.n}
                     </span>
@@ -302,17 +328,29 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* ── STATUS BAR ────────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-6 px-4 py-2.5 bg-slate-900/4 border border-slate-200 rounded-lg">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 bg-slate-900/4 border border-slate-200 rounded-lg" role="status">
           <div className="flex items-center gap-2">
-            <Activity className="w-3.5 h-3.5 text-green-500" />
-            <span className="font-data text-[10px] text-slate-500 tracking-wide">API CONECTADA</span>
+            <Activity
+              className={`w-3.5 h-3.5 ${apiStatus === 'ok' ? 'text-green-500' : apiStatus === 'error' ? 'text-red-500' : 'text-slate-400'}`}
+              aria-hidden="true"
+            />
+            <span className="font-data text-[10px] text-slate-500 tracking-wide">
+              {apiStatus === 'ok' ? 'SERVIDOR CONECTADO' : apiStatus === 'error' ? 'SIN CONEXIÓN CON EL SERVIDOR' : 'VERIFICANDO CONEXIÓN…'}
+            </span>
           </div>
-          <div className="h-3 w-px bg-slate-200" />
+          <div className="h-3 w-px bg-slate-200" aria-hidden="true" />
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-            <span className="font-data text-[10px] text-slate-500 tracking-wide">MOTOR DE RATIOS ACTIVO</span>
+            <CalendarCheck className={`w-3.5 h-3.5 ${readOnly ? 'text-red-500' : 'text-amber-500'}`} aria-hidden="true" />
+            <span className="font-data text-[10px] text-slate-500 tracking-wide">
+              {privileged
+                ? 'SUSCRIPCIÓN SIN VENCIMIENTO'
+                : readOnly
+                  ? `SUSCRIPCIÓN VENCIDA${endsAt ? ` EL ${formatDateCL(endsAt)}` : ''}`
+                  : endsAt
+                    ? `SUSCRIPCIÓN VIGENTE HASTA ${formatDateCL(endsAt)}`
+                    : 'SUSCRIPCIÓN VIGENTE'}
+            </span>
           </div>
-          <div className="h-3 w-px bg-slate-200" />
           <span className="font-data text-[10px] text-slate-400 ml-auto tracking-wide">v1.0</span>
         </div>
 

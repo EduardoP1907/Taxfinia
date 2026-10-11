@@ -44,17 +44,19 @@ export const ForgotPasswordPage: React.FC = () => {
       </div>
 
       {error && (
-        <div className="mb-5 p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-sm">
+        <div role="alert" className="mb-5 p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-sm">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Email</label>
+          <label htmlFor="forgot-email" className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Email</label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
+              id="forgot-email"
+              name="email"
               type="email"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setError(''); }}

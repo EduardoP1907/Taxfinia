@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAccess } from '../../hooks/useAccess';
 import {
   Sparkles, RefreshCw, XCircle, CheckCircle2, Clock, FileText,
   Download, Crown, Star,
@@ -33,6 +34,7 @@ export const MonthlyAIReportPanel: React.FC<MonthlyAIReportPanelProps> = ({ comp
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const { readOnly } = useAccess();
 
   const loadReports = useCallback(async () => {
     try {
@@ -64,7 +66,7 @@ export const MonthlyAIReportPanel: React.FC<MonthlyAIReportPanelProps> = ({ comp
     try {
       await monthlyReportService.downloadReport(reportId, variant, format, companyName, year);
     } catch {
-      alert('Error al descargar el archivo');
+      setError('No se pudo descargar el archivo. Revisa tu conexión e inténtalo de nuevo.');
     } finally {
       setDownloading(prev => ({ ...prev, [key]: false }));
     }
@@ -85,7 +87,8 @@ export const MonthlyAIReportPanel: React.FC<MonthlyAIReportPanelProps> = ({ comp
           </div>
           <Button
             onClick={handleGenerate}
-            disabled={generating}
+            disabled={generating || readOnly}
+            title={readOnly ? 'Requiere una suscripción vigente' : undefined}
             className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm disabled:opacity-60"
           >
             {generating ? (
@@ -97,7 +100,7 @@ export const MonthlyAIReportPanel: React.FC<MonthlyAIReportPanelProps> = ({ comp
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+          <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
             <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
             <p className="text-sm text-red-700">{error}</p>
           </div>

@@ -45,7 +45,10 @@ export const CompanySelector: React.FC<CompanySelectorProps> = ({
           {/* Section label */}
           <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
             <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center flex-shrink-0">
-              {icon ?? <Building2 className="w-4 h-4 text-amber-400" />}
+              {/* Fuerza tamaño/color: varias páginas pasan iconos oscuros que no se veían sobre este fondo */}
+              <span className="flex [&>svg]:w-4 [&>svg]:h-4 [&>svg]:text-amber-400" aria-hidden="true">
+                {icon ?? <Building2 />}
+              </span>
             </div>
             <span className="text-sm font-semibold text-slate-900">
               {companies.length > 0
@@ -57,8 +60,9 @@ export const CompanySelector: React.FC<CompanySelectorProps> = ({
           {/* Company list */}
           <div className="p-4">
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-7 h-7 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              <div className="flex items-center justify-center py-12" role="status">
+                <div className="w-7 h-7 border-2 border-amber-500 border-t-transparent rounded-full motion-safe:animate-spin" aria-hidden="true" />
+                <span className="sr-only">Cargando empresas…</span>
               </div>
             ) : companies.length === 0 ? (
               <div className="text-center py-12">
@@ -80,7 +84,7 @@ export const CompanySelector: React.FC<CompanySelectorProps> = ({
                   <button
                     key={company.id}
                     onClick={() => onSelect(company)}
-                    className="w-full flex items-center justify-between px-4 py-3 border border-slate-200 rounded-lg hover:border-amber-300 hover:bg-amber-50/50 transition-all text-left group focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-slate-200 rounded-lg hover:border-amber-300 hover:bg-amber-50/50 transition-colors text-left group focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-lg bg-slate-100 group-hover:bg-amber-100 flex items-center justify-center flex-shrink-0 transition-colors">

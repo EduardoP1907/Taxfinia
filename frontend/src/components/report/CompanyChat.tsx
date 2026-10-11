@@ -9,6 +9,8 @@ interface Props {
   companyName: string;
   isLocked?: boolean;
   onUnlock?: () => void;
+  // 'page': dedicated full-height view (always open, no collapse toggle)
+  variant?: 'panel' | 'page';
 }
 
 const STORAGE_KEY = (id: string) => `chat_history_${id}`;
@@ -101,8 +103,9 @@ const MarkdownContent: React.FC<{ content: string }> = ({ content }) => (
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked = false, onUnlock }) => {
-  const [open, setOpen] = useState(false);
+export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked = false, onUnlock, variant = 'panel' }) => {
+  const isPage = variant === 'page';
+  const [open, setOpen] = useState(isPage);
   const [history, setHistory] = useState<ChatMessage[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY(companyId));
@@ -162,48 +165,60 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
     localStorage.removeItem(STORAGE_KEY(companyId));
   };
 
+  const headerTitle = (
+    <>
+      <span className="relative flex-shrink-0">
+        <span className="flex w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+          <Bot className="w-5 h-5 text-amber-400" aria-hidden="true" />
+        </span>
+        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-slate-900" />
+      </span>
+      <span className="text-left min-w-0">
+        <span className="text-sm font-bold text-white flex items-center gap-1.5">
+          Asistente Financiero IA
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+        </span>
+        <span className="block text-xs text-slate-400 truncate">Consultas sobre {companyName}</span>
+      </span>
+      {history.length > 0 && (
+        <span className="ml-1 px-2 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/30 tracking-wide tabular-nums">
+          {history.length}
+        </span>
+      )}
+    </>
+  );
+
   return (
     <div className="rounded-2xl overflow-hidden shadow-lg border border-slate-200 bg-white">
       {/* ── Header ── */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 transition-all duration-200"
-      >
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
-              <Bot className="w-5 h-5 text-amber-400" />
-            </div>
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-slate-900" />
-          </div>
-          <div className="text-left">
-            <p className="text-sm font-bold text-white flex items-center gap-1.5">
-              Asistente Financiero IA
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            </p>
-            <p className="text-xs text-slate-400">Consultas sobre {companyName}</p>
-          </div>
-          {history.length > 0 && (
-            <span className="ml-1 px-2 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/30 tracking-wide">
-              {history.length}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {history.length > 0 && open && (
-            <span
-              onClick={e => { e.stopPropagation(); clearHistory(); }}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-white/10 transition-colors"
-              title="Limpiar conversación"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </span>
-          )}
-          {open
-            ? <ChevronUp className="w-4 h-4 text-slate-400" />
-            : <ChevronDown className="w-4 h-4 text-slate-400" />}
-        </div>
-      </button>
+      <div className="flex items-center justify-between gap-2 px-5 py-4 bg-gradient-to-r from-slate-900 to-slate-800">
+        {isPage ? (
+          <div className="flex items-center gap-3 min-w-0">{headerTitle}</div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            aria-expanded={open}
+            className="flex flex-1 items-center justify-between gap-3 min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+          >
+            <span className="flex items-center gap-3 min-w-0">{headerTitle}</span>
+            {open
+              ? <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" aria-hidden="true" />
+              : <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" aria-hidden="true" />}
+          </button>
+        )}
+        {history.length > 0 && open && (
+          <button
+            type="button"
+            onClick={clearHistory}
+            aria-label="Limpiar conversación"
+            title="Limpiar conversación"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 flex-shrink-0"
+          >
+            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
+        )}
+      </div>
 
       {/* ── Locked state ── */}
       {open && isLocked && (
@@ -229,10 +244,10 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
 
       {/* ── Chat body ── */}
       {open && !isLocked && (
-        <div className="flex flex-col" style={{ height: '560px' }}>
+        <div className="flex flex-col" style={{ height: isPage ? 'calc(100dvh - 15rem)' : '560px', minHeight: '420px' }}>
 
           {/* Messages */}
-          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-slate-50 to-white">
+          <div ref={messagesContainerRef} role="log" aria-live="polite" aria-label="Conversación con el asistente" className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-slate-50 to-white">
             {history.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full gap-5 pb-4">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center shadow-lg">
@@ -249,7 +264,7 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
                     <button
                       key={i}
                       onClick={() => send(s)}
-                      className="text-xs px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:border-amber-400 hover:text-amber-700 hover:bg-amber-50 hover:shadow-sm transition-all duration-150 text-left shadow-sm"
+                      className="text-xs px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:border-amber-400 hover:text-amber-700 hover:bg-amber-50 hover:shadow-sm transition-colors duration-150 text-left shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                     >
                       {s}
                     </button>
@@ -294,9 +309,9 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
                 </div>
                 <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
                   <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="w-2 h-2 bg-amber-400 rounded-full motion-safe:animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-2 h-2 bg-amber-400 rounded-full motion-safe:animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-2 h-2 bg-amber-400 rounded-full motion-safe:animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>
@@ -311,8 +326,10 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
 
           {/* Input */}
           <div className="p-3 bg-white border-t border-slate-100">
-            <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20 transition-all">
+            <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20 transition-colors">
               <textarea
+                aria-label="Escribe tu pregunta para el asistente"
+                name="chat-message"
                 ref={inputRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
@@ -324,15 +341,19 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
                 disabled={loading}
               />
               <button
+                type="button"
                 onClick={() => send(input)}
+                aria-label="Enviar pregunta"
                 disabled={!input.trim() || loading}
-                className="p-2 bg-slate-900 text-white rounded-lg hover:bg-amber-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 flex-shrink-0"
+                className="p-2 bg-slate-900 text-white rounded-lg hover:bg-amber-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
               >
                 {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               </button>
               {history.length > 0 && (
                 <button
+                  type="button"
                   onClick={clearHistory}
+                  aria-label="Limpiar conversación"
                   title="Limpiar conversación"
                   className="p-2 text-slate-300 hover:text-red-400 transition-colors flex-shrink-0"
                 >

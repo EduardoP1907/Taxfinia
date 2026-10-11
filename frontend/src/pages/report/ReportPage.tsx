@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -21,16 +21,18 @@ import {
   X,
   Gift,
   Star,
+  Bot,
+  ArrowRight,
 } from 'lucide-react';
 import { companyService } from '../../services/company.service';
 import { ratiosService, type CompanyAnalysis } from '../../services/ratios.service';
 import { reportService, type Report } from '../../services/report.service';
 import { useAuthStore } from '../../store/authStore';
+import { useAccess } from '../../hooks/useAccess';
 import { YearSelector } from '../../components/data/YearSelector';
 import { IncomeStatementSection } from '../../components/report/IncomeStatementSection';
 import { BalanceSheetSection } from '../../components/report/BalanceSheetSection';
 import { RatiosSection } from '../../components/report/RatiosSection';
-import { CompanyChat } from '../../components/report/CompanyChat';
 import { ProtectedPdfViewer } from '../../components/report/ProtectedPdfViewer';
 import { CompanySelector } from '../../components/companies/CompanySelector';
 import { AnalyticsSection } from '../../components/report/AnalyticsSection';
@@ -92,9 +94,11 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ previewUrl, companyName, ye
           </div>
         </div>
         <button
+          type="button"
           onClick={onClose}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
           title="Cerrar vista previa"
+          aria-label="Cerrar vista previa"
         >
           <X className="w-5 h-5" />
         </button>
@@ -119,6 +123,7 @@ interface AIReportPanelProps {
 
 const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, selectedYear }) => {
   const { user } = useAuthStore();
+  const { readOnly } = useAccess();
   const isTrial = user?.planType === 'TRIAL';
   const freeUsed = user?.freeReportsUsed ?? 0;
   const freeRemaining = Math.max(0, 2 - freeUsed);
@@ -155,32 +160,35 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
   };
 
   const handlePreview = async (reportId: string) => {
+    setError(null);
     try {
       const { token } = await reportService.getPreviewToken(reportId);
       setPreviewUrl(reportService.getPreviewUrl(token));
     } catch {
-      alert('Error al generar la vista previa. Inténtalo de nuevo.');
+      setError('No se pudo abrir la vista previa. Inténtalo de nuevo en unos segundos.');
     }
   };
 
   const handleDownloadClick = async (reportId: string, format: 'pdf' | 'docx') => {
     const key = `${reportId}-${format}`;
+    setError(null);
     setDownloading(prev => ({ ...prev, [key]: true }));
     try {
       await reportService.downloadReport(reportId, format, companyName, selectedYear);
     } catch {
-      alert('Error al descargar el archivo');
+      setError('No se pudo descargar el archivo. Revisa tu conexión e inténtalo de nuevo.');
     } finally {
       setDownloading(prev => ({ ...prev, [key]: false }));
     }
   };
 
   const handleDownloadExecutive = async (reportId: string) => {
+    setError(null);
     setDownloadingExec(prev => ({ ...prev, [reportId]: true }));
     try {
       await reportService.downloadExecutiveSummary(reportId, companyName, selectedYear);
     } catch {
-      alert('Error al generar el resumen ejecutivo');
+      setError('No se pudo generar el resumen ejecutivo. Inténtalo de nuevo.');
     } finally {
       setDownloadingExec(prev => ({ ...prev, [reportId]: false }));
     }
@@ -200,8 +208,8 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
 
       <div className="bg-gradient-to-br from-amber-50 to-slate-50 border border-amber-200 rounded-xl p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="p-2 bg-amber-500 rounded-lg">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
@@ -224,7 +232,8 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
           </div>
           <Button
             onClick={handleGenerate}
-            disabled={generating}
+            disabled={generating || readOnly}
+            title={readOnly ? 'Requiere una suscripción vigente' : undefined}
             className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm disabled:opacity-60"
           >
             {generating ? (
@@ -245,7 +254,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
 
         {/* Error */}
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+          <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
             <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
             <p className="text-sm text-red-700">{error}</p>
           </div>
@@ -270,7 +279,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
             <div className="space-y-2">
               {reports.map(report => (
                 <div key={report.id} className="bg-white rounded-lg p-3 border border-amber-100">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-3 min-w-0">
                       <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
                       <div className="min-w-0">
@@ -285,7 +294,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
                     </div>
 
                     {report.status === 'COMPLETED' && (
-                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         {/* Analysis — preview button */}
                         {report.docxPath && (
                           <button
@@ -344,7 +353,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
 
         {reports.length === 0 && !generating && (
           <p className="text-sm text-amber-500 text-center py-2">
-            Aún no hay informes generados para esta empresa. Haz clic en "Generar Informe IA" para crear el primero.
+            Aún no hay informes generados para esta empresa. Haz clic en «Generar Informe IA» para crear el primero.
           </p>
         )}
       </div>
@@ -442,7 +451,7 @@ export const ReportPage: React.FC = () => {
           <Card>
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Cargando informe...</p>
+              <p className="text-gray-600">Cargando informe…</p>
             </div>
           </Card>
         </div>
@@ -517,9 +526,9 @@ export const ReportPage: React.FC = () => {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-1">Informe Económico-Financiero</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="min-w-0">
+              <h1 className="text-3xl font-bold text-gray-900 mb-1 text-balance">Informe Económico-Financiero</h1>
               <p className="text-gray-600">{company.name} {company.taxId && `• ${company.taxId}`}</p>
             </div>
             <div className="flex items-center gap-3">
@@ -553,17 +562,27 @@ export const ReportPage: React.FC = () => {
           selectedYear={selectedYear}
         />
 
-        {/* Company Chat */}
-        <CompanyChat
-          companyId={companyId}
-          companyName={company.name}
-          isLocked={false}
-        />
+        {/* Acceso al Asistente IA (movido a su propia pestaña del menú) */}
+        <Link
+          to={`/asistente?companyId=${companyId}`}
+          className="flex items-center justify-between gap-3 px-5 py-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          <span className="flex items-center gap-3 min-w-0">
+            <span className="flex w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 items-center justify-center flex-shrink-0">
+              <Bot className="w-5 h-5 text-amber-400" aria-hidden="true" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-white">Asistente Financiero IA</span>
+              <span className="block text-xs text-slate-400 truncate">Haz preguntas sobre {company.name}</span>
+            </span>
+          </span>
+          <ArrowRight className="w-4 h-4 text-amber-400 flex-shrink-0" aria-hidden="true" />
+        </Link>
 
         {/* Financial Tabs */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="border-b border-gray-200">
-            <nav className="flex -mb-px">
+            <nav className="flex -mb-px overflow-x-auto" aria-label="Secciones del informe">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;

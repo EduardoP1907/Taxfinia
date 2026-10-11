@@ -6,11 +6,23 @@ import { companyService } from '../../services/company.service';
 import type { Company, CreateCompanyData, UpdateCompanyData } from '../../types/company';
 import { useNavigate } from 'react-router-dom';
 import { useCompanyStore } from '../../store/companyStore';
+import { useAuthStore } from '../../store/authStore';
+import { useAccess } from '../../hooks/useAccess';
 import { Building2, Plus, Pencil, Trash2, FileText, Calendar, Briefcase, Users, DollarSign } from 'lucide-react';
 
 export const CompaniesPage: React.FC = () => {
   const navigate = useNavigate();
   const setSelectedCompanyInStore = useCompanyStore((s) => s.setSelectedCompany);
+  const invalidateCompanies = useCompanyStore((s) => s.invalidateCompanies);
+  const initActiveCompany = useCompanyStore((s) => s.initActiveCompany);
+  const userId = useAuthStore((s) => s.user?.id);
+  const { privileged, readOnly } = useAccess();
+
+  // Mantiene la "empresa activa" del menú al día tras crear/editar/eliminar
+  const refreshActiveCompany = () => {
+    invalidateCompanies();
+    if (userId) initActiveCompany(userId);
+  };
 
   const [companies, setCompanies]         = useState<Company[]>([]);
   const [isLoading, setIsLoading]         = useState(true);
@@ -35,6 +47,7 @@ export const CompaniesPage: React.FC = () => {
   const handleCreate = async (data: CreateCompanyData | UpdateCompanyData) => {
     await companyService.createCompany(data as CreateCompanyData);
     await loadCompanies();
+    refreshActiveCompany();
   };
 
   const handleUpdate = async (data: UpdateCompanyData) => {
@@ -42,6 +55,7 @@ export const CompaniesPage: React.FC = () => {
       const updated = await companyService.updateCompany(selectedCompany.id, data);
       setSelectedCompanyInStore(updated);
       await loadCompanies();
+      refreshActiveCompany();
     }
   };
 
@@ -49,14 +63,19 @@ export const CompaniesPage: React.FC = () => {
     try {
       await companyService.deleteCompany(id);
       await loadCompanies();
+      refreshActiveCompany();
       setDeleteConfirm(null);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Error al eliminar la empresa');
+      setDeleteConfirm(null);
+      setError(err.response?.data?.message || 'No se pudo eliminar la empresa. Inténtalo de nuevo.');
     }
   };
 
   const openModal = (company?: Company) => { setSelected(company || null); setIsModalOpen(true); };
   const closeModal = () => { setIsModalOpen(false); setSelected(null); };
+
+  // Usuarios normales: una sola empresa y solo con suscripción vigente
+  const canCreate = privileged || (!readOnly && companies.length === 0);
 
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -81,14 +100,23 @@ export const CompaniesPage: React.FC = () => {
                 : `${companies.length} empresa${companies.length > 1 ? 's' : ''} en el portfolio`}
             </p>
           </div>
-          <Button onClick={() => openModal()} size="md">
-            <Plus className="w-4 h-4" />
-            Nueva Empresa
-          </Button>
+          {canCreate && (
+            <Button onClick={() => openModal()} size="md">
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              Nueva Empresa
+            </Button>
+          )}
         </div>
 
+        {!privileged && !readOnly && companies.length > 0 && (
+          <p className="mb-6 text-xs text-slate-500">
+            Tu cuenta permite una empresa. Tras generar el primer informe, la razón social y el RUT quedan fijos
+            y la empresa no se puede eliminar.
+          </p>
+        )}
+
         {error && (
-          <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+          <div role="alert" className="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
             {error}
           </div>
         )}
@@ -109,10 +137,12 @@ export const CompaniesPage: React.FC = () => {
             <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto">
               Crea tu primera empresa para comenzar a analizar datos financieros
             </p>
-            <Button onClick={() => openModal()}>
-              <Plus className="w-4 h-4" />
-              Crear Primera Empresa
-            </Button>
+            {canCreate && (
+              <Button onClick={() => openModal()}>
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                Crear Primera Empresa
+              </Button>
+            )}
           </div>
 
         /* ── Company grid ────────────────────────────────────────────────── */
@@ -121,7 +151,7 @@ export const CompaniesPage: React.FC = () => {
             {companies.map((company) => (
               <div
                 key={company.id}
-                className="group bg-white rounded-xl border border-slate-200 hover:border-amber-200 hover:shadow-md transition-all duration-200 overflow-hidden"
+                className="group bg-white rounded-xl border border-slate-200 hover:border-amber-200 hover:shadow-md transition duration-200 overflow-hidden"
               >
                 {/* Card top accent */}
                 <div className="h-1 bg-gradient-to-r from-amber-500 to-amber-300 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
@@ -204,12 +234,16 @@ export const CompaniesPage: React.FC = () => {
                           <FileText className="w-3.5 h-3.5" />
                           Datos
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => openModal(company)}>
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setDeleteConfirm(company.id)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        {!readOnly && (
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => openModal(company)} aria-label={`Editar ${company.name}`} title="Editar">
+                              <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setDeleteConfirm(company.id)} aria-label={`Eliminar ${company.name}`} title="Eliminar">
+                              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

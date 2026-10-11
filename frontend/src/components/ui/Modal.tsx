@@ -38,7 +38,10 @@ export const Modal: React.FC<ModalProps> = ({
 
       <div className="flex min-h-full items-center justify-center p-4">
         <div
-          className={`relative w-full ${widths[maxWidth]} bg-white rounded-xl shadow-2xl border border-slate-200`}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          className={`relative w-full ${widths[maxWidth]} bg-white rounded-xl shadow-2xl border border-slate-200 overscroll-contain`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -48,10 +51,12 @@ export const Modal: React.FC<ModalProps> = ({
               <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">{title}</h3>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              aria-label="Cerrar"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
 

@@ -8,6 +8,13 @@ export interface User {
   planType?: string;
   freeReportsUsed?: number;
   createdAt: string;
+  // Suscripción y acceso (vienen de /auth/me)
+  isActive?: boolean;
+  isExempt?: boolean;
+  privileged?: boolean;              // ADMIN o exento: sin vencimiento ni bloqueos
+  subscriptionEndsAt?: string | null;
+  subscriptionActive?: boolean;      // false = modo solo lectura
+  annualYearWindow?: { min: number; max: number }; // años anuales editables
 }
 
 export interface AuthResponse {
