@@ -20,6 +20,8 @@ import chatRoutes from './routes/chat.routes';
 import monthlyForecastRoutes from './routes/monthly-forecast.routes';
 import monthlyReportRoutes from './routes/monthly-report.routes';
 import comparisonReportRoutes from './routes/comparison-report.routes';
+import adminRoutes from './routes/admin.routes';
+import { startSubscriptionJobs } from './services/subscription.service';
 
 const app = express();
 
@@ -98,6 +100,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/monthly-forecast', monthlyForecastRoutes);
 app.use('/api/monthly-reports', monthlyReportRoutes);
 app.use('/api/comparison-reports', comparisonReportRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Manejo de errores global
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
@@ -125,6 +128,7 @@ app.listen(PORT, () => {
 ║   Frontend: ${config.frontendUrl}        ║
 ╚═══════════════════════════════════════╝
   `);
+  startSubscriptionJobs();
 });
 
 export default app;

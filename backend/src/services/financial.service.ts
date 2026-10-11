@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 import { Prisma } from '@prisma/client';
 import type { ParsedImportData } from '../utils/excel-import';
+import { assertAnnualYearWritable } from './access.service';
 
 // Helper para convertir objetos Prisma Decimal a números
 function convertDecimalsToNumbers(data: any): any {
@@ -362,13 +363,23 @@ export const financialService = {
 
     const results: { year: number; created: boolean }[] = [];
 
+    // Validar TODOS los años antes de escribir (ventana de años y ejercicios
+    // consolidados): o se importa el archivo completo, o nada.
+    for (const year of parsed.years) {
+      const existing = await prisma.fiscalYear.findFirst({
+        where: { companyId, year, quarter: 0, month: 0 },
+        select: { consolidatedAt: true },
+      });
+      await assertAnnualYearWritable(userId, year, existing);
+    }
+
     for (const year of parsed.years) {
       const yearData = parsed.byYear[year];
 
-      // Upsert annual FiscalYear (quarter = 0)
-      let fy = await prisma.fiscalYear.findFirst({ where: { companyId, year, quarter: 0 } });
+      // Upsert annual FiscalYear (quarter = 0, month = 0)
+      let fy = await prisma.fiscalYear.findFirst({ where: { companyId, year, quarter: 0, month: 0 } });
       if (!fy) {
-        fy = await prisma.fiscalYear.create({ data: { companyId, year, quarter: 0 } });
+        fy = await prisma.fiscalYear.create({ data: { companyId, year, quarter: 0, month: 0 } });
       }
       const fyId = fy.id;
       const created = !fy.createdAt || fy.createdAt > new Date(Date.now() - 2000);

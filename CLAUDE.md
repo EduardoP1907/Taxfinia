@@ -78,7 +78,9 @@ Controllers → Services → Prisma (ORM) → PostgreSQL
 
 **Key middleware:**
 - `middlewares/auth.middleware.ts` — JWT validation, attaches `req.user`
-- `middlewares/company-lock.middleware.ts` — Blocks write operations on locked companies. Companies are locked (`isLocked=true`) after AI report generation or chat use; accepts `:companyId` or `:fiscalYearId` in params
+- `middlewares/company-lock.middleware.ts` — Per-fiscal-year lock for ANNUAL data: consolidated years (`FiscalYear.consolidatedAt`, set after AI report or chat use) are read-only, and only years in the window [current year − 5, current year − 1] can be created/edited. Monthly/quarterly records are never locked. Accepts `:companyId` (+ `body.year`) or `:fiscalYearId`
+- `middlewares/auth.middleware.ts` — Also enforces read-only mode: write requests from expired (`subscriptionEndsAt` past) or inactive accounts get 403 `{ subscriptionExpired: true }`, except report preview/download-code endpoints
+- `services/access.service.ts` — Single source of the access/anti-fraud rules: Chile-time year, subscription end (31-Dec), privileged users (ADMIN or `isExempt`), annual year window, consolidation, RUT validation (mod 11) and system-wide unique tax ID
 
 ### Frontend Structure
 
@@ -109,7 +111,9 @@ User → InviteToken (trial access system)
 ```
 
 **Important model fields:**
-- `Company.isLocked` — set to `true` after first AI report/chat; prevents financial data edits
+- `FiscalYear.consolidatedAt` — set on annual years after an AI report/chat; those years become read-only. `Company.isLocked` is legacy (migrated by `scripts/migrate-access-model.ts`)
+- `User.subscriptionEndsAt` — always 31-Dec (Chile time) of the paid year; admin renews via `POST /api/admin/users/:id/renew`. `User.isExempt` — no expiry and no locks (managed from the admin panel)
+- Non-privileged users: max 1 company, tax ID required/valid/unique; name and tax ID are frozen and the company can't be deleted once it has reports or consolidated years
 - `Company.businessActivity` — freeform business description used in AI prompt
 - `User.planType` — `"FREE"` or `"TRIAL"` etc.; `freeReportsUsed` tracks report quota
 - `Report.aiAnalysis` — JSON blob with 13 AI-generated sections stored in DB
@@ -130,7 +134,7 @@ User → InviteToken (trial access system)
 
 ### Chat Feature
 
-`POST /api/chat/:companyId` — Builds a full system prompt with all company financial data (all fiscal years, ratios, projections, prior AI analysis) and calls `claude-opus-4-6`. Accepts `{ message, history: [{role, content}] }`. Locking the company is triggered by the chat route.
+`POST /api/chat/:companyId` — Builds a full system prompt with all company financial data (all fiscal years, ratios, projections, prior AI analysis) and calls `claude-opus-4-6`. Accepts `{ message, history: [{role, content}] }`. Using the chat consolidates the company's annual years (read-only). Blocked for expired accounts.
 
 ### AI Features (Anthropic SDK)
 
@@ -243,6 +247,6 @@ Backend allows: `localhost:5173-5177` and the S3 static hosting URL for the fron
 
 ## Implementation Status
 
-**Completed:** Auth (OTP email, JWT, roles), company CRUD with soft delete, multi-year financial data entry, ratios engine (liquidity, leverage, profitability, activity, Altman Z-Score), AI report generation (13 sections), AI WACC estimation, DOCX/PDF report generation, S3 storage, preview tokens, download codes with admin email notifications, company lock mechanism, AI chat per company, DCF projections (sheets 4.1 and 4.3), invite token trial system, admin panel.
+**Completed:** Auth (OTP email, JWT, roles), company CRUD with soft delete, multi-year financial data entry, ratios engine (liquidity, leverage, profitability, activity, Altman Z-Score), AI report generation (13 sections), AI WACC estimation, DOCX/PDF report generation, S3 storage, preview tokens, download codes with admin email notifications, per-year data consolidation, subscriptions (31-Dec expiry, admin renewal, expiry warning emails, read-only mode), AI chat per company, DCF projections (sheets 4.1 and 4.3), invite token trial system, admin panel.
 
 **Pending:** Static valuation methods (DCF sheet 4.1 uses projections but Book Value/Multiples/EVA valuation modules not yet complete), Excel/CSV import, industry benchmarking, multi-company comparison, mobile optimization.

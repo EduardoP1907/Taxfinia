@@ -313,3 +313,36 @@ export const sendAdminReportCodeEmail = async (data: ReportCodeEmailData): Promi
 
   await transporter.sendMail(mailOptions);
 };
+
+/** Aviso al usuario de que su suscripción vence pronto (se envía ~30 días antes). */
+export const sendSubscriptionExpiryWarningEmail = async (data: {
+  email: string;
+  firstName?: string | null;
+  endsAt: string; // fecha ya formateada (dd-mm-aaaa)
+}): Promise<void> => {
+  const name = data.firstName || 'Hola';
+  await transporter.sendMail({
+    from: config.email.from,
+    to: data.email,
+    subject: `[PROMETHEIA] Tu suscripción vence el ${data.endsAt}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <body style="font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #334155; background: #f8fafc; margin: 0; padding: 40px 20px;">
+        <div style="max-width: 580px; margin: 0 auto;">
+          <div style="background: #0f172a; padding: 28px 36px; border-radius: 12px 12px 0 0;">
+            <div style="color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: 2px;">🔥 PROMETHEIA</div>
+          </div>
+          <div style="background: #ffffff; padding: 36px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+            <h2 style="color: #0f172a; margin: 0 0 12px 0; font-size: 20px;">${name}, tu suscripción vence pronto</h2>
+            <p>Tu suscripción a PROMETHEIA vence el <strong>${data.endsAt}</strong>.</p>
+            <p>Desde esa fecha tu cuenta quedará en <strong>modo solo lectura</strong>: podrás ver y descargar los informes ya generados, pero no cargar datos, generar informes nuevos ni usar el asistente IA.</p>
+            <p>Para renovarla, contacta al administrador. Una vez renovada podrás agregar el ejercicio recién cerrado.</p>
+            <p style="color: #94a3b8; font-size: 12px; margin-top: 28px; text-align: center;">© ${new Date().getFullYear()} PROMETHEIA</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+};

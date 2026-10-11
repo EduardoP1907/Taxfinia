@@ -1,5 +1,12 @@
 import prisma from '../config/database';
 import { Company, Prisma } from '@prisma/client';
+import {
+  AccessError, getAccessUser, isPrivileged, validateTaxId, assertTaxIdAvailable,
+  companyHasConsolidatedData, consolidateAnnualYears, unconsolidateAnnualYears,
+} from './access.service';
+
+/** Empresas activas permitidas por usuario (los privilegiados no tienen límite). */
+export const MAX_COMPANIES_PER_USER = 1;
 
 interface CreateCompanyData {
   name: string;
@@ -33,11 +40,25 @@ interface UpdateCompanyData {
 
 export class CompanyService {
   async createCompany(userId: string, data: CreateCompanyData): Promise<Company> {
+    const user = await getAccessUser(userId);
+    if (!user) throw new AccessError('Usuario no encontrado', 401);
+    const privileged = isPrivileged(user);
+
+    let taxId = data.taxId;
+    if (!privileged) {
+      const count = await prisma.company.count({ where: { userId, deletedAt: null } });
+      if (count >= MAX_COMPANIES_PER_USER) {
+        throw new AccessError('Tu cuenta permite registrar una sola empresa.', 403);
+      }
+      taxId = validateTaxId(data.taxId, data.country);
+      await assertTaxIdAvailable(taxId);
+    }
+
     const company = await prisma.company.create({
       data: {
         userId,
         name: data.name,
-        taxId: data.taxId,
+        taxId,
         industry: data.industry,
         businessActivity: data.businessActivity,
         companySize: data.companySize,
@@ -105,11 +126,28 @@ export class CompanyService {
       throw new Error('Empresa no encontrada');
     }
 
+    // Antifraude: tras el primer informe o consulta al asistente, la identidad de
+    // la empresa (razón social y RUT) queda fija; el RUT siempre debe ser válido y único.
+    let taxId = data.taxId;
+    const user = await getAccessUser(userId);
+    if (user && !isPrivileged(user)) {
+      const norm = (v: string | null | undefined) => (v ?? '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+      const nameChanged = data.name !== undefined && data.name.trim() !== company.name.trim();
+      const taxIdChanged = data.taxId !== undefined && norm(data.taxId) !== norm(company.taxId);
+      if ((nameChanged || taxIdChanged) && await companyHasConsolidatedData(companyId)) {
+        throw new AccessError('La razón social y el RUT no se pueden modificar después de generar un informe o usar el asistente.', 403);
+      }
+      if (taxIdChanged || (data.country !== undefined && data.country !== company.country)) {
+        taxId = validateTaxId(data.taxId ?? company.taxId, data.country ?? company.country);
+        await assertTaxIdAvailable(taxId, companyId);
+      }
+    }
+
     const updated = await prisma.company.update({
       where: { id: companyId },
       data: {
         name: data.name,
-        taxId: data.taxId,
+        taxId,
         industry: data.industry,
         businessActivity: data.businessActivity,
         companySize: data.companySize,
@@ -139,6 +177,13 @@ export class CompanyService {
 
     if (!company) {
       throw new Error('Empresa no encontrada');
+    }
+
+    // Antifraude: una empresa con informes o datos consolidados no se puede
+    // eliminar (evita borrarla y registrar otra con la misma suscripción).
+    const user = await getAccessUser(userId);
+    if (user && !isPrivileged(user) && await companyHasConsolidatedData(companyId)) {
+      throw new AccessError('Esta empresa ya tiene informes generados y no se puede eliminar. Contacta al administrador si necesitas hacerlo.', 403);
     }
 
     // Soft delete
@@ -220,41 +265,41 @@ export class CompanyService {
 export const companyService = new CompanyService();
 
 /**
- * Cuentas cuyas empresas nunca se bloquean: mantienen acceso permanente a
- * los datos anuales aunque hayan generado informes o usado el asistente.
+ * Consolida los ejercicios anuales de la empresa (quedan solo lectura).
+ * Se llama al generar el informe anual y al usar el asistente IA.
+ * Las empresas de usuarios exentos o administradores nunca se consolidan.
  */
-export const LOCK_EXEMPT_EMAILS = ['fmonroyfe@gmail.com'];
-
-/** Lock a company so its financial data can no longer be edited */
 export async function lockCompany(companyId: string): Promise<void> {
-  const company = await prisma.company.findUnique({
-    where: { id: companyId },
-    select: { user: { select: { email: true } } },
-  });
-  if (company && LOCK_EXEMPT_EMAILS.includes(company.user.email.toLowerCase())) return;
-
-  await prisma.company.update({
-    where: { id: companyId },
-    data: { isLocked: true },
-  });
+  await consolidateAnnualYears(companyId);
 }
 
-/** Unlock a company so its financial data can be edited again (admin only) */
+/** Admin: habilita de nuevo la edición de todos los ejercicios anuales */
 export async function unlockCompany(companyId: string): Promise<void> {
-  await prisma.company.update({
-    where: { id: companyId },
-    data: { isLocked: false },
-  });
+  await unconsolidateAnnualYears(companyId);
 }
 
 /** Get all companies (admin view — across all users) */
 export async function getAllCompaniesAdmin(): Promise<{
   id: string; name: string; taxId: string | null; isLocked: boolean;
   userId: string; createdAt: Date; currency: string;
+  consolidatedYears: number[];
 }[]> {
-  return prisma.company.findMany({
+  const companies = await prisma.company.findMany({
     where: { deletedAt: null },
-    select: { id: true, name: true, taxId: true, isLocked: true, userId: true, createdAt: true, currency: true },
+    select: {
+      id: true, name: true, taxId: true, userId: true, createdAt: true, currency: true,
+      fiscalYears: {
+        where: { quarter: 0, month: 0, consolidatedAt: { not: null } },
+        select: { year: true },
+        orderBy: { year: 'asc' },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
+  // isLocked = tiene algún ejercicio consolidado (compatibilidad con el panel admin)
+  return companies.map(({ fiscalYears, ...c }) => ({
+    ...c,
+    consolidatedYears: fiscalYears.map(f => f.year),
+    isLocked: fiscalYears.length > 0,
+  }));
 }

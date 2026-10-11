@@ -281,7 +281,7 @@ export const financialController = {
       });
     } catch (error: any) {
       console.error('Error importing financial data:', error);
-      res.status(400).json({ success: false, error: error.message || 'Error al importar el archivo' });
+      res.status(error?.status ?? 400).json({ success: false, error: error.message || 'Error al importar el archivo' });
     }
   },
 };

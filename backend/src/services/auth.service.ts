@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../config/database';
+import { endOfSubscriptionYear, currentYear, isPrivileged, isSubscriptionActive, annualYearWindow } from './access.service';
 import { generateOtp, isOtpExpired } from '../utils/otp';
 import { sendOtpEmail, sendPasswordResetEmail, sendNewUserNotificationEmail } from '../utils/email';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
@@ -43,6 +44,8 @@ export class AuthService {
         firstName,
         lastName,
         ...(validToken ? { planType: 'TRIAL' } : {}),
+        // Toda cuenta nueva vence el 31-dic del año en curso
+        subscriptionEndsAt: endOfSubscriptionYear(currentYear()),
       },
     });
 
@@ -288,6 +291,9 @@ export class AuthService {
         planType: true,
         freeReportsUsed: true,
         createdAt: true,
+        isActive: true,
+        isExempt: true,
+        subscriptionEndsAt: true,
       },
     });
 
@@ -295,7 +301,13 @@ export class AuthService {
       throw new Error('Usuario no encontrado');
     }
 
-    return user;
+    return {
+      ...user,
+      // El frontend usa esto para el modo solo lectura y la ventana de años
+      privileged: isPrivileged(user),
+      subscriptionActive: user.isActive && isSubscriptionActive(user),
+      annualYearWindow: annualYearWindow(),
+    };
   }
 
   /**

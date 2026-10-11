@@ -1,7 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt';
+import { getAccessUser, isSubscriptionActive, formatDateCL } from '../services/access.service';
 
-export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+// Escrituras permitidas con la suscripción vencida: solo acciones para VER o
+// DESCARGAR informes ya generados (no crean ni modifican datos financieros).
+const READ_ONLY_ALLOWED = [
+  /\/reports\/[^/]+\/preview-token$/,
+  /\/(reports|monthly-reports|comparison-reports)\/[^/]+\/(generate-code|validate-code)$/,
+  /\/auth\/logout$/,
+];
+
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+  let decoded;
   try {
     // Read token from httpOnly cookie first, fallback to Authorization header
     const cookieToken = (req as any).cookies?.accessToken;
@@ -14,13 +26,35 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
       return res.status(401).json({ error: 'Token no proporcionado' });
     }
 
-    const decoded = verifyToken(token);
+    decoded = verifyToken(token);
     req.user = decoded;
-
-    next();
   } catch (error) {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }
+
+  // Suscripción vencida o cuenta desactivada → modo solo lectura
+  if (WRITE_METHODS.has(req.method) && !READ_ONLY_ALLOWED.some(r => r.test(req.originalUrl.split('?')[0]))) {
+    try {
+      const user = await getAccessUser(decoded.userId);
+      if (!user) return res.status(401).json({ error: 'Usuario no encontrado' });
+      // El rol vigente se toma de la BD (el del token puede estar desactualizado)
+      req.user = { ...decoded, role: user.role };
+      if (!user.isActive || !isSubscriptionActive(user)) {
+        const until = user.subscriptionEndsAt ? ` el ${formatDateCL(user.subscriptionEndsAt)}` : '';
+        return res.status(403).json({
+          error: !user.isActive
+            ? 'Tu cuenta está desactivada. Contacta al administrador.'
+            : `Tu suscripción venció${until}. La cuenta está en modo solo lectura: contacta al administrador para renovarla.`,
+          subscriptionExpired: true,
+        });
+      }
+    } catch (err) {
+      console.error('[AUTH] Error verificando suscripción:', err);
+      return res.status(500).json({ error: 'No se pudo verificar la suscripción. Inténtalo de nuevo.' });
+    }
+  }
+
+  next();
 };
 
 export const optionalAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {

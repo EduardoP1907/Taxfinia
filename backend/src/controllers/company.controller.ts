@@ -26,7 +26,7 @@ export class CompanyController {
       });
     } catch (error: any) {
       console.error('Error creating company:', error);
-      res.status(500).json({
+      res.status(error?.status ?? 500).json({
         success: false,
         message: error.message || 'Error al crear la empresa',
       });
@@ -126,7 +126,7 @@ export class CompanyController {
       });
     } catch (error: any) {
       console.error('Error updating company:', error);
-      res.status(500).json({
+      res.status(error?.status ?? 500).json({
         success: false,
         message: error.message || 'Error al actualizar la empresa',
       });
@@ -146,7 +146,7 @@ export class CompanyController {
       });
     } catch (error: any) {
       console.error('Error deleting company:', error);
-      res.status(500).json({
+      res.status(error?.status ?? 500).json({
         success: false,
         message: error.message || 'Error al eliminar la empresa',
       });
