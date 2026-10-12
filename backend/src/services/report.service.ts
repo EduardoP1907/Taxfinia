@@ -240,35 +240,65 @@ export async function buildFinancialData(companyId: string, preferredBaseYear?: 
   };
 }
 
-// ─── Main: Generate Report ────────────────────────────────────────────────────
-export async function generateReport(companyId: string, userId: string, year?: number): Promise<string> {
-  ensureReportsDir();
+// A GENERATING record older than this is considered abandoned (e.g. the server
+// restarted mid-generation) and a new one may be started.
+const STALE_GENERATION_MS = 10 * 60 * 1000;
 
-  // Fetch financial data
+// ─── Start: validate + create GENERATING record (returns immediately) ────────
+// Generation takes ~1 min (AI), longer than the proxy/CloudFront request timeout,
+// so the HTTP request only starts it; the client polls the report list.
+export async function startReport(
+  companyId: string,
+  userId: string,
+  year?: number,
+): Promise<{ reportId: string; alreadyRunning: boolean }> {
+  // Validates that there is financial data (throws otherwise)
   const financialData = await buildFinancialData(companyId, year);
   // Use requested year only if data exists for it; otherwise fall back to latest available
   const reportYear = (year && financialData.years.includes(year))
     ? year
     : financialData.latestYear;
 
-  // Check if user is on TRIAL plan and has free reports remaining
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { planType: true, freeReportsUsed: true },
-  });
-  const isFreeTrialReport = user?.planType === 'TRIAL' && (user?.freeReportsUsed ?? 0) < 2;
-
-  // Create report record in DB (status: GENERATING)
-  const report = await prisma.report.create({
-    data: {
+  const running = await prisma.report.findFirst({
+    where: {
       companyId,
-      userId,
       year: reportYear,
       status: 'GENERATING',
+      updatedAt: { gt: new Date(Date.now() - STALE_GENERATION_MS) },
     },
+    orderBy: { createdAt: 'desc' },
   });
+  if (running) return { reportId: running.id, alreadyRunning: true };
+
+  const report = await prisma.report.create({
+    data: { companyId, userId, year: reportYear, status: 'GENERATING' },
+  });
+  return { reportId: report.id, alreadyRunning: false };
+}
+
+// ─── Main: Generate Report (synchronous, start → run) ─────────────────────────
+export async function generateReport(companyId: string, userId: string, year?: number): Promise<string> {
+  const { reportId } = await startReport(companyId, userId, year);
+  await runReport(reportId);
+  return reportId;
+}
+
+// ─── Run: AI → DOCX → S3 → COMPLETED / FAILED ─────────────────────────────────
+export async function runReport(reportId: string): Promise<void> {
+  ensureReportsDir();
+  const report = await prisma.report.findUniqueOrThrow({ where: { id: reportId } });
+  const { companyId, userId, year: reportYear } = report;
 
   try {
+    const financialData = await buildFinancialData(companyId, reportYear);
+
+    // Check if user is on TRIAL plan and has free reports remaining
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { planType: true, freeReportsUsed: true },
+    });
+    const isFreeTrialReport = user?.planType === 'TRIAL' && (user?.freeReportsUsed ?? 0) < 2;
+
     // ── Step 1: Generate AI narrative analysis ──
     console.log(`[REPORT] Generating AI analysis for ${financialData.company.name}...`);
     const aiData: FinancialDataForAI = {
@@ -342,7 +372,6 @@ export async function generateReport(companyId: string, userId: string, year?: n
     );
 
     console.log(`[REPORT] Report ${report.id} generated successfully`);
-    return report.id;
 
   } catch (error) {
     // Update report status to FAILED

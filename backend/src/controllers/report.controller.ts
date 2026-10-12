@@ -4,6 +4,8 @@ import fs from 'fs';
 import crypto from 'crypto';
 import {
   generateReport,
+  startReport,
+  runReport,
   getCompanyReports,
   getReport,
   getReportFilePath,
@@ -81,13 +83,33 @@ export class ReportController {
       if (!userId) { res.status(401).json({ error: 'No autorizado' }); return; }
       if (!companyId) { res.status(400).json({ error: 'ID de empresa requerido' }); return; }
 
-      res.json({ message: 'Generando informe...', status: 'GENERATING' });
-      generateReport(companyId, userId, year).catch(err => {
-        console.error('[REPORT] Background generation failed:', err.message);
+      const { reportId, alreadyRunning } = await startReport(companyId, userId, year);
+      if (!alreadyRunning) {
+        runReport(reportId).catch(err =>
+          console.error(`[REPORT] Background generation ${reportId} failed:`, err.message),
+        );
+      }
+
+      const report = await getReport(reportId);
+      res.status(202).json({
+        success: true,
+        reportId,
+        report: {
+          id: report!.id,
+          year: report!.year,
+          status: report!.status,
+          generatedAt: report!.generatedAt,
+          pdfPath: report!.pdfPath,
+          docxPath: report!.docxPath,
+          errorMessage: report!.errorMessage,
+          createdAt: report!.createdAt,
+          hasDownloadCode: !!report!.downloadCode,
+        },
       });
     } catch (error) {
       console.error('[REPORT] Generate error:', error);
-      res.status(500).json({ error: 'Error al iniciar la generación del informe' });
+      const message = error instanceof Error ? error.message : 'Error al iniciar la generación del informe';
+      res.status(500).json({ error: message });
     }
   }
 

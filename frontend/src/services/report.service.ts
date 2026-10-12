@@ -14,10 +14,11 @@ export interface Report {
 
 export const reportService = {
   /**
-   * Generate a new report (sync - waits for AI to finish)
+   * Start generating a report. Returns immediately with the GENERATING record;
+   * the AI takes ~1 min, so the caller polls getCompanyReports.
    */
-  async generateReport(companyId: string, year?: number): Promise<{ reportId: string; report: Report }> {
-    const response = await api.post(`/reports/generate-sync/${companyId}`, { year });
+  async generateReport(companyId: string, year?: number): Promise<{ reportId: string; report?: Report }> {
+    const response = await api.post(`/reports/generate/${companyId}`, { year });
     return response.data;
   },
 

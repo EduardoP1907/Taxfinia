@@ -28,6 +28,8 @@ import { companyService } from '../../services/company.service';
 import { ratiosService, type CompanyAnalysis } from '../../services/ratios.service';
 import { reportService, type Report } from '../../services/report.service';
 import { useAuthStore } from '../../store/authStore';
+
+const POLL_INTERVAL_MS = 4000;
 import { useAccess } from '../../hooks/useAccess';
 import { YearSelector } from '../../components/data/YearSelector';
 import { IncomeStatementSection } from '../../components/report/IncomeStatementSection';
@@ -129,7 +131,7 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
   const freeRemaining = Math.max(0, 2 - freeUsed);
 
   const [reports, setReports] = useState<Report[]>([]);
-  const [generating, setGenerating] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
   const [downloadingExec, setDownloadingExec] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
@@ -146,16 +148,27 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
 
   useEffect(() => { loadReports(); }, [loadReports]);
 
+  // Generation runs in the background on the server (~1 min, longer than the
+  // proxy timeout); while any report is GENERATING, refresh the list until it
+  // turns COMPLETED or FAILED.
+  const generating = starting || reports.some(r => r.status === 'GENERATING');
+  useEffect(() => {
+    if (!reports.some(r => r.status === 'GENERATING')) return;
+    const timer = setInterval(loadReports, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [reports, loadReports]);
+
   const handleGenerate = async () => {
-    setGenerating(true);
+    setStarting(true);
     setError(null);
     try {
       const { report } = await reportService.generateReport(companyId, selectedYear);
-      setReports(prev => [report, ...prev.filter(r => r.id !== report.id)]);
+      if (report) setReports(prev => [report, ...prev.filter(r => r.id !== report.id)]);
+      else await loadReports();
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Error al generar el informe. Verifica que haya datos financieros completos.');
     } finally {
-      setGenerating(false);
+      setStarting(false);
     }
   };
 
@@ -262,8 +275,9 @@ const AIReportPanel: React.FC<AIReportPanelProps> = ({ companyId, companyName, s
 
         {/* Generating state */}
         {generating && (
-          <div className="mb-4 flex justify-center py-4">
-            <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" />
+          <div className="mb-4 flex flex-col items-center gap-2 py-4" role="status">
+            <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" aria-hidden="true" />
+            <p className="text-xs text-slate-500">Generando informe, suele tardar alrededor de un minuto. Puedes seguir navegando: aparecerá aquí al terminar.</p>
           </div>
         )}
 

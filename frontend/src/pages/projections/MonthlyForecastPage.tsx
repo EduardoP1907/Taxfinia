@@ -239,19 +239,60 @@ const RateInput: React.FC<{
   );
 };
 
-// Editable cell for the projected balance — overrides the calculated value.
+// Thousands-separated display for the editable amount cells: 1000000 → "1.000.000".
+// es-CL groups 4-digit numbers too (es-ES would leave "1000").
+const fmtEditable = (n: number) =>
+  new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(n);
+
+// An amount in display format: thousand dots and optional decimal comma
+// ("1.000.000", "-25.000", "1.234,5"). Anything else (arithmetic like
+// "100*1.05") goes to the evaluator, where "." is the decimal point.
+const GROUPED_NUMBER = /^-?\d{1,3}(\.\d{3})*(,\d+)?$/;
+
+const parseEditable = (raw: string): number | null => {
+  const t = raw.trim();
+  if (GROUPED_NUMBER.test(t)) return Number(t.replace(/\./g, '').replace(',', '.'));
+  return evaluateArithmeticExpression(t);
+};
+
+// Editable cell for projected values — overrides the calculated value.
 // Empty input = no override, falls back to the calculated value (shown as placeholder).
+// Plain numbers are regrouped with thousand dots while typing.
 const BalanceOverrideInput: React.FC<{
   value: number | null;
   computed: number;
   onChange: (v: number | null) => void;
   label?: string;
 }> = ({ value, computed, onChange, label }) => {
-  const [local, setLocal] = useState(value === null ? '' : String(value));
+  const [local, setLocal] = useState(value === null ? '' : fmtEditable(value));
 
   useEffect(() => {
-    setLocal(value === null ? '' : String(value));
+    setLocal(value === null ? '' : fmtEditable(value));
   }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const el = e.target;
+    const raw = el.value;
+    // Only digits/dots (optionally negative): treat dots as thousand separators
+    if (!/^-?[\d.]+$/.test(raw)) {
+      setLocal(raw);
+      return;
+    }
+    const caret = el.selectionStart ?? raw.length;
+    const digitsAfterCaret = raw.slice(caret).replace(/\D/g, '').length;
+    const neg = raw.startsWith('-');
+    const digits = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    const formatted = digits === '' ? (neg ? '-' : '') : (neg ? '-' : '') + fmtEditable(Number(digits));
+    setLocal(formatted);
+    // Keep the caret in the same place relative to the digits on its right
+    requestAnimationFrame(() => {
+      let pos = formatted.length;
+      for (let seen = 0; pos > 0 && seen < digitsAfterCaret; pos--) {
+        if (/\d/.test(formatted[pos - 1])) seen++;
+      }
+      el.setSelectionRange(pos, pos);
+    });
+  };
 
   return (
     <input
@@ -260,20 +301,20 @@ const BalanceOverrideInput: React.FC<{
       inputMode="decimal"
       value={local}
       placeholder={fmt(computed)}
-      onChange={e => setLocal(e.target.value)}
+      onChange={handleChange}
       onFocus={caretToEnd}
       onMouseUp={caretToEnd}
       onBlur={() => {
-        if (local.trim() === '') {
+        if (local.trim() === '' || local.trim() === '-') {
+          setLocal('');
           onChange(null);
           return;
         }
-        const parsed = evaluateArithmeticExpression(local);
+        const parsed = parseEditable(local);
         onChange(parsed);
-        if (parsed === null) setLocal('');
-        else setLocal(String(parsed));
+        setLocal(parsed === null ? '' : fmtEditable(parsed));
       }}
-      className="w-full text-right text-xs border border-slate-200 rounded px-1 py-0.5 bg-white
+      className="w-full text-right text-xs border border-slate-200 rounded px-1 py-0.5 bg-white tabular-nums
                  focus:outline-none focus:ring-1 focus:ring-amber-400
                  [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
     />

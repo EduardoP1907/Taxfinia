@@ -16,10 +16,11 @@ export interface MonthlyReport {
 
 export const monthlyReportService = {
   /**
-   * Generate the two monthly AI reports (Prometheia + Ejecutivo), sync
+   * Start generating the two monthly AI reports (Prometheia + Ejecutivo).
+   * Returns immediately with the GENERATING record; the caller polls getCompanyReports.
    */
   async generateReport(companyId: string, year: number): Promise<{ reportId: string; report: MonthlyReport }> {
-    const response = await api.post(`/monthly-reports/generate-sync/${companyId}`, { year });
+    const response = await api.post(`/monthly-reports/generate/${companyId}`, { year });
     return response.data;
   },
 

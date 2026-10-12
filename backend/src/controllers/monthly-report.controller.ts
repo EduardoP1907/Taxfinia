@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import crypto from 'crypto';
 import {
-  generateMonthlyReport, getCompanyMonthlyReports, getMonthlyReport,
+  generateMonthlyReport, startMonthlyReport, runMonthlyReport, getCompanyMonthlyReports, getMonthlyReport,
   getMonthlyReportFilePath, setMonthlyReportDownloadCode, convertDocxToPdf,
 } from '../services/monthly-report.service';
 import { sendAdminReportCodeEmail } from '../utils/email';
@@ -38,6 +38,49 @@ async function resolveDocxLocally(storedPath: string): Promise<{ localDocxPath: 
 }
 
 export class MonthlyReportController {
+  /**
+   * POST /api/monthly-reports/generate/:companyId
+   * body: { year: number } — async (202), the client polls the report list
+   */
+  async generate(req: Request, res: Response): Promise<void> {
+    try {
+      const { companyId } = req.params;
+      const userId = (req as any).user?.userId;
+      const year = req.body.year ? parseInt(req.body.year) : new Date().getFullYear();
+
+      if (!userId) { res.status(401).json({ error: 'No autorizado' }); return; }
+      if (!companyId) { res.status(400).json({ error: 'ID de empresa requerido' }); return; }
+
+      const { reportId, alreadyRunning } = await startMonthlyReport(companyId, userId, year);
+      if (!alreadyRunning) {
+        runMonthlyReport(reportId).catch(error =>
+          console.error(`[MONTHLY-REPORT] Background generation ${reportId} failed:`, error),
+        );
+      }
+
+      const report = await getMonthlyReport(reportId);
+      res.status(202).json({
+        success: true,
+        reportId,
+        report: {
+          id: report!.id,
+          year: report!.year,
+          status: report!.status,
+          generatedAt: report!.generatedAt,
+          docxPathPrometheia: report!.docxPathPrometheia,
+          docxPathEjecutivo: report!.docxPathEjecutivo,
+          errorMessage: report!.errorMessage,
+          createdAt: report!.createdAt,
+          hasDownloadCode: !!report!.downloadCode,
+        },
+      });
+    } catch (error) {
+      console.error('[MONTHLY-REPORT] Generate error:', error);
+      const message = error instanceof Error ? error.message : 'Error al generar el informe mensual';
+      res.status(500).json({ error: message });
+    }
+  }
+
   /**
    * POST /api/monthly-reports/generate-sync/:companyId
    * body: { year: number }

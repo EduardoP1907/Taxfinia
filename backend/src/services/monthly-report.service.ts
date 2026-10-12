@@ -23,25 +23,63 @@ function ensureReportsDir() {
   if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
 }
 
-// ─── Main: Generate Monthly Report (Prometheia + Ejecutivo) ──────────────────
-export async function generateMonthlyReport(companyId: string, userId: string, year: number): Promise<string> {
-  ensureReportsDir();
+// A GENERATING record older than this is considered abandoned (e.g. the server
+// restarted mid-generation) and may be started again.
+const STALE_GENERATION_MS = 10 * 60 * 1000;
 
+// ─── Start: validate + mark GENERATING (returns immediately) ─────────────────
+// Generation takes ~1 min (two AI calls), longer than the proxy/CloudFront
+// request timeout, so the HTTP request only starts it; the client polls the list.
+export async function startMonthlyReport(
+  companyId: string,
+  userId: string,
+  year: number,
+): Promise<{ reportId: string; alreadyRunning: boolean }> {
   const company = await prisma.company.findFirst({
     where: { id: companyId, userId, deletedAt: null },
   });
   if (!company) throw new Error('Empresa no encontrada');
 
-  // Reuses the existing forecast calculation (verifies ownership again internally)
-  const calc = await monthlyForecastService.calculate(companyId, userId, year);
+  // Validates that the forecast can be calculated (throws otherwise)
+  await monthlyForecastService.calculate(companyId, userId, year);
+
+  const existing = await prisma.monthlyReport.findUnique({
+    where: { companyId_year: { companyId, year } },
+  });
+  if (existing?.status === 'GENERATING' && Date.now() - existing.updatedAt.getTime() < STALE_GENERATION_MS) {
+    return { reportId: existing.id, alreadyRunning: true };
+  }
 
   const report = await prisma.monthlyReport.upsert({
     where: { companyId_year: { companyId, year } },
     update: { status: 'GENERATING', errorMessage: null },
     create: { companyId, userId, year, status: 'GENERATING' },
   });
+  return { reportId: report.id, alreadyRunning: false };
+}
+
+// ─── Main: Generate Monthly Report (synchronous, start → run) ────────────────
+export async function generateMonthlyReport(companyId: string, userId: string, year: number): Promise<string> {
+  const { reportId } = await startMonthlyReport(companyId, userId, year);
+  await runMonthlyReport(reportId);
+  return reportId;
+}
+
+// ─── Run: AI (Prometheia + Ejecutivo) → DOCX → S3 → COMPLETED / FAILED ───────
+export async function runMonthlyReport(reportId: string): Promise<void> {
+  ensureReportsDir();
+  const report = await prisma.monthlyReport.findUniqueOrThrow({ where: { id: reportId } });
+  const { companyId, userId, year } = report;
 
   try {
+    const company = await prisma.company.findFirst({
+      where: { id: companyId, userId, deletedAt: null },
+    });
+    if (!company) throw new Error('Empresa no encontrada');
+
+    // Reuses the existing forecast calculation (verifies ownership again internally)
+    const calc = await monthlyForecastService.calculate(companyId, userId, year);
+
     const aiData: MonthlyFinancialDataForAI = {
       company: {
         name: company.name,
@@ -110,7 +148,6 @@ export async function generateMonthlyReport(companyId: string, userId: string, y
     });
 
     console.log(`[MONTHLY-REPORT] Report ${report.id} generated successfully`);
-    return report.id;
 
   } catch (error) {
     await prisma.monthlyReport.update({

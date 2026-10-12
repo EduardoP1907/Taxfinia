@@ -6,6 +6,8 @@ const router = Router();
 
 router.use(authMiddleware);
 
+// async (202), client polls GET /company/:companyId
+router.post('/generate/:companyId', monthlyReportController.generate.bind(monthlyReportController));
 router.post('/generate-sync/:companyId', monthlyReportController.generateSync.bind(monthlyReportController));
 router.get('/company/:companyId', monthlyReportController.getByCompany.bind(monthlyReportController));
 router.post('/:id/generate-code', monthlyReportController.generateCode.bind(monthlyReportController));
