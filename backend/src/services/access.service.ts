@@ -27,6 +27,17 @@ export function endOfSubscriptionYear(year: number): Date {
   return new Date(Date.UTC(year + 1, 0, 1, 3, 0, 0) - 1000);
 }
 
+/**
+ * Período de pruebas: hasta el 31-12-2026 (23:59:59 hora de Chile) las cuentas
+ * nuevas quedan habilitadas al registrarse. Después parten deshabilitadas y el
+ * admin las habilita desde el panel.
+ */
+export const OPEN_REGISTRATION_UNTIL = endOfSubscriptionYear(2026);
+
+export function isOpenRegistrationPeriod(now = new Date()): boolean {
+  return now.getTime() <= OPEN_REGISTRATION_UNTIL.getTime();
+}
+
 /** Años anuales que se pueden cargar/editar: del año anterior hasta 5 años atrás. */
 export function annualYearWindow(now = new Date()): { min: number; max: number } {
   const cy = currentYear(now);

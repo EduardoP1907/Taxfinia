@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../config/database';
-import { endOfSubscriptionYear, currentYear, isPrivileged, isSubscriptionActive, annualYearWindow } from './access.service';
+import { endOfSubscriptionYear, currentYear, isPrivileged, isSubscriptionActive, annualYearWindow, isOpenRegistrationPeriod } from './access.service';
 import { generateOtp, isOtpExpired } from '../utils/otp';
 import { sendOtpEmail, sendPasswordResetEmail, sendNewUserNotificationEmail } from '../utils/email';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
@@ -46,6 +46,8 @@ export class AuthService {
         ...(validToken ? { planType: 'TRIAL' } : {}),
         // Toda cuenta nueva vence el 31-dic del año en curso
         subscriptionEndsAt: endOfSubscriptionYear(currentYear()),
+        // En el período de pruebas la cuenta queda habilitada; después la habilita el admin
+        isActive: isOpenRegistrationPeriod(),
       },
     });
 
@@ -79,6 +81,7 @@ export class AuthService {
       lastName,
       planType: validToken ? 'TRIAL' : 'STANDARD',
       hasInviteToken: !!validToken,
+      isActive: user.isActive,
     }).catch(() => {});
 
     return {

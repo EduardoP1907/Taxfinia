@@ -150,20 +150,23 @@ export const sendPasswordResetEmail = async (email: string, code: string): Promi
   await transporter.sendMail(mailOptions);
 };
 
+/** Reciben el aviso de cada cuenta nueva registrada */
+const NEW_USER_NOTIFICATION_EMAILS = ['eduardo.ps1907@gmail.com', 'fmonroy@fm02.cl'];
+
 export const sendNewUserNotificationEmail = async (userData: {
   email: string;
   firstName?: string;
   lastName?: string;
   planType?: string;
   hasInviteToken?: boolean;
+  isActive?: boolean;
 }): Promise<void> => {
-  const adminEmail = 'fmonroy@fm02.cl';
   const fullName = [userData.firstName, userData.lastName].filter(Boolean).join(' ') || '(sin nombre)';
   const plan = userData.hasInviteToken ? 'TRIAL (con invitación)' : (userData.planType || 'STANDARD');
 
   const mailOptions = {
     from: config.email.from,
-    to: adminEmail,
+    to: NEW_USER_NOTIFICATION_EMAILS.join(', '),
     subject: `[PROMETHEIA] Nuevo usuario registrado — ${userData.email}`,
     html: `
       <!DOCTYPE html>
@@ -194,7 +197,9 @@ export const sendNewUserNotificationEmail = async (userData: {
             </div>
             <div class="content">
               <h2>Nuevo Usuario Registrado</h2>
-              <p style="color:#64748b; margin:0 0 20px 0; font-size:15px;">Se ha creado una nueva cuenta en la plataforma. Queda <strong>deshabilitada</strong> hasta que la habilites desde el panel de administración.</p>
+              <p style="color:#64748b; margin:0 0 20px 0; font-size:15px;">Se ha creado una nueva cuenta en la plataforma. ${userData.isActive
+                ? 'Quedó <strong>habilitada</strong> automáticamente (período de pruebas).'
+                : 'Queda <strong>deshabilitada</strong> hasta que la habilites desde el panel de administración.'}</p>
 
               <div class="info-row">
                 <div class="lbl">Nombre</div>

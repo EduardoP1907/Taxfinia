@@ -38,6 +38,9 @@ interface AdminCompany {
 
 // Las rutas /admin/* exigen rol ADMIN (PrivateRoute requireAdmin)
 
+// Debe coincidir con OPEN_REGISTRATION_UNTIL del backend (31-12-2026 23:59:59 hora de Chile)
+const OPEN_REGISTRATION_UNTIL = new Date('2027-01-01T02:59:59Z');
+
 const AdminHeader: React.FC<{ icon: React.ElementType; title: string; subtitle: string }> = ({ icon: Icon, title, subtitle }) => (
   <div className="flex items-center gap-3 mb-6">
     <div className="p-2 bg-slate-900 rounded-xl">
@@ -275,7 +278,10 @@ export const AdminInvitesPage: React.FC = () => {
           <div className="mb-3">
             <p className="text-sm font-semibold text-slate-800">Nuevo link de invitación</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              El usuario registrado obtendrá plan TRIAL con 2 informes gratuitos. Su cuenta queda deshabilitada hasta que la habilites en «Usuarios».
+              El usuario registrado obtendrá plan TRIAL con 2 informes gratuitos.
+              {new Date() <= OPEN_REGISTRATION_UNTIL
+                ? ' Hasta el 31-12-2026 (período de pruebas) su cuenta queda habilitada al registrarse.'
+                : ' Su cuenta queda deshabilitada hasta que la habilites en «Usuarios».'}
             </p>
           </div>
           <div className="flex items-center gap-3">
