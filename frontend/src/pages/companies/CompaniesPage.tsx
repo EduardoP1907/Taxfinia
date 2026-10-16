@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCompanyStore } from '../../store/companyStore';
 import { useAuthStore } from '../../store/authStore';
 import { useAccess } from '../../hooks/useAccess';
-import { Building2, Plus, Pencil, Trash2, FileText, Calendar, Briefcase, Users, DollarSign } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, FileText, Calendar, Briefcase, Users, DollarSign, Lock } from 'lucide-react';
 
 export const CompaniesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -163,9 +163,12 @@ export const CompaniesPage: React.FC = () => {
                       <Building2 className="w-5 h-5 text-white group-hover:text-slate-900 transition-colors duration-200" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-slate-900 text-sm leading-tight truncate">
+                      <h3 className={`font-semibold text-sm leading-tight truncate ${company.isEnabled === false ? 'text-slate-400' : 'text-slate-900'}`}>
                         {company.name}
                       </h3>
+                      {company.isEnabled === false && (
+                        <span className="inline-block mt-1 text-[10px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">DESHABILITADA</span>
+                      )}
                       {company.taxId && (
                         <p className="font-data text-[11px] text-slate-400 mt-0.5">{company.taxId}</p>
                       )}
@@ -208,7 +211,12 @@ export const CompaniesPage: React.FC = () => {
                       Actualizado {formatDate(company.updatedAt)}
                     </p>
 
-                    {deleteConfirm === company.id ? (
+                    {company.isEnabled === false ? (
+                      <p role="status" className="flex items-start gap-2 px-3 py-2 rounded-lg bg-slate-100 text-xs text-slate-600">
+                        <Lock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-slate-500" aria-hidden="true" />
+                        Empresa deshabilitada por el administrador. Contáctalo para volver a usarla.
+                      </p>
+                    ) : deleteConfirm === company.id ? (
                       <div className="space-y-2">
                         <p className="text-xs text-red-600 font-medium">¿Eliminar esta empresa?</p>
                         <div className="flex gap-2">

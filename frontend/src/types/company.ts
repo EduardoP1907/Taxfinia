@@ -14,6 +14,7 @@ export interface Company {
   baseYear: number;
   currency?: string;
   isLocked?: boolean;
+  isEnabled?: boolean;               // false = deshabilitada por el admin (no se puede abrir)
   deedDocumentName?: string;
   deedDocumentUploadedAt?: string;
   createdAt: string;

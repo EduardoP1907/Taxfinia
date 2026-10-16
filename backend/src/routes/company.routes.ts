@@ -3,6 +3,7 @@ import multer from 'multer';
 import { body } from 'express-validator';
 import { companyController } from '../controllers/company.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
+import { requireEnabledCompany, companyResolvers } from '../middlewares/company-enabled.middleware';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -10,6 +11,9 @@ const router = Router();
 
 // Todas las rutas requieren autenticación
 router.use(authMiddleware);
+
+// Empresas deshabilitadas por el admin: 403 en cualquier ruta que las toque
+router.param('id', requireEnabledCompany(companyResolvers.company));
 
 // Validaciones
 const createCompanyValidation = [

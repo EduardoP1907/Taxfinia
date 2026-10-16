@@ -1,12 +1,17 @@
 import { Router } from 'express';
 import { RatiosController } from '../controllers/ratios.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
+import { requireEnabledCompany, companyResolvers } from '../middlewares/company-enabled.middleware';
 
 const router = Router();
 const controller = new RatiosController();
 
 // All routes require authentication
 router.use(authMiddleware);
+
+// Empresas deshabilitadas por el admin: 403 en cualquier ruta que las toque
+router.param('companyId', requireEnabledCompany(companyResolvers.company));
+router.param('fiscalYearId', requireEnabledCompany(companyResolvers.fiscalYear));
 
 // Calculate ratios for a fiscal year
 router.post('/calculate/:fiscalYearId', controller.calculateRatios);

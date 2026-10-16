@@ -1,10 +1,15 @@
 import { Router } from 'express';
 import { monthlyReportController } from '../controllers/monthly-report.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
+import { requireEnabledCompany, companyResolvers } from '../middlewares/company-enabled.middleware';
 
 const router = Router();
 
 router.use(authMiddleware);
+
+// Empresas deshabilitadas por el admin: 403 en cualquier ruta que las toque
+router.param('companyId', requireEnabledCompany(companyResolvers.company));
+router.param('id', requireEnabledCompany(companyResolvers.monthlyReport));
 
 // async (202), client polls GET /company/:companyId
 router.post('/generate/:companyId', monthlyReportController.generate.bind(monthlyReportController));

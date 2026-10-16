@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { reportController } from '../controllers/report.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
+import { requireEnabledCompany, companyResolvers } from '../middlewares/company-enabled.middleware';
 
 const router = Router();
 
@@ -10,6 +11,10 @@ router.get('/preview/:token', reportController.previewServe.bind(reportControlle
 
 // ─── Protected routes ─────────────────────────────────────────────────────────
 router.use(authMiddleware);
+
+// Empresas deshabilitadas por el admin: 403 en cualquier ruta que las toque
+router.param('companyId', requireEnabledCompany(companyResolvers.company));
+router.param('id', requireEnabledCompany(companyResolvers.report));
 
 // Generate report (sync - waits for completion)
 router.post('/generate-sync/:companyId', reportController.generateSync.bind(reportController));

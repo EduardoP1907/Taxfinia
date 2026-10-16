@@ -38,9 +38,11 @@ export const useCompanyStore = create<CompanyState>((set, get) => ({
     try {
       const companies = await companyService.getCompanies();
       const stored = localStorage.getItem(lastKey(userId));
+      // Una empresa deshabilitada por el admin no puede ser la activa
+      const usable = companies.filter(c => c.isEnabled !== false);
       const match =
-        companies.find(c => c.id === (get().activeCompanyId ?? stored)) ??
-        (companies.length === 1 ? companies[0] : undefined);
+        usable.find(c => c.id === (get().activeCompanyId ?? stored)) ??
+        (usable.length === 1 ? usable[0] : undefined);
       if (match) localStorage.setItem(lastKey(userId), match.id);
       else localStorage.removeItem(lastKey(userId));
       set({

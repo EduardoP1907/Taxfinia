@@ -1,10 +1,15 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { comparisonReportController } from '../controllers/comparison-report.controller';
+import { requireEnabledCompany, companyResolvers } from '../middlewares/company-enabled.middleware';
 
 const router = Router();
 
 router.use(authMiddleware);
+
+// Empresas deshabilitadas por el admin: 403 en cualquier ruta que las toque
+router.param('companyId', requireEnabledCompany(companyResolvers.company));
+router.param('id', requireEnabledCompany(companyResolvers.comparisonReport));
 
 // GET /api/comparison-reports/:companyId/eligibility?type=FORECAST_VS_ANNUAL|FORECAST_BUDGET_VS_ANNUAL
 router.get('/:companyId/eligibility', comparisonReportController.eligibility.bind(comparisonReportController));

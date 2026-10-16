@@ -16,7 +16,7 @@ interface CompanySelectorProps {
 }
 
 export const CompanySelector: React.FC<CompanySelectorProps> = ({
-  companies,
+  companies: allCompanies,
   onSelect,
   title,
   description = 'Selecciona una empresa para continuar',
@@ -25,6 +25,8 @@ export const CompanySelector: React.FC<CompanySelectorProps> = ({
   loading = false,
 }) => {
   const navigate = useNavigate();
+  // Las empresas deshabilitadas por el admin no se pueden abrir
+  const companies = allCompanies.filter(c => c.isEnabled !== false);
 
   return (
     <DashboardLayout>

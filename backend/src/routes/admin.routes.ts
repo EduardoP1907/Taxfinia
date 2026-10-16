@@ -26,13 +26,33 @@ router.get('/users', async (_req: Request, res: Response) => {
       select: {
         id: true, email: true, firstName: true, lastName: true, role: true,
         isActive: true, isExempt: true, subscriptionEndsAt: true, createdAt: true, lastLogin: true,
-        companies: { where: { deletedAt: null }, select: { id: true, name: true, taxId: true } },
+        companies: {
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true, name: true, taxId: true, industry: true, country: true, currency: true,
+            isEnabled: true, createdAt: true,
+            // Solo ejercicios anuales (los mensuales/trimestrales usan quarter/month ≠ 0)
+            fiscalYears: {
+              where: { quarter: 0, month: 0 },
+              select: { year: true, consolidatedAt: true },
+              orderBy: { year: 'asc' },
+            },
+            _count: { select: { reports: true, monthlyReports: true, comparisonReports: true } },
+          },
+        },
       },
     });
     res.json({
       success: true,
       data: users.map(u => ({
         ...u,
+        companies: u.companies.map(({ fiscalYears, _count, ...c }) => ({
+          ...c,
+          annualYears: fiscalYears.map(f => f.year),
+          consolidatedYears: fiscalYears.filter(f => f.consolidatedAt).map(f => f.year),
+          reportCount: _count.reports + _count.monthlyReports + _count.comparisonReports,
+        })),
         privileged: isPrivileged(u),
         subscriptionActive: u.isActive && isSubscriptionActive(u),
       })),
@@ -91,6 +111,30 @@ router.put('/users/:id/active', async (req: Request, res: Response) => {
     }
     console.error('[ADMIN] Error cambiando habilitación:', err);
     res.status(500).json({ error: 'Error al actualizar el usuario' });
+  }
+});
+
+/** PUT /api/admin/companies/:id/enabled — { isEnabled: boolean } habilita/deshabilita una empresa */
+router.put('/companies/:id/enabled', async (req: Request, res: Response) => {
+  try {
+    if (typeof req.body?.isEnabled !== 'boolean') {
+      res.status(400).json({ error: 'isEnabled debe ser verdadero o falso' });
+      return;
+    }
+    const exists = await prisma.company.findFirst({ where: { id: req.params.id, deletedAt: null }, select: { id: true } });
+    if (!exists) {
+      res.status(404).json({ error: 'Empresa no encontrada' });
+      return;
+    }
+    const company = await prisma.company.update({
+      where: { id: req.params.id },
+      data: { isEnabled: req.body.isEnabled },
+      select: { id: true, name: true, isEnabled: true },
+    });
+    res.json({ success: true, data: company });
+  } catch (err: any) {
+    console.error('[ADMIN] Error cambiando habilitación de empresa:', err);
+    res.status(500).json({ error: 'Error al actualizar la empresa' });
   }
 });
 

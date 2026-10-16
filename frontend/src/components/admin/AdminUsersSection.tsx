@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, Users, CalendarCheck, ShieldCheck, Power, Trash2, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Users, CalendarCheck, ShieldCheck, Power, Trash2, AlertTriangle, ChevronDown, Building2 } from 'lucide-react';
 import api from '../../services/api';
 import { formatDateCL } from '../../hooks/useAccess';
 
@@ -15,7 +15,21 @@ interface AdminUser {
   subscriptionEndsAt: string | null;
   subscriptionActive: boolean;
   createdAt: string;
-  companies: { id: string; name: string; taxId: string | null }[];
+  companies: AdminUserCompany[];
+}
+
+interface AdminUserCompany {
+  id: string;
+  name: string;
+  taxId: string | null;
+  industry: string | null;
+  country: string;
+  currency: string;
+  isEnabled: boolean;
+  createdAt: string;
+  annualYears: number[];
+  consolidatedYears: number[];
+  reportCount: number;
 }
 
 type Filter = 'all' | 'disabled' | 'expired' | 'active';
@@ -92,6 +106,31 @@ export const AdminUsersSection: React.FC = () => {
   };
 
   const [toDelete, setToDelete] = useState<AdminUser | null>(null);
+
+  // Usuarios con más de una empresa: desplegable con el detalle de cada una
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (userId: string) => setExpanded(prev => {
+    const next = new Set(prev);
+    if (next.has(userId)) next.delete(userId); else next.add(userId);
+    return next;
+  });
+
+  const toggleCompany = async (c: AdminUserCompany) => {
+    setBusy(c.id);
+    setError(null);
+    try {
+      await api.put(`/admin/companies/${c.id}/enabled`, { isEnabled: !c.isEnabled });
+      // Actualización local: no recarga la lista para no cerrar el desplegable
+      setUsers(prev => prev.map(u => ({
+        ...u,
+        companies: u.companies.map(x => x.id === c.id ? { ...x, isEnabled: !c.isEnabled } : x),
+      })));
+    } catch (e) {
+      setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || `No se pudo actualizar la empresa ${c.name}.`);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const deleteAccount = async (u: AdminUser) => {
     setBusy(u.id);
@@ -185,6 +224,9 @@ export const AdminUsersSection: React.FC = () => {
           {visible.map(u => {
             const name = [u.firstName, u.lastName].filter(Boolean).join(' ');
             const ends = u.subscriptionEndsAt ? new Date(u.subscriptionEndsAt) : null;
+            const hasMany = u.companies.length > 1;
+            const isOpen = hasMany && expanded.has(u.id);
+            const disabledCompanies = u.companies.filter(c => !c.isEnabled).length;
             return (
               <li key={u.id} className="px-5 py-3 flex flex-wrap items-center gap-3">
                 <span
@@ -200,8 +242,26 @@ export const AdminUsersSection: React.FC = () => {
                   </p>
                   <p className="text-xs text-slate-400 truncate">
                     {name ? `${u.email} · ` : ''}
-                    {u.companies.length > 0 ? u.companies.map(c => c.name).join(', ') : 'Sin empresa'}
+                    {u.companies.length === 0
+                      ? 'Sin empresa'
+                      : u.companies.length === 1
+                        ? `${u.companies[0].name}${u.companies[0].isEnabled ? '' : ' (deshabilitada)'}`
+                        : null}
                   </p>
+                  {hasMany && (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(u.id)}
+                      aria-expanded={isOpen}
+                      aria-controls={`companies-${u.id}`}
+                      className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded"
+                    >
+                      <Building2 className="w-3 h-3" aria-hidden="true" />
+                      {u.companies.length} empresas
+                      {disabledCompanies > 0 && <span className="text-slate-500 font-normal">· {disabledCompanies} deshabilitada{disabledCompanies > 1 ? 's' : ''}</span>}
+                      <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    </button>
+                  )}
                   <p className={`text-xs mt-0.5 ${u.subscriptionActive || !u.isActive ? 'text-slate-500' : 'text-red-600 font-medium'}`}>
                     {!u.isActive
                       ? 'Sin acceso hasta que la habilites'
@@ -277,6 +337,14 @@ export const AdminUsersSection: React.FC = () => {
                     </button>
                   )}
                 </div>
+
+                {isOpen && (
+                  <ul id={`companies-${u.id}`} className="basis-full ml-5 space-y-2">
+                    {u.companies.map(c => (
+                      <CompanyItem key={c.id} company={c} busy={busy === c.id} onToggle={() => toggleCompany(c)} />
+                    ))}
+                  </ul>
+                )}
               </li>
             );
           })}
@@ -294,6 +362,53 @@ export const AdminUsersSection: React.FC = () => {
     </div>
   );
 };
+
+/** Detalle de una empresa en el desplegable del usuario, con su habilitación. */
+const CompanyItem: React.FC<{ company: AdminUserCompany; busy: boolean; onToggle: () => void }> = ({ company: c, busy, onToggle }) => (
+  <li className={`rounded-lg border px-4 py-3 flex flex-wrap items-start gap-3 ${c.isEnabled ? 'border-slate-200 bg-slate-50' : 'border-slate-200 bg-slate-100/70'}`}>
+    <div className="flex-1 min-w-[14rem]">
+      <p className={`text-sm font-medium truncate ${c.isEnabled ? 'text-slate-800' : 'text-slate-500'}`}>
+        {c.name}
+        {!c.isEnabled && <span className="ml-2 text-[10px] font-semibold text-slate-600 bg-white border border-slate-200 rounded px-1.5 py-0.5">DESHABILITADA</span>}
+      </p>
+      <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+        <dt className="text-slate-400">RUT</dt>
+        <dd className="text-slate-600 font-mono">{c.taxId || '—'}</dd>
+        {c.industry && (<>
+          <dt className="text-slate-400">Sector</dt>
+          <dd className="text-slate-600 truncate">{c.industry}</dd>
+        </>)}
+        <dt className="text-slate-400">País / moneda</dt>
+        <dd className="text-slate-600">{c.country} · {c.currency}</dd>
+        <dt className="text-slate-400">Creada</dt>
+        <dd className="text-slate-600">{formatDateCL(new Date(c.createdAt))}</dd>
+        <dt className="text-slate-400">Ejercicios</dt>
+        <dd className="text-slate-600 tabular-nums">{c.annualYears.length > 0 ? c.annualYears.join(', ') : 'Sin datos anuales'}</dd>
+        {c.consolidatedYears.length > 0 && (<>
+          <dt className="text-slate-400">Solo lectura</dt>
+          <dd className="text-slate-600 tabular-nums">{c.consolidatedYears.join(', ')}</dd>
+        </>)}
+        <dt className="text-slate-400">Informes</dt>
+        <dd className="text-slate-600 tabular-nums">{c.reportCount}</dd>
+      </dl>
+    </div>
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={busy}
+      aria-pressed={c.isEnabled}
+      aria-label={`${c.isEnabled ? 'Deshabilitar' : 'Habilitar'} empresa ${c.name}`}
+      className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border disabled:opacity-50 ${c.isEnabled
+        ? 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+        : 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700'}`}
+    >
+      {busy
+        ? <RefreshCw className="w-3 h-3 motion-safe:animate-spin" aria-hidden="true" />
+        : <Power className="w-3 h-3" aria-hidden="true" />}
+      {c.isEnabled ? 'Deshabilitar' : 'Habilitar'}
+    </button>
+  </li>
+);
 
 /** Confirmación de borrado: hay que escribir el email de la cuenta. */
 const DeleteAccountDialog: React.FC<{

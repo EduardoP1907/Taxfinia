@@ -6,14 +6,20 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import * as projectionsController from '../controllers/projections.controller';
+import { requireEnabledCompany, requireEnabledCompanyFromBody, companyResolvers } from '../middlewares/company-enabled.middleware';
 
 const router = Router();
 
 // Todas las rutas requieren autenticación
 router.use(authMiddleware);
 
+// Empresas deshabilitadas por el admin: 403 en cualquier ruta que las toque
+router.param('companyId', requireEnabledCompany(companyResolvers.company));
+router.param('scenarioId', requireEnabledCompany(companyResolvers.scenario));
+router.param('projectionId', requireEnabledCompany(companyResolvers.projection));
+
 // Crear nuevo escenario de proyección
-router.post('/', projectionsController.createProjectionScenario);
+router.post('/', requireEnabledCompanyFromBody, projectionsController.createProjectionScenario);
 
 // Obtener todos los escenarios de una empresa
 router.get('/company/:companyId', projectionsController.getCompanyScenarios);

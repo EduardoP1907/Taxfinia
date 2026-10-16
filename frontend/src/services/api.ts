@@ -31,6 +31,15 @@ api.interceptors.response.use(
     if (error.response?.status === 403 && error.response?.data?.subscriptionExpired) {
       import('../store/authStore').then(m => m.useAuthStore.getState().refreshUser(true));
     }
+    // Empresa deshabilitada por el admin: olvidarla como activa y volver a «Mis Empresas»
+    if (error.response?.status === 403 && error.response?.data?.companyDisabled) {
+      import('../store/companyStore').then(({ useCompanyStore }) => {
+        const userId = JSON.parse(localStorage.getItem('user') || 'null')?.id;
+        if (userId) useCompanyStore.getState().forgetCompany(userId);
+        useCompanyStore.getState().invalidateCompanies();
+        if (!window.location.pathname.startsWith('/empresas')) window.location.href = '/empresas';
+      });
+    }
     if (error.response?.status === 401 && !error.response?.data?.requiresCode) {
       const publicRoutes = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password'];
       const isPublicRoute = publicRoutes.some(r => window.location.pathname.startsWith(r));

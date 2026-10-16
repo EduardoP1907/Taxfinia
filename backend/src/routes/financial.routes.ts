@@ -3,6 +3,7 @@ import multer from 'multer';
 import { financialController } from '../controllers/financial.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { companyLockMiddleware } from '../middlewares/company-lock.middleware';
+import { requireEnabledCompany, companyResolvers } from '../middlewares/company-enabled.middleware';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -10,6 +11,10 @@ const router = Router();
 
 // Todas las rutas requieren autenticación
 router.use(authMiddleware);
+
+// Empresas deshabilitadas por el admin: 403 en cualquier ruta que las toque
+router.param('companyId', requireEnabledCompany(companyResolvers.company));
+router.param('fiscalYearId', requireEnabledCompany(companyResolvers.fiscalYear));
 
 // ============= FISCAL YEARS =============
 router.get('/companies/:companyId/fiscal-years', financialController.getFiscalYears);
