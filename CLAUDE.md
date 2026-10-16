@@ -113,7 +113,7 @@ User → InviteToken (trial access system)
 
 **Important model fields:**
 - `FiscalYear.consolidatedAt` — set on annual years after an AI report/chat; those years become read-only. `Company.isLocked` is legacy (migrated by `scripts/migrate-access-model.ts`)
-- `User.isActive` — defaults to `false`: every new account starts disabled until an admin enables it (`PUT /api/admin/users/:id/active`, emails the user). Disabled users can't log in, `verify-otp` returns `{ pendingActivation }` without a session, and `authMiddleware` answers 401 `{ accountDisabled: true }` to any request (disabling also deletes their sessions). Renewing a subscription does NOT enable the account
+- `User.isActive` — defaults to `false`: every new account starts disabled until an admin enables it (`PUT /api/admin/users/:id/active`, emails the user). Disabled users can't log in, `verify-otp` returns `{ pendingActivation }` without a session, and `authMiddleware` answers 401 `{ accountDisabled: true }` to any request (disabling also deletes their sessions). Renewing a subscription does NOT enable the account. `DELETE /api/admin/users/:id` permanently deletes a non-admin account and cascades to all its data (report files in S3/local disk are not removed)
 - `User.subscriptionEndsAt` — always 31-Dec (Chile time) of the paid year; admin renews via `POST /api/admin/users/:id/renew`. `User.isExempt` — no expiry and no locks (managed from the admin panel)
 - Non-privileged users: max 1 company, tax ID required/valid/unique; name and tax ID are frozen and the company can't be deleted once it has reports or consolidated years
 - `Company.businessActivity` — freeform business description used in AI prompt

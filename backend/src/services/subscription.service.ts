@@ -57,6 +57,22 @@ export async function setUserActive(userId: string, isActive: boolean) {
   return user;
 }
 
+/**
+ * Admin: elimina una cuenta de forma definitiva. Sus empresas, ejercicios,
+ * informes y sesiones se borran en cascada (onDelete: Cascade en el schema).
+ */
+export async function deleteUserAccount(userId: string, requestedBy: string) {
+  if (userId === requestedBy) throw new AccountError('No puedes eliminar tu propia cuenta', 400);
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, email: true } });
+  if (!target) throw new AccountError('Usuario no encontrado', 404);
+  if (target.role === 'ADMIN') throw new AccountError('No se puede eliminar una cuenta de administrador', 400);
+
+  await prisma.user.delete({ where: { id: userId } });
+  invalidateAccessUser(userId);
+  console.log(`[ACCOUNT] Cuenta ${target.email} eliminada por el admin ${requestedBy}`);
+  return { id: userId, email: target.email };
+}
+
 export class AccountError extends Error {
   constructor(message: string, public status: number) { super(message); }
 }

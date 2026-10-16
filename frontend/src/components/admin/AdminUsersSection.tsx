@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, Users, CalendarCheck, ShieldCheck, Power } from 'lucide-react';
+import { RefreshCw, Users, CalendarCheck, ShieldCheck, Power, Trash2, AlertTriangle } from 'lucide-react';
 import api from '../../services/api';
 import { formatDateCL } from '../../hooks/useAccess';
 
@@ -86,6 +86,23 @@ export const AdminUsersSection: React.FC = () => {
       await load();
     } catch (e) {
       setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || `No se pudo actualizar a ${u.email}.`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const [toDelete, setToDelete] = useState<AdminUser | null>(null);
+
+  const deleteAccount = async (u: AdminUser) => {
+    setBusy(u.id);
+    setError(null);
+    try {
+      await api.delete(`/admin/users/${u.id}`);
+      setToDelete(null);
+      await load();
+    } catch (e) {
+      setToDelete(null);
+      setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || `No se pudo eliminar a ${u.email}.`);
     } finally {
       setBusy(null);
     }
@@ -247,12 +264,122 @@ export const AdminUsersSection: React.FC = () => {
                       {u.isExempt ? 'Quitar exención' : 'Marcar exento'}
                     </button>
                   )}
+                  {u.role !== 'ADMIN' && (
+                    <button
+                      type="button"
+                      onClick={() => setToDelete(u)}
+                      disabled={busy === u.id}
+                      aria-label={`Eliminar cuenta de ${u.email}`}
+                      title="Eliminar cuenta"
+                      className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
               </li>
             );
           })}
         </ul>
       )}
+
+      {toDelete && (
+        <DeleteAccountDialog
+          user={toDelete}
+          deleting={busy === toDelete.id}
+          onCancel={() => setToDelete(null)}
+          onConfirm={() => deleteAccount(toDelete)}
+        />
+      )}
+    </div>
+  );
+};
+
+/** Confirmación de borrado: hay que escribir el email de la cuenta. */
+const DeleteAccountDialog: React.FC<{
+  user: AdminUser;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}> = ({ user, deleting, onCancel, onConfirm }) => {
+  const [typed, setTyped] = useState('');
+  const matches = typed.trim().toLowerCase() === user.email.toLowerCase();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !deleting) onCancel(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [deleting, onCancel]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-slate-950/60" onClick={() => !deleting && onCancel()} />
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-account-title"
+        aria-describedby="delete-account-desc"
+        className="relative w-full max-w-md bg-white rounded-xl shadow-xl border border-slate-200 p-6"
+      >
+        <div className="flex items-start gap-3">
+          <span className="flex w-10 h-10 rounded-full bg-red-50 items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-5 h-5 text-red-600" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <h3 id="delete-account-title" className="text-base font-bold text-slate-900">Eliminar cuenta</h3>
+            <div id="delete-account-desc" className="mt-1 text-sm text-slate-600 space-y-2">
+              <p>
+                Se eliminará <span className="font-semibold text-slate-900 break-all">{user.email}</span> junto con
+                {user.companies.length > 0
+                  ? <> sus empresas (<span className="font-medium">{user.companies.map(c => c.name).join(', ')}</span>), </>
+                  : ' '}
+                ejercicios, proyecciones e informes.
+              </p>
+              <p className="font-medium text-red-700">Esta acción no se puede deshacer.</p>
+            </div>
+          </div>
+        </div>
+
+        <form
+          className="mt-5"
+          onSubmit={e => { e.preventDefault(); if (matches && !deleting) onConfirm(); }}
+        >
+          <label htmlFor="delete-confirm-email" className="block text-xs font-medium text-slate-600 mb-1">
+            Escribe el email de la cuenta para confirmar
+          </label>
+          <input
+            id="delete-confirm-email"
+            type="email"
+            autoComplete="off"
+            spellCheck={false}
+            autoFocus
+            value={typed}
+            onChange={e => setTyped(e.target.value)}
+            placeholder={user.email}
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+          />
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={deleting}
+              className="px-3.5 py-2 text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={!matches || deleting}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {deleting
+                ? <RefreshCw className="w-4 h-4 motion-safe:animate-spin" aria-hidden="true" />
+                : <Trash2 className="w-4 h-4" aria-hidden="true" />}
+              {deleting ? 'Eliminando…' : 'Eliminar definitivamente'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

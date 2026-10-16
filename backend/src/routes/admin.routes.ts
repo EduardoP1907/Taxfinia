@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import prisma from '../config/database';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { getAccessUser, isPrivileged, isSubscriptionActive, currentYear } from '../services/access.service';
-import { renewSubscription, setUserExempt, setUserActive, AccountError } from '../services/subscription.service';
+import { renewSubscription, setUserExempt, setUserActive, deleteUserAccount, AccountError } from '../services/subscription.service';
 
 const router = Router();
 
@@ -91,6 +91,21 @@ router.put('/users/:id/active', async (req: Request, res: Response) => {
     }
     console.error('[ADMIN] Error cambiando habilitación:', err);
     res.status(500).json({ error: 'Error al actualizar el usuario' });
+  }
+});
+
+/** DELETE /api/admin/users/:id — elimina la cuenta y todos sus datos (irreversible) */
+router.delete('/users/:id', async (req: Request, res: Response) => {
+  try {
+    const user = await deleteUserAccount(req.params.id, req.user!.userId);
+    res.json({ success: true, data: user });
+  } catch (err: any) {
+    if (err instanceof AccountError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    console.error('[ADMIN] Error eliminando cuenta:', err);
+    res.status(500).json({ error: 'Error al eliminar la cuenta' });
   }
 });
 
