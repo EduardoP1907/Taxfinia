@@ -1,5 +1,5 @@
 import api from './api';
-import type { AuthResponse, RegisterData, LoginData, VerifyOtpData, User } from '../types/auth';
+import type { AuthResponse, PendingActivationResponse, RegisterData, LoginData, VerifyOtpData, User } from '../types/auth';
 
 export const authService = {
   async register(data: RegisterData): Promise<{ userId: string; email: string; message: string }> {
@@ -7,8 +7,9 @@ export const authService = {
     return response.data;
   },
 
-  async verifyOtp(data: VerifyOtpData): Promise<AuthResponse> {
+  async verifyOtp(data: VerifyOtpData): Promise<AuthResponse | PendingActivationResponse> {
     const response = await api.post('/auth/verify-otp', data);
+    if (response.data.pendingActivation) return response.data;
     const { user, accessToken, refreshToken } = response.data;
 
     // Store tokens for Authorization header fallback (HTTP cross-origin production)

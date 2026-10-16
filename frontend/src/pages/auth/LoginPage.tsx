@@ -11,7 +11,11 @@ export const LoginPage: React.FC = () => {
   const setUser = useAuthStore((state) => state.setUser);
 
   const [formData, setFormData] = useState({ email: '', password: '' });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Sesión cerrada porque el admin deshabilitó la cuenta (ver interceptor de api.ts)
+  const [errors, setErrors] = useState<Record<string, string>>((): Record<string, string> =>
+    new URLSearchParams(window.location.search).get('cuenta') === 'deshabilitada'
+      ? { submit: 'Tu cuenta fue deshabilitada por el administrador.' }
+      : {});
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,7 +33,7 @@ export const LoginPage: React.FC = () => {
     try {
       const response = await authService.login(formData);
       setUser(response.user);
-      navigate('/dashboard');
+      navigate(response.user.role === 'ADMIN' ? '/admin' : '/dashboard');
     } catch (error: any) {
       const msg = error.response?.data?.error || 'Error al iniciar sesión';
       if (msg.includes('no verificado')) {

@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import prisma from '../config/database';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { getAccessUser, isPrivileged, isSubscriptionActive, currentYear } from '../services/access.service';
-import { renewSubscription, setUserExempt } from '../services/subscription.service';
+import { renewSubscription, setUserExempt, setUserActive, AccountError } from '../services/subscription.service';
 
 const router = Router();
 
@@ -71,6 +71,25 @@ router.put('/users/:id/exempt', async (req: Request, res: Response) => {
     res.json({ success: true, data: user });
   } catch (err: any) {
     console.error('[ADMIN] Error cambiando exención:', err);
+    res.status(500).json({ error: 'Error al actualizar el usuario' });
+  }
+});
+
+/** PUT /api/admin/users/:id/active — { isActive: boolean } habilita/deshabilita la cuenta */
+router.put('/users/:id/active', async (req: Request, res: Response) => {
+  try {
+    if (typeof req.body?.isActive !== 'boolean') {
+      res.status(400).json({ error: 'isActive debe ser verdadero o falso' });
+      return;
+    }
+    const user = await setUserActive(req.params.id, req.body.isActive);
+    res.json({ success: true, data: user });
+  } catch (err: any) {
+    if (err instanceof AccountError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    console.error('[ADMIN] Error cambiando habilitación:', err);
     res.status(500).json({ error: 'Error al actualizar el usuario' });
   }
 });

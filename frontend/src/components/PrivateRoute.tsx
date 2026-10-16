@@ -22,8 +22,13 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, requireAdm
     return <Navigate to="/login" replace />;
   }
 
-  if (requireAdmin && user?.role !== 'ADMIN') {
+  // Admin y usuarios tienen áreas separadas: el admin solo ve /admin/*
+  const isAdmin = user?.role === 'ADMIN';
+  if (requireAdmin && !isAdmin) {
     return <Navigate to="/dashboard" replace />;
+  }
+  if (!requireAdmin && isAdmin) {
+    return <Navigate to="/admin" replace />;
   }
 
   return <>{children}</>;

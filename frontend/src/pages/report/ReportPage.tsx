@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -21,8 +21,6 @@ import {
   X,
   Gift,
   Star,
-  Bot,
-  ArrowRight,
 } from 'lucide-react';
 import { companyService } from '../../services/company.service';
 import { ratiosService, type CompanyAnalysis } from '../../services/ratios.service';
@@ -575,23 +573,6 @@ export const ReportPage: React.FC = () => {
           companyName={company.name}
           selectedYear={selectedYear}
         />
-
-        {/* Acceso al Asistente IA (movido a su propia pestaña del menú) */}
-        <Link
-          to={`/asistente?companyId=${companyId}`}
-          className="flex items-center justify-between gap-3 px-5 py-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-        >
-          <span className="flex items-center gap-3 min-w-0">
-            <span className="flex w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 items-center justify-center flex-shrink-0">
-              <Bot className="w-5 h-5 text-amber-400" aria-hidden="true" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-bold text-white">Asistente Financiero IA</span>
-              <span className="block text-xs text-slate-400 truncate">Haz preguntas sobre {company.name}</span>
-            </span>
-          </span>
-          <ArrowRight className="w-4 h-4 text-amber-400 flex-shrink-0" aria-hidden="true" />
-        </Link>
 
         {/* Financial Tabs */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">

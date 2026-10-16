@@ -17,6 +17,7 @@ export const VerifyOtpPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [canResend, setCanResend] = useState(false);
   const [countdown, setCountdown] = useState(60);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!email) navigate('/register');
@@ -62,8 +63,12 @@ export const VerifyOtpPage: React.FC = () => {
     setIsLoading(true);
     try {
       const response = await authService.verifyOtp({ email, code: otpCode });
+      if ('pendingActivation' in response) {
+        setPendingMessage(response.message);
+        return;
+      }
       setUser(response.user);
-      navigate('/dashboard');
+      navigate(response.user.role === 'ADMIN' ? '/admin' : '/dashboard');
     } catch (error: any) {
       setError(error.response?.data?.error || 'Código inválido');
       setCode(['', '', '', '', '', '']);
@@ -83,6 +88,25 @@ export const VerifyOtpPage: React.FC = () => {
       setError(error.response?.data?.error || 'Error al reenviar código');
     }
   };
+
+  if (pendingMessage) {
+    return (
+      <AuthLayout>
+        <div role="status" className="text-center">
+          <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-5">
+            <ShieldCheck className="w-7 h-7 text-emerald-400" aria-hidden="true" />
+          </div>
+          <p className="font-data text-[10px] text-amber-500/60 tracking-[0.2em] uppercase mb-2">/ Cuenta pendiente</p>
+          <h1 className="text-2xl font-bold text-white mb-3">Email verificado</h1>
+          <p className="text-slate-400 text-sm">{pendingMessage}</p>
+          <p className="text-slate-500 text-sm mt-2">Te avisaremos por email a <span className="text-slate-300">{email}</span> cuando esté habilitada.</p>
+          <Link to="/login" className="inline-block mt-8 text-sm text-amber-400 hover:text-amber-300 font-medium">
+            Ir a iniciar sesión →
+          </Link>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

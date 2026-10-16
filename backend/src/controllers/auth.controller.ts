@@ -61,6 +61,11 @@ export class AuthController {
       const { email, code } = req.body;
       const result = await authService.verifyOtp(email, code);
 
+      // Cuenta pendiente de habilitación: no se abre sesión
+      if ('pendingActivation' in result) {
+        return res.json(result);
+      }
+
       setAuthCookies(res, result.accessToken, result.refreshToken);
 
       // Also return tokens in body — required for HTTP cross-origin (production without HTTPS)

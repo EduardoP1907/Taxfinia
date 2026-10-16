@@ -15,7 +15,8 @@ model User {
   lastName        String?       @map("last_name")
   role            Role          @default(ANALYST)
   isVerified      Boolean       @default(false) @map("is_verified")
-  isActive        Boolean       @default(true) @map("is_active")
+  // Toda cuenta nueva parte deshabilitada: el admin la habilita desde el panel
+  isActive        Boolean       @default(false) @map("is_active")
   planType        String        @default("FREE") @map("plan_type")
   freeReportsUsed Int           @default(0) @map("free_reports_used")
   // Vigencia de la suscripción (siempre hasta el 31-dic). null = cuenta legacy sin fecha.

@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
-import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
 import { AdminUsersSection } from '../../components/admin/AdminUsersSection';
 import {
-  ShieldCheck,
   Link2,
   Copy,
   Check,
@@ -39,38 +36,38 @@ interface AdminCompany {
   createdAt: string;
 }
 
-export const AdminPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { user } = useAuthStore();
-  const [tokens, setTokens] = useState<InviteToken[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
-  const [recipientNote, setRecipientNote] = useState('');
+// Las rutas /admin/* exigen rol ADMIN (PrivateRoute requireAdmin)
 
+const AdminHeader: React.FC<{ icon: React.ElementType; title: string; subtitle: string }> = ({ icon: Icon, title, subtitle }) => (
+  <div className="flex items-center gap-3 mb-6">
+    <div className="p-2 bg-slate-900 rounded-xl">
+      <Icon className="w-5 h-5 text-amber-400" aria-hidden="true" />
+    </div>
+    <div>
+      <h1 className="text-xl font-bold text-slate-900">{title}</h1>
+      <p className="text-sm text-slate-500">{subtitle}</p>
+    </div>
+  </div>
+);
+
+// ── Usuarios ────────────────────────────────────────────────────────────────
+
+export const AdminUsersPage: React.FC = () => (
+  <DashboardLayout>
+    <div className="max-w-4xl mx-auto">
+      <AdminHeader icon={Users} title="Usuarios" subtitle="Habilitación de cuentas, suscripciones y exenciones" />
+      <AdminUsersSection />
+    </div>
+  </DashboardLayout>
+);
+
+// ── Empresas ────────────────────────────────────────────────────────────────
+
+export const AdminCompaniesPage: React.FC = () => {
   const [allCompanies, setAllCompanies] = useState<AdminCompany[]>([]);
   const [companiesLoading, setCompaniesLoading] = useState(true);
   const [unlocking, setUnlocking] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (user?.role !== 'ADMIN') {
-      navigate('/dashboard');
-    }
-  }, [user, navigate]);
-
-  const loadTokens = useCallback(async () => {
-    try {
-      const res = await api.get('/auth/admin/invite-tokens');
-      setTokens(res.data.tokens);
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { loadTokens(); }, [loadTokens]);
 
   const loadAllCompanies = useCallback(async () => {
     setCompaniesLoading(true);
@@ -78,7 +75,7 @@ export const AdminPage: React.FC = () => {
       const res = await api.get('/companies/admin/all');
       setAllCompanies(res.data.data);
     } catch {
-      // silently fail
+      setActionError('No se pudieron cargar las empresas. Pulsa «Actualizar» para reintentar.');
     } finally {
       setCompaniesLoading(false);
     }
@@ -99,8 +96,108 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  return (
+    <DashboardLayout>
+      <div className="max-w-4xl mx-auto">
+        <AdminHeader icon={Building2} title="Empresas" subtitle="Ejercicios consolidados y habilitación de edición" />
+
+        {actionError && (
+          <p role="alert" className="mb-4 px-4 py-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">{actionError}</p>
+        )}
+
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-slate-500" aria-hidden="true" />
+              <h2 className="text-sm font-semibold text-slate-800">Empresas y ejercicios consolidados</h2>
+            </div>
+            <button type="button" onClick={loadAllCompanies} className="text-xs text-amber-600 hover:text-amber-800 flex items-center gap-1">
+              <RefreshCw className="w-3 h-3" aria-hidden="true" /> Actualizar
+            </button>
+          </div>
+
+          {companiesLoading ? (
+            <div className="p-8 flex justify-center" role="status">
+              <RefreshCw className="w-5 h-5 text-slate-400 motion-safe:animate-spin" aria-hidden="true" />
+              <span className="sr-only">Cargando empresas…</span>
+            </div>
+          ) : allCompanies.length === 0 ? (
+            <div className="p-8 text-center">
+              <Building2 className="w-8 h-8 text-slate-300 mx-auto mb-2" aria-hidden="true" />
+              <p className="text-sm text-slate-500">No hay empresas registradas</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {allCompanies.map(company => (
+                <div key={company.id} className="px-5 py-3 flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${company.isLocked ? 'bg-red-400' : 'bg-emerald-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{company.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {company.taxId && <span className="text-xs text-slate-400 font-mono">{company.taxId}</span>}
+                      <span className="text-xs text-slate-400">{new Date(company.createdAt).toLocaleDateString('es-CL')}</span>
+                      {company.consolidatedYears && company.consolidatedYears.length > 0 && (
+                        <span className="text-xs text-slate-500">· Solo lectura: {company.consolidatedYears.join(', ')}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {company.isLocked ? (
+                      <button
+                        type="button"
+                        onClick={() => handleUnlock(company.id)}
+                        disabled={unlocking === company.id}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors text-red-600 border-red-200 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                      >
+                        {unlocking === company.id
+                          ? <RefreshCw className="w-3 h-3 motion-safe:animate-spin" aria-hidden="true" />
+                          : <LockOpen className="w-3 h-3" aria-hidden="true" />
+                        }
+                        {unlocking === company.id ? 'Habilitando…' : 'Habilitar edición'}
+                      </button>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-emerald-600">
+                        <Lock className="w-3 h-3 opacity-30" aria-hidden="true" />
+                        Editable
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+};
+
+// ── Invitaciones ────────────────────────────────────────────────────────────
+
+export const AdminInvitesPage: React.FC = () => {
+  const [tokens, setTokens] = useState<InviteToken[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [recipientNote, setRecipientNote] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const loadTokens = useCallback(async () => {
+    try {
+      const res = await api.get('/auth/admin/invite-tokens');
+      setTokens(res.data.tokens);
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadTokens(); }, [loadTokens]);
+
   const handleGenerate = async () => {
     setGenerating(true);
+    setActionError(null);
     try {
       const res = await api.post('/auth/admin/invite-tokens', { recipientNote: recipientNote.trim() || undefined });
       setTokens(prev => [{ ...res.data, usedById: null, usedAt: null, createdAt: new Date().toISOString() }, ...prev]);
@@ -142,45 +239,34 @@ export const AdminPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-slate-900 rounded-xl">
-            <ShieldCheck className="w-5 h-5 text-amber-400" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Panel de Administración</h1>
-            <p className="text-sm text-slate-500">Suscripciones, empresas e invitaciones de prueba</p>
-          </div>
-        </div>
+        <AdminHeader icon={Link2} title="Invitaciones" subtitle="Links de prueba (plan TRIAL)" />
 
         {actionError && (
           <p role="alert" className="mb-4 px-4 py-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">{actionError}</p>
         )}
 
-        <AdminUsersSection />
-
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-white border border-slate-200 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-1">
-              <Gift className="w-4 h-4 text-emerald-500" />
+              <Gift className="w-4 h-4 text-emerald-500" aria-hidden="true" />
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Disponibles</span>
             </div>
-            <p className="text-2xl font-bold text-slate-900">{available}</p>
+            <p className="text-2xl font-bold text-slate-900 tabular-nums">{available}</p>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-1">
-              <CheckCircle2 className="w-4 h-4 text-blue-500" />
+              <CheckCircle2 className="w-4 h-4 text-blue-500" aria-hidden="true" />
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Usados</span>
             </div>
-            <p className="text-2xl font-bold text-slate-900">{used}</p>
+            <p className="text-2xl font-bold text-slate-900 tabular-nums">{used}</p>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-1">
-              <Users className="w-4 h-4 text-amber-500" />
+              <Users className="w-4 h-4 text-amber-500" aria-hidden="true" />
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</span>
             </div>
-            <p className="text-2xl font-bold text-slate-900">{tokens.length}</p>
+            <p className="text-2xl font-bold text-slate-900 tabular-nums">{tokens.length}</p>
           </div>
         </div>
 
@@ -188,7 +274,9 @@ export const AdminPage: React.FC = () => {
         <div className="bg-white border border-slate-200 rounded-xl p-5 mb-5">
           <div className="mb-3">
             <p className="text-sm font-semibold text-slate-800">Nuevo link de invitación</p>
-            <p className="text-xs text-slate-500 mt-0.5">El usuario registrado obtendrá plan TRIAL con 2 informes gratuitos</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              El usuario registrado obtendrá plan TRIAL con 2 informes gratuitos. Su cuenta queda deshabilitada hasta que la habilites en «Usuarios».
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex-1">
@@ -205,104 +293,42 @@ export const AdminPage: React.FC = () => {
               />
             </div>
             <button
+              type="button"
               onClick={handleGenerate}
               disabled={generating}
               className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-700 disabled:opacity-50 transition-colors mt-4 flex-shrink-0"
             >
-              {generating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {generating ? <RefreshCw className="w-4 h-4 motion-safe:animate-spin" aria-hidden="true" /> : <Plus className="w-4 h-4" aria-hidden="true" />}
               Generar link
             </button>
           </div>
-        </div>
-
-        {/* Companies lock management */}
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-5">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-slate-500" />
-              <h2 className="text-sm font-semibold text-slate-800">Empresas y ejercicios consolidados</h2>
-            </div>
-            <button onClick={loadAllCompanies} className="text-xs text-amber-500 hover:text-amber-700 flex items-center gap-1">
-              <RefreshCw className="w-3 h-3" /> Actualizar
-            </button>
-          </div>
-
-          {companiesLoading ? (
-            <div className="p-8 flex justify-center">
-              <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
-            </div>
-          ) : allCompanies.length === 0 ? (
-            <div className="p-8 text-center">
-              <Building2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">No hay empresas registradas</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {allCompanies.map(company => (
-                <div key={company.id} className="px-5 py-3 flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${company.isLocked ? 'bg-red-400' : 'bg-emerald-400'}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{company.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {company.taxId && <span className="text-xs text-slate-400 font-mono">{company.taxId}</span>}
-                      <span className="text-xs text-slate-400">{new Date(company.createdAt).toLocaleDateString('es-CL')}</span>
-                      {company.consolidatedYears && company.consolidatedYears.length > 0 && (
-                        <span className="text-xs text-slate-500">· Solo lectura: {company.consolidatedYears.join(', ')}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0">
-                    {company.isLocked ? (
-                      <button
-                        onClick={() => handleUnlock(company.id)}
-                        disabled={unlocking === company.id}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors text-red-600 border-red-200 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
-                      >
-                        {unlocking === company.id
-                          ? <RefreshCw className="w-3 h-3 animate-spin" />
-                          : <LockOpen className="w-3 h-3" />
-                        }
-                        {unlocking === company.id ? 'Habilitando…' : 'Habilitar edición'}
-                      </button>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs text-emerald-600">
-                        <Lock className="w-3 h-3 opacity-30" aria-hidden="true" />
-                        Editable
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Tokens list */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <p className="text-sm font-semibold text-slate-800">Links generados</p>
-            <button onClick={loadTokens} className="text-xs text-amber-500 hover:text-amber-700 flex items-center gap-1">
-              <RefreshCw className="w-3 h-3" /> Actualizar
+            <button type="button" onClick={loadTokens} className="text-xs text-amber-600 hover:text-amber-800 flex items-center gap-1">
+              <RefreshCw className="w-3 h-3" aria-hidden="true" /> Actualizar
             </button>
           </div>
 
           {loading ? (
-            <div className="p-8 flex justify-center">
-              <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
+            <div className="p-8 flex justify-center" role="status">
+              <RefreshCw className="w-5 h-5 text-slate-400 motion-safe:animate-spin" aria-hidden="true" />
+              <span className="sr-only">Cargando invitaciones…</span>
             </div>
           ) : tokens.length === 0 ? (
             <div className="p-8 text-center">
-              <Link2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <Link2 className="w-8 h-8 text-slate-300 mx-auto mb-2" aria-hidden="true" />
               <p className="text-sm text-slate-500">No hay links generados aún</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
               {tokens.map(token => (
                 <div key={token.id} className="px-5 py-3 flex items-center gap-3">
-                  {/* Status dot */}
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${token.usedById ? 'bg-slate-300' : 'bg-emerald-400'}`} />
 
-                  {/* URL */}
                   <div className="flex-1 min-w-0">
                     {token.recipientNote && (
                       <p className="text-xs font-semibold text-slate-700 truncate mb-0.5">→ {token.recipientNote}</p>
@@ -311,12 +337,12 @@ export const AdminPage: React.FC = () => {
                     <div className="flex items-center gap-2 mt-0.5">
                       {token.usedById ? (
                         <span className="flex items-center gap-1 text-xs text-slate-400">
-                          <CheckCircle2 className="w-3 h-3" />
+                          <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
                           Usado {token.usedAt ? new Date(token.usedAt).toLocaleDateString('es-CL') : ''}
                         </span>
                       ) : (
                         <span className="flex items-center gap-1 text-xs text-emerald-600">
-                          <Clock className="w-3 h-3" />
+                          <Clock className="w-3 h-3" aria-hidden="true" />
                           Disponible
                         </span>
                       )}
@@ -327,17 +353,18 @@ export const AdminPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Copy button — only if not used */}
+                  {/* Copiar — solo si no se ha usado */}
                   {!token.usedById && (
                     <button
+                      type="button"
                       onClick={() => handleCopy(token.url, token.id)}
                       className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors flex-shrink-0
                         text-slate-600 border-slate-200 hover:border-amber-400 hover:text-amber-700 hover:bg-amber-50"
                     >
                       {copied === token.id ? (
-                        <><Check className="w-3 h-3 text-emerald-500" /> Copiado</>
+                        <><Check className="w-3 h-3 text-emerald-500" aria-hidden="true" /> Copiado</>
                       ) : (
-                        <><Copy className="w-3 h-3" /> Copiar</>
+                        <><Copy className="w-3 h-3" aria-hidden="true" /> Copiar</>
                       )}
                     </button>
                   )}

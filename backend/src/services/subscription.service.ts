@@ -2,7 +2,7 @@
  * Gestión de suscripciones: renovación (admin) y aviso automático de vencimiento.
  */
 import prisma from '../config/database';
-import { sendSubscriptionExpiryWarningEmail } from '../utils/email';
+import { sendSubscriptionExpiryWarningEmail, sendAccountActivatedEmail } from '../utils/email';
 import { currentYear, endOfSubscriptionYear, formatDateCL, invalidateAccessUser } from './access.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -15,7 +15,8 @@ const WARNING_DAYS = 30;
 export async function renewSubscription(userId: string, year = currentYear()) {
   const user = await prisma.user.update({
     where: { id: userId },
-    data: { subscriptionEndsAt: endOfSubscriptionYear(year), isActive: true, expiryWarningSentAt: null },
+    // Renovar no habilita la cuenta: eso se hace aparte con setUserActive
+    data: { subscriptionEndsAt: endOfSubscriptionYear(year), expiryWarningSentAt: null },
     select: { id: true, email: true, subscriptionEndsAt: true },
   });
   invalidateAccessUser(userId);
@@ -30,6 +31,34 @@ export async function setUserExempt(userId: string, isExempt: boolean) {
   });
   invalidateAccessUser(userId);
   return user;
+}
+
+/**
+ * Admin: habilita o deshabilita una cuenta. Al deshabilitarla se cierran sus
+ * sesiones; al habilitarla se avisa al usuario por email.
+ */
+export async function setUserActive(userId: string, isActive: boolean) {
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true } });
+  if (!target) throw new AccountError('Usuario no encontrado', 404);
+  if (target.role === 'ADMIN') throw new AccountError('No se puede deshabilitar una cuenta de administrador', 400);
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { isActive },
+    select: { id: true, email: true, firstName: true, isActive: true },
+  });
+  if (!isActive) await prisma.session.deleteMany({ where: { userId } });
+  invalidateAccessUser(userId);
+
+  if (isActive && !target.isActive) {
+    sendAccountActivatedEmail({ email: user.email, firstName: user.firstName })
+      .catch(err => console.error(`[ACCOUNT] No se pudo avisar la habilitación a ${user.email}:`, err));
+  }
+  return user;
+}
+
+export class AccountError extends Error {
+  constructor(message: string, public status: number) { super(message); }
 }
 
 /** Envía el aviso a cuentas que vencen en los próximos 30 días (una vez por período). */

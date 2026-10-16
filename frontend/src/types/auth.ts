@@ -23,6 +23,12 @@ export interface AuthResponse {
   refreshToken?: string;
 }
 
+/** verify-otp de una cuenta que el admin aún no habilita: no abre sesión */
+export interface PendingActivationResponse {
+  pendingActivation: true;
+  message: string;
+}
+
 export interface RegisterData {
   email: string;
   password: string;

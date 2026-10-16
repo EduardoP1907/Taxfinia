@@ -32,26 +32,33 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }
 
-  // Suscripción vencida o cuenta desactivada → modo solo lectura
-  if (WRITE_METHODS.has(req.method) && !READ_ONLY_ALLOWED.some(r => r.test(req.originalUrl.split('?')[0]))) {
-    try {
-      const user = await getAccessUser(decoded.userId);
-      if (!user) return res.status(401).json({ error: 'Usuario no encontrado' });
-      // El rol vigente se toma de la BD (el del token puede estar desactualizado)
-      req.user = { ...decoded, role: user.role };
-      if (!user.isActive || !isSubscriptionActive(user)) {
-        const until = user.subscriptionEndsAt ? ` el ${formatDateCL(user.subscriptionEndsAt)}` : '';
-        return res.status(403).json({
-          error: !user.isActive
-            ? 'Tu cuenta está desactivada. Contacta al administrador.'
-            : `Tu suscripción venció${until}. La cuenta está en modo solo lectura: contacta al administrador para renovarla.`,
-          subscriptionExpired: true,
-        });
-      }
-    } catch (err) {
-      console.error('[AUTH] Error verificando suscripción:', err);
-      return res.status(500).json({ error: 'No se pudo verificar la suscripción. Inténtalo de nuevo.' });
+  try {
+    const user = await getAccessUser(decoded.userId);
+    if (!user) return res.status(401).json({ error: 'Usuario no encontrado' });
+    // El rol vigente se toma de la BD (el del token puede estar desactualizado)
+    req.user = { ...decoded, role: user.role };
+
+    // Cuenta deshabilitada por el admin → sin acceso (el frontend cierra la sesión)
+    if (!user.isActive) {
+      return res.status(401).json({
+        error: 'Tu cuenta no está habilitada. Contacta al administrador.',
+        accountDisabled: true,
+      });
     }
+
+    // Suscripción vencida → modo solo lectura
+    if (WRITE_METHODS.has(req.method)
+      && !READ_ONLY_ALLOWED.some(r => r.test(req.originalUrl.split('?')[0]))
+      && !isSubscriptionActive(user)) {
+      const until = user.subscriptionEndsAt ? ` el ${formatDateCL(user.subscriptionEndsAt)}` : '';
+      return res.status(403).json({
+        error: `Tu suscripción venció${until}. La cuenta está en modo solo lectura: contacta al administrador para renovarla.`,
+        subscriptionExpired: true,
+      });
+    }
+  } catch (err) {
+    console.error('[AUTH] Error verificando suscripción:', err);
+    return res.status(500).json({ error: 'No se pudo verificar la suscripción. Inténtalo de nuevo.' });
   }
 
   next();

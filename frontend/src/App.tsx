@@ -18,7 +18,7 @@ import { ReportPage } from './pages/report/ReportPage';
 import { CombinedProjectionsPage } from './pages/projections/CombinedProjectionsPage';
 import { Projection41Page } from './pages/projections/Projection41Page';
 import { Projection43Page } from './pages/projections/Projection43Page';
-import { AdminPage } from './pages/admin/AdminPage';
+import { AdminUsersPage, AdminCompaniesPage, AdminInvitesPage } from './pages/admin/AdminPage';
 import { MonthlyReportPage } from './pages/report/MonthlyReportPage';
 import { CompareCompaniesPage } from './pages/companies/CompareCompaniesPage';
 import { MonthlyForecastPage } from './pages/projections/MonthlyForecastPage';
@@ -160,11 +160,29 @@ function App() {
             </PrivateRoute>
           }
         />
+        {/* Área de administración (menú propio) */}
+        <Route path="/admin" element={<Navigate to="/admin/usuarios" replace />} />
         <Route
-          path="/admin"
+          path="/admin/usuarios"
           element={
-            <PrivateRoute>
-              <AdminPage />
+            <PrivateRoute requireAdmin>
+              <AdminUsersPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin/empresas"
+          element={
+            <PrivateRoute requireAdmin>
+              <AdminCompaniesPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin/invitaciones"
+          element={
+            <PrivateRoute requireAdmin>
+              <AdminInvitesPage />
             </PrivateRoute>
           }
         />

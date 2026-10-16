@@ -134,6 +134,14 @@ export class AuthService {
       data: { isVerified: true },
     });
 
+    // Cuenta aún no habilitada por el admin: email verificado, pero sin sesión
+    if (!user.isActive) {
+      return {
+        pendingActivation: true as const,
+        message: 'Email verificado. Tu cuenta quedará disponible cuando el administrador la habilite.',
+      };
+    }
+
     // Generar tokens
     const accessToken = generateAccessToken({
       id: user.id,
@@ -188,7 +196,7 @@ export class AuthService {
     }
 
     if (!user.isActive) {
-      throw new Error('Usuario desactivado. Contacta al administrador.');
+      throw new Error('Tu cuenta no está habilitada. El administrador debe habilitarla para que puedas ingresar.');
     }
 
     // Verificar contraseña

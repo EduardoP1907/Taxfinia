@@ -58,7 +58,8 @@ AWS_S3_BUCKET="..."
 ### Frontend (`frontend/.env`)
 ```env
 VITE_API_URL=http://localhost:5000/api
-VITE_DEV_BYPASS_AUTH=true   # Skips auth entirely for local dev (logs in as dev@local.com ADMIN)
+VITE_DEV_BYPASS_AUTH=true   # Skips auth entirely for local dev (logs in as dev@local.com, role ANALYST)
+VITE_DEV_BYPASS_ROLE=ADMIN  # Optional: dev bypass user is ADMIN (only sees /admin/*)
 ```
 
 ## Architecture
@@ -91,7 +92,7 @@ Controllers → Services → Prisma (ORM) → PostgreSQL
 - `/informe` — AI report viewer with chat (ReportPage)
 - `/proyecciones` — DCF projections combined view
 - `/proyecciones-41`, `/proyecciones-43` — Individual projection sheets
-- `/admin` — Admin panel (ADMIN role only)
+- `/admin/usuarios`, `/admin/empresas`, `/admin/invitaciones` — Admin panel with its own sidebar. ADMIN users only see `/admin/*` and non-admins never do (`PrivateRoute` redirects both ways)
 
 **State management:**
 - `store/authStore.ts` — Auth state; supports `VITE_DEV_BYPASS_AUTH` to skip login in dev
@@ -112,6 +113,7 @@ User → InviteToken (trial access system)
 
 **Important model fields:**
 - `FiscalYear.consolidatedAt` — set on annual years after an AI report/chat; those years become read-only. `Company.isLocked` is legacy (migrated by `scripts/migrate-access-model.ts`)
+- `User.isActive` — defaults to `false`: every new account starts disabled until an admin enables it (`PUT /api/admin/users/:id/active`, emails the user). Disabled users can't log in, `verify-otp` returns `{ pendingActivation }` without a session, and `authMiddleware` answers 401 `{ accountDisabled: true }` to any request (disabling also deletes their sessions). Renewing a subscription does NOT enable the account
 - `User.subscriptionEndsAt` — always 31-Dec (Chile time) of the paid year; admin renews via `POST /api/admin/users/:id/renew`. `User.isExempt` — no expiry and no locks (managed from the admin panel)
 - Non-privileged users: max 1 company, tax ID required/valid/unique; name and tax ID are frozen and the company can't be deleted once it has reports or consolidated years
 - `Company.businessActivity` — freeform business description used in AI prompt

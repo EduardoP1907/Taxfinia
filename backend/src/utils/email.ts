@@ -194,7 +194,7 @@ export const sendNewUserNotificationEmail = async (userData: {
             </div>
             <div class="content">
               <h2>Nuevo Usuario Registrado</h2>
-              <p style="color:#64748b; margin:0 0 20px 0; font-size:15px;">Se ha creado una nueva cuenta en la plataforma.</p>
+              <p style="color:#64748b; margin:0 0 20px 0; font-size:15px;">Se ha creado una nueva cuenta en la plataforma. Queda <strong>deshabilitada</strong> hasta que la habilites desde el panel de administración.</p>
 
               <div class="info-row">
                 <div class="lbl">Nombre</div>
@@ -338,6 +338,40 @@ export const sendSubscriptionExpiryWarningEmail = async (data: {
             <p>Tu suscripción a PROMETHEIA vence el <strong>${data.endsAt}</strong>.</p>
             <p>Desde esa fecha tu cuenta quedará en <strong>modo solo lectura</strong>: podrás ver y descargar los informes ya generados, pero no cargar datos, generar informes nuevos ni usar el asistente IA.</p>
             <p>Para renovarla, contacta al administrador. Una vez renovada podrás agregar el ejercicio recién cerrado.</p>
+            <p style="color: #94a3b8; font-size: 12px; margin-top: 28px; text-align: center;">© ${new Date().getFullYear()} PROMETHEIA</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+};
+
+/** Aviso al usuario de que el administrador habilitó su cuenta. */
+export const sendAccountActivatedEmail = async (data: {
+  email: string;
+  firstName?: string | null;
+}): Promise<void> => {
+  const name = data.firstName || 'Hola';
+  const loginUrl = `${config.frontendUrl}/login`;
+  await transporter.sendMail({
+    from: config.email.from,
+    to: data.email,
+    subject: '[PROMETHEIA] Tu cuenta ha sido habilitada',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <body style="font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #334155; background: #f8fafc; margin: 0; padding: 40px 20px;">
+        <div style="max-width: 580px; margin: 0 auto;">
+          <div style="background: #0f172a; padding: 28px 36px; border-radius: 12px 12px 0 0;">
+            <div style="color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: 2px;">🔥 PROMETHEIA</div>
+          </div>
+          <div style="background: #ffffff; padding: 36px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+            <h2 style="color: #0f172a; margin: 0 0 12px 0; font-size: 20px;">${name}, tu cuenta ya está habilitada</h2>
+            <p>El administrador habilitó tu cuenta en PROMETHEIA. Ya puedes iniciar sesión.</p>
+            <p style="text-align: center; margin: 28px 0;">
+              <a href="${loginUrl}" style="background: #f59e0b; color: #0f172a; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 700;">Iniciar sesión</a>
+            </p>
             <p style="color: #94a3b8; font-size: 12px; margin-top: 28px; text-align: center;">© ${new Date().getFullYear()} PROMETHEIA</p>
           </div>
         </div>

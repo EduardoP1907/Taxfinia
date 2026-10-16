@@ -38,7 +38,8 @@ api.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        // Cuenta deshabilitada por el admin: el login muestra el motivo
+        window.location.href = error.response?.data?.accountDisabled ? '/login?cuenta=deshabilitada' : '/login';
       }
     }
     return Promise.reject(error);

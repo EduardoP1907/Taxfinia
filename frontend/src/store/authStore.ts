@@ -57,7 +57,8 @@ export const useAuthStore = create<AuthState>((set) => ({
           email: 'dev@local.com',
           firstName: 'Dev',
           lastName: 'Local',
-          role: 'ADMIN',
+          // Admin y usuario tienen áreas separadas: VITE_DEV_BYPASS_ROLE=ADMIN para ver el panel admin
+          role: import.meta.env.VITE_DEV_BYPASS_ROLE === 'ADMIN' ? 'ADMIN' : 'ANALYST',
           isVerified: true,
           createdAt: new Date().toISOString(),
           privileged: true,

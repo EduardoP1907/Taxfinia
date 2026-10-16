@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, Users, CalendarCheck, ShieldCheck } from 'lucide-react';
+import { RefreshCw, Users, CalendarCheck, ShieldCheck, Power } from 'lucide-react';
 import api from '../../services/api';
 import { formatDateCL } from '../../hooks/useAccess';
 
@@ -18,11 +18,12 @@ interface AdminUser {
   companies: { id: string; name: string; taxId: string | null }[];
 }
 
-type Filter = 'all' | 'expired' | 'active';
+type Filter = 'all' | 'disabled' | 'expired' | 'active';
 
 /**
- * Gestión de suscripciones: vigencia hasta el 31-dic, renovación tras el pago
- * y cuentas exentas (sin vencimiento ni bloqueo de ejercicios).
+ * Gestión de cuentas: habilitación (toda cuenta nueva parte deshabilitada),
+ * vigencia hasta el 31-dic, renovación tras el pago y cuentas exentas
+ * (sin vencimiento ni bloqueo de ejercicios).
  */
 export const AdminUsersSection: React.FC = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -77,15 +78,30 @@ export const AdminUsersSection: React.FC = () => {
     }
   };
 
+  const toggleActive = async (u: AdminUser) => {
+    setBusy(u.id);
+    setError(null);
+    try {
+      await api.put(`/admin/users/${u.id}/active`, { isActive: !u.isActive });
+      await load();
+    } catch (e) {
+      setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || `No se pudo actualizar a ${u.email}.`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const q = query.trim().toLowerCase();
   const visible = users.filter(u => {
-    if (filter === 'expired' && u.subscriptionActive) return false;
+    if (filter === 'disabled' && u.isActive) return false;
+    if (filter === 'expired' && (!u.isActive || u.subscriptionActive)) return false;
     if (filter === 'active' && !u.subscriptionActive) return false;
     if (!q) return true;
     return [u.email, u.firstName, u.lastName, ...u.companies.flatMap(c => [c.name, c.taxId])]
       .some(v => v?.toLowerCase().includes(q));
   });
-  const expiredCount = users.filter(u => !u.subscriptionActive).length;
+  const disabledCount = users.filter(u => !u.isActive).length;
+  const expiredCount = users.filter(u => u.isActive && !u.subscriptionActive).length;
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-5">
@@ -93,6 +109,11 @@ export const AdminUsersSection: React.FC = () => {
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-slate-500" aria-hidden="true" />
           <h2 className="text-sm font-semibold text-slate-800">Usuarios y suscripciones</h2>
+          {disabledCount > 0 && (
+            <span className="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-slate-100 text-slate-600 border border-slate-200 tabular-nums">
+              {disabledCount} deshabilitada{disabledCount > 1 ? 's' : ''}
+            </span>
+          )}
           {expiredCount > 0 && (
             <span className="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-50 text-red-600 border border-red-200 tabular-nums">
               {expiredCount} vencida{expiredCount > 1 ? 's' : ''}
@@ -117,7 +138,7 @@ export const AdminUsersSection: React.FC = () => {
           className="flex-1 min-w-[12rem] px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
         />
         <div role="group" aria-label="Filtrar por estado" className="flex rounded-lg border border-slate-200 overflow-hidden text-xs">
-          {([['all', 'Todos'], ['expired', 'Vencidas'], ['active', 'Vigentes']] as [Filter, string][]).map(([f, label]) => (
+          {([['all', 'Todos'], ['disabled', 'Deshabilitadas'], ['expired', 'Vencidas'], ['active', 'Vigentes']] as [Filter, string][]).map(([f, label]) => (
             <button
               key={f}
               type="button"
@@ -150,24 +171,25 @@ export const AdminUsersSection: React.FC = () => {
             return (
               <li key={u.id} className="px-5 py-3 flex flex-wrap items-center gap-3">
                 <span
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${u.subscriptionActive ? 'bg-emerald-400' : 'bg-red-400'}`}
+                  className={`w-2 h-2 rounded-full flex-shrink-0 ${!u.isActive ? 'bg-slate-300' : u.subscriptionActive ? 'bg-emerald-400' : 'bg-red-400'}`}
                   aria-hidden="true"
                 />
                 <div className="flex-1 min-w-[14rem]">
                   <p className="text-sm font-medium text-slate-800 truncate">
                     {name || u.email}
                     {u.role === 'ADMIN' && <span className="ml-2 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">ADMIN</span>}
+                    {!u.isActive && <span className="ml-2 text-[10px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">DESHABILITADA</span>}
                     {u.isExempt && <span className="ml-2 text-[10px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded px-1.5 py-0.5">EXENTO</span>}
                   </p>
                   <p className="text-xs text-slate-400 truncate">
                     {name ? `${u.email} · ` : ''}
                     {u.companies.length > 0 ? u.companies.map(c => c.name).join(', ') : 'Sin empresa'}
                   </p>
-                  <p className={`text-xs mt-0.5 ${u.subscriptionActive ? 'text-slate-500' : 'text-red-600 font-medium'}`}>
-                    {u.privileged
-                      ? 'Sin vencimiento'
-                      : !u.isActive
-                        ? 'Cuenta desactivada'
+                  <p className={`text-xs mt-0.5 ${u.subscriptionActive || !u.isActive ? 'text-slate-500' : 'text-red-600 font-medium'}`}>
+                    {!u.isActive
+                      ? 'Sin acceso hasta que la habilites'
+                      : u.privileged
+                        ? 'Sin vencimiento'
                         : ends
                           ? `${u.subscriptionActive ? 'Vigente hasta' : 'Venció el'} ${formatDateCL(ends)}`
                           : 'Sin fecha de vigencia'}
@@ -175,6 +197,20 @@ export const AdminUsersSection: React.FC = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5">
+                  {u.role !== 'ADMIN' && (
+                    <button
+                      type="button"
+                      onClick={() => toggleActive(u)}
+                      disabled={busy === u.id}
+                      aria-pressed={u.isActive}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border disabled:opacity-50 ${u.isActive
+                        ? 'border-red-200 text-red-600 hover:bg-red-50'
+                        : 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                    >
+                      <Power className="w-3 h-3" aria-hidden="true" />
+                      {u.isActive ? 'Deshabilitar' : 'Habilitar'}
+                    </button>
+                  )}
                   {!u.privileged && (
                     <>
                       <button

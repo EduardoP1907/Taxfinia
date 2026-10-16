@@ -6,7 +6,7 @@ import { useAccess, formatDateCL } from '../hooks/useAccess';
 import { authService } from '../services/auth.service';
 import {
   LayoutDashboard, FileText, LogOut, Menu, X,
-  Building2, FileBarChart, TrendingUp, Flame, ShieldCheck, ChevronRight, Bot, ArrowLeftRight, Lock,
+  Building2, FileBarChart, TrendingUp, Flame, ChevronRight, Bot, ArrowLeftRight, Lock, Users, Link2,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -32,8 +32,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
   } = useCompanyStore();
 
   useEffect(() => {
-    if (user?.id) initActiveCompany(user.id);
-  }, [user?.id, initActiveCompany]);
+    if (user?.id && !isAdmin) initActiveCompany(user.id);
+  }, [user?.id, isAdmin, initActiveCompany]);
 
   // Cualquier página abierta con ?companyId= pasa a ser la empresa activa
   const urlCompanyId = new URLSearchParams(location.search).get('companyId');
@@ -56,41 +56,60 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     navigate('/login');
   };
 
-  const navGroups: NavGroup[] = [
+  // Los años del menú se calculan cada vez: el informe anual es del último
+  // ejercicio cerrado, la proyección del año en curso y el presupuesto del siguiente.
+  const currentYear = new Date().getFullYear();
+
+  // El admin tiene su propio menú: no ve las secciones de usuario
+  const adminNavGroups: NavGroup[] = [
     {
-      label: null,
+      label: 'Cuentas',
+      items: [{ name: 'Usuarios', href: '/admin/usuarios', icon: Users }],
+    },
+    {
+      label: 'Empresas',
+      items: [{ name: 'Empresas', href: '/admin/empresas', icon: Building2 }],
+    },
+    {
+      label: 'Accesos de prueba',
+      items: [{ name: 'Invitaciones', href: '/admin/invitaciones', icon: Link2 }],
+    },
+  ];
+
+  const userNavGroups: NavGroup[] = [
+    {
+      label: 'Inicio',
       items: [
-        { name: 'Dashboard',    href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Mis Empresas', href: '/empresas',  icon: Building2 },
+        { name: 'Panel Principal', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Mis Empresas',    href: '/empresas',  icon: Building2 },
       ],
     },
     {
-      label: 'Análisis Anual',
+      label: 'Análisis Financiero',
       items: [
-        { name: 'Datos Anuales',  href: '/datos',        icon: FileText,     scoped: true },
-        { name: 'Proyecciones',   href: '/proyecciones', icon: TrendingUp,   scoped: true },
-        { name: 'Informe Anual',  href: '/informe',      icon: FileBarChart, scoped: true },
+        { name: 'Datos Financieros',                       href: '/datos',        icon: FileText,     scoped: true },
+        { name: 'Proyecciones a 10 Años',                  href: '/proyecciones', icon: TrendingUp,   scoped: true },
+        { name: `Informe Financiero Anual ${currentYear - 1}`, href: '/informe',  icon: FileBarChart, scoped: true },
       ],
     },
     {
-      label: 'Análisis Mensual',
+      label: 'Proyecciones Mensuales',
       items: [
-        { name: `Forecast ${new Date().getFullYear()}`, href: '/forecast-mensual',    icon: TrendingUp, scoped: true },
-        { name: `Budget ${new Date().getFullYear() + 1}`, href: '/budget',    icon: TrendingUp, scoped: true },
-        { name: 'Informe Forecast y Budget', href: '/informes-comparativos', icon: FileBarChart, scoped: true },
+        { name: `Proyección Financiera ${currentYear}`,   href: '/forecast-mensual',      icon: TrendingUp,   scoped: true },
+        { name: `Presupuesto Financiero ${currentYear + 1}`, href: '/budget',             icon: TrendingUp,   scoped: true },
+        { name: 'Informes Proyectados',                   href: '/informes-comparativos', icon: FileBarChart, scoped: true },
       ],
     },
     {
       label: 'Inteligencia Artificial',
       items: [
-        { name: 'Asistente Financiero', href: '/asistente', icon: Bot, scoped: true },
+        { name: 'Asistente IA', href: '/asistente', icon: Bot, scoped: true },
       ],
     },
-    ...(isAdmin ? [{
-      label: 'Administración',
-      items: [{ name: 'Admin', href: '/admin', icon: ShieldCheck }],
-    }] : []),
   ];
+
+  const navGroups = isAdmin ? adminNavGroups : userNavGroups;
+  const sidebarCompanyId = isAdmin ? null : activeCompanyId;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -109,7 +128,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
               isAdmin={isAdmin}
               onLogout={handleLogout}
               onClose={() => setSidebarOpen(false)}
-              activeCompanyId={activeCompanyId}
+              activeCompanyId={sidebarCompanyId}
               activeCompanyName={activeCompanyName}
               canChangeCompany={(companies?.length ?? 0) > 1}
               onChangeCompany={handleChangeCompany}
@@ -126,7 +145,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
           user={user}
           isAdmin={isAdmin}
           onLogout={handleLogout}
-          activeCompanyId={activeCompanyId}
+          activeCompanyId={sidebarCompanyId}
           activeCompanyName={activeCompanyName}
           canChangeCompany={(companies?.length ?? 0) > 1}
           onChangeCompany={handleChangeCompany}
@@ -157,7 +176,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
         </div>
 
         <main className="py-8 px-4 sm:px-6 lg:px-8">
-          {readOnly && (
+          {readOnly && !isAdmin && (
             <div role="status" className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
               <Lock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
               <div className="text-sm text-amber-900">
