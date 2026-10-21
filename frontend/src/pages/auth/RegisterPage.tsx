@@ -2,8 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { authService } from '../../services/auth.service';
-import { Mail, Lock, User, Gift } from 'lucide-react';
+import { Mail, Lock, User, Gift, FileText, ExternalLink } from 'lucide-react';
 import { AuthLayout } from '../../layouts/AuthLayout';
+import { Modal } from '../../components/ui/Modal';
+
+const CONTRACTS = [
+  { href: '/contrato.pdf', title: 'Contrato de uso no comercial', description: 'Condiciones de uso de la plataforma PROMETHEIA' },
+  { href: '/contrato-comercial-promocional.pdf', title: 'Contrato comercial promocional', description: 'Condiciones comerciales y promocionales de PROMETHEIA' },
+];
 
 const RegisterPanelBody: React.FC = () => (
   <>
@@ -47,6 +53,7 @@ export const RegisterPage: React.FC = () => {
     email: '', password: '', confirmPassword: '', firstName: '', lastName: '',
   });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -175,9 +182,13 @@ export const RegisterPage: React.FC = () => {
               />
               <span className="text-sm text-slate-400">
                 Acepto los{' '}
-                <a href="/contrato.pdf" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors">
+                <button
+                  type="button"
+                  onClick={e => { e.preventDefault(); setShowTerms(true); }}
+                  className="text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors"
+                >
                   términos y condiciones
-                </a>
+                </button>
               </span>
             </label>
             {errors.terms && <p className="text-xs text-red-400">{errors.terms}</p>}
@@ -195,6 +206,30 @@ export const RegisterPage: React.FC = () => {
           </Link>
         </p>
       </div>
+
+      <Modal isOpen={showTerms} onClose={() => setShowTerms(false)} title="Términos y condiciones" maxWidth="md">
+        <p className="text-sm text-slate-600 mb-4">
+          Al crear tu cuenta aceptas los siguientes contratos:
+        </p>
+        <div className="space-y-2.5">
+          {CONTRACTS.map(c => (
+            <a
+              key={c.href}
+              href={c.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-amber-400 hover:bg-amber-50 transition-colors group"
+            >
+              <FileText className="w-5 h-5 text-amber-500 flex-shrink-0" aria-hidden="true" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-900">{c.title}</p>
+                <p className="text-xs text-slate-500">{c.description}</p>
+              </div>
+              <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-amber-500 flex-shrink-0" aria-hidden="true" />
+            </a>
+          ))}
+        </div>
+      </Modal>
     </AuthLayout>
   );
 };
