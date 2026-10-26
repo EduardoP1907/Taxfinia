@@ -52,6 +52,7 @@ export interface AccessUser {
   isExempt: boolean;
   isActive: boolean;
   subscriptionEndsAt: Date | null;
+  maxCompanies: number;
 }
 
 export function isPrivileged(user: Pick<AccessUser, 'role' | 'isExempt'>): boolean {
@@ -74,7 +75,7 @@ export async function getAccessUser(userId: string): Promise<AccessUser | null> 
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.user;
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, role: true, isExempt: true, isActive: true, subscriptionEndsAt: true },
+    select: { id: true, role: true, isExempt: true, isActive: true, subscriptionEndsAt: true, maxCompanies: true },
   });
   if (user) cache.set(userId, { user, at: Date.now() });
   return user;

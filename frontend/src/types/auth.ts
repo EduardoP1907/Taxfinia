@@ -12,6 +12,7 @@ export interface User {
   isActive?: boolean;
   isExempt?: boolean;
   privileged?: boolean;              // ADMIN o exento: sin vencimiento ni bloqueos
+  maxCompanies?: number;             // cupo de empresas habilitado por el admin (no aplica a privilegiados)
   subscriptionEndsAt?: string | null;
   subscriptionActive?: boolean;      // false = modo solo lectura
   annualYearWindow?: { min: number; max: number }; // años anuales editables

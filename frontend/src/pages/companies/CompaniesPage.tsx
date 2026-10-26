@@ -16,6 +16,7 @@ export const CompaniesPage: React.FC = () => {
   const invalidateCompanies = useCompanyStore((s) => s.invalidateCompanies);
   const initActiveCompany = useCompanyStore((s) => s.initActiveCompany);
   const userId = useAuthStore((s) => s.user?.id);
+  const maxCompanies = useAuthStore((s) => s.user?.maxCompanies) ?? 1;
   const { privileged, readOnly } = useAccess();
 
   // Mantiene la "empresa activa" del menú al día tras crear/editar/eliminar
@@ -74,8 +75,8 @@ export const CompaniesPage: React.FC = () => {
   const openModal = (company?: Company) => { setSelected(company || null); setIsModalOpen(true); };
   const closeModal = () => { setIsModalOpen(false); setSelected(null); };
 
-  // Usuarios normales: una sola empresa y solo con suscripción vigente
-  const canCreate = privileged || (!readOnly && companies.length === 0);
+  // Usuarios normales: hasta el cupo que les habilite el admin y solo con suscripción vigente
+  const canCreate = privileged || (!readOnly && companies.length < maxCompanies);
 
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -110,7 +111,11 @@ export const CompaniesPage: React.FC = () => {
 
         {!privileged && !readOnly && companies.length > 0 && (
           <p className="mb-6 text-xs text-slate-500">
-            Tu cuenta permite una empresa. Tras generar el primer informe, la razón social y el RUT quedan fijos
+            {maxCompanies === 1
+              ? 'Tu cuenta permite una empresa.'
+              : `Tu cuenta permite ${maxCompanies} empresas (${companies.length} registrada${companies.length > 1 ? 's' : ''}).`}
+            {companies.length >= maxCompanies && ' Para agregar otra, contacta al administrador.'}
+            {' '}Tras generar el primer informe, la razón social y el RUT quedan fijos
             y la empresa no se puede eliminar.
           </p>
         )}

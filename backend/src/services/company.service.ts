@@ -5,9 +5,6 @@ import {
   companyHasConsolidatedData, consolidateAnnualYears, unconsolidateAnnualYears,
 } from './access.service';
 
-/** Empresas activas permitidas por usuario (los privilegiados no tienen límite). */
-export const MAX_COMPANIES_PER_USER = 1;
-
 interface CreateCompanyData {
   name: string;
   taxId?: string;
@@ -47,8 +44,14 @@ export class CompanyService {
     let taxId = data.taxId;
     if (!privileged) {
       const count = await prisma.company.count({ where: { userId, deletedAt: null } });
-      if (count >= MAX_COMPANIES_PER_USER) {
-        throw new AccessError('Tu cuenta permite registrar una sola empresa.', 403);
+      // Cupo habilitado por el admin (p. ej. una empresa por suscripción comprada)
+      if (count >= user.maxCompanies) {
+        throw new AccessError(
+          user.maxCompanies === 1
+            ? 'Tu cuenta permite registrar una sola empresa. Para agregar otra, contacta al administrador.'
+            : `Tu cuenta permite registrar ${user.maxCompanies} empresas. Para agregar otra, contacta al administrador.`,
+          403,
+        );
       }
       taxId = validateTaxId(data.taxId, data.country);
       await assertTaxIdAvailable(taxId);

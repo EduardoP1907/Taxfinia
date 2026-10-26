@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, Users, CalendarCheck, ShieldCheck, Power, Trash2, AlertTriangle, ChevronDown, Building2 } from 'lucide-react';
+import { RefreshCw, Users, CalendarCheck, ShieldCheck, Power, Trash2, AlertTriangle, ChevronDown, Building2, Minus, Plus } from 'lucide-react';
 import api from '../../services/api';
 import { formatDateCL } from '../../hooks/useAccess';
 
@@ -11,6 +11,7 @@ interface AdminUser {
   role: string;
   isActive: boolean;
   isExempt: boolean;
+  maxCompanies: number;
   privileged: boolean;
   subscriptionEndsAt: string | null;
   subscriptionActive: boolean;
@@ -87,6 +88,20 @@ export const AdminUsersSection: React.FC = () => {
       await load();
     } catch (e) {
       setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || `No se pudo actualizar a ${u.email}.`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const setMaxCompanies = async (u: AdminUser, maxCompanies: number) => {
+    setBusy(u.id);
+    setError(null);
+    try {
+      await api.put(`/admin/users/${u.id}/max-companies`, { maxCompanies });
+      // Actualización local: no recarga la lista para no cerrar el desplegable
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, maxCompanies } : x));
+    } catch (e) {
+      setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || `No se pudo actualizar el cupo de ${u.email}.`);
     } finally {
       setBusy(null);
     }
@@ -287,6 +302,38 @@ export const AdminUsersSection: React.FC = () => {
                       <Power className="w-3 h-3" aria-hidden="true" />
                       {u.isActive ? 'Deshabilitar' : 'Habilitar'}
                     </button>
+                  )}
+                  {/* Cupo de empresas: el admin suma una por cada suscripción comprada */}
+                  {!u.privileged && (
+                    <div
+                      role="group"
+                      aria-label={`Cupo de empresas de ${u.email}`}
+                      title={`Puede registrar hasta ${u.maxCompanies} empresa${u.maxCompanies > 1 ? 's' : ''} (tiene ${u.companies.length})`}
+                      className="flex items-center rounded-lg border border-slate-200 text-xs"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setMaxCompanies(u, u.maxCompanies - 1)}
+                        disabled={busy === u.id || u.maxCompanies <= 1}
+                        aria-label="Quitar un cupo de empresa"
+                        className="p-1.5 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-l-lg disabled:opacity-40"
+                      >
+                        <Minus className="w-3 h-3" aria-hidden="true" />
+                      </button>
+                      <span className={`px-1.5 flex items-center gap-1 font-semibold tabular-nums ${u.companies.length > u.maxCompanies ? 'text-red-600' : 'text-slate-700'}`}>
+                        <Building2 className="w-3 h-3 text-slate-400" aria-hidden="true" />
+                        {u.companies.length}/{u.maxCompanies}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setMaxCompanies(u, u.maxCompanies + 1)}
+                        disabled={busy === u.id}
+                        aria-label="Agregar un cupo de empresa"
+                        className="p-1.5 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-r-lg disabled:opacity-40"
+                      >
+                        <Plus className="w-3 h-3" aria-hidden="true" />
+                      </button>
+                    </div>
                   )}
                   {!u.privileged && (
                     <>

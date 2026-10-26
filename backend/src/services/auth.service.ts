@@ -304,6 +304,7 @@ export class AuthService {
         createdAt: true,
         isActive: true,
         isExempt: true,
+        maxCompanies: true,
         subscriptionEndsAt: true,
       },
     });

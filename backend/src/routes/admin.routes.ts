@@ -2,9 +2,12 @@ import { Router, Request, Response, NextFunction } from 'express';
 import prisma from '../config/database';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { getAccessUser, isPrivileged, isSubscriptionActive, currentYear } from '../services/access.service';
-import { renewSubscription, setUserExempt, setUserActive, deleteUserAccount, AccountError } from '../services/subscription.service';
+import { renewSubscription, setUserExempt, setUserMaxCompanies, setUserActive, deleteUserAccount, AccountError } from '../services/subscription.service';
 
 const router = Router();
+
+// Tope de seguridad para el cupo de empresas de un usuario
+const MAX_COMPANIES_LIMIT = 100;
 
 router.use(authMiddleware);
 
@@ -25,7 +28,7 @@ router.get('/users', async (_req: Request, res: Response) => {
       orderBy: { createdAt: 'desc' },
       select: {
         id: true, email: true, firstName: true, lastName: true, role: true,
-        isActive: true, isExempt: true, subscriptionEndsAt: true, createdAt: true, lastLogin: true,
+        isActive: true, isExempt: true, maxCompanies: true, subscriptionEndsAt: true, createdAt: true, lastLogin: true,
         companies: {
           where: { deletedAt: null },
           orderBy: { createdAt: 'asc' },
@@ -95,7 +98,23 @@ router.put('/users/:id/exempt', async (req: Request, res: Response) => {
   }
 });
 
-/** PUT /api/admin/users/:id/active — { isActive: boolean } habilita/deshabilita la cuenta */
+/** PUT /api/admin/users/:id/max-companies — { maxCompanies: entero ≥ 1 } cupo de empresas */
+router.put('/users/:id/max-companies', async (req: Request, res: Response) => {
+  try {
+    const max = req.body?.maxCompanies;
+    if (!Number.isInteger(max) || max < 1 || max > MAX_COMPANIES_LIMIT) {
+      res.status(400).json({ error: `El cupo de empresas debe ser un número entero entre 1 y ${MAX_COMPANIES_LIMIT}` });
+      return;
+    }
+    const user = await setUserMaxCompanies(req.params.id, max);
+    res.json({ success: true, data: user });
+  } catch (err: any) {
+    console.error('[ADMIN] Error cambiando cupo de empresas:', err);
+    res.status(500).json({ error: 'Error al actualizar el usuario' });
+  }
+});
+
+/** PUT /api/admin/users/:id/active —{ isActive: boolean } habilita/deshabilita la cuenta */
 router.put('/users/:id/active', async (req: Request, res: Response) => {
   try {
     if (typeof req.body?.isActive !== 'boolean') {

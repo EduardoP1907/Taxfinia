@@ -33,6 +33,17 @@ export async function setUserExempt(userId: string, isExempt: boolean) {
   return user;
 }
 
+/** Admin: fija cuántas empresas activas puede registrar el usuario (p. ej. una por suscripción comprada). */
+export async function setUserMaxCompanies(userId: string, maxCompanies: number) {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { maxCompanies },
+    select: { id: true, email: true, maxCompanies: true },
+  });
+  invalidateAccessUser(userId);
+  return user;
+}
+
 /**
  * Admin: habilita o deshabilita una cuenta. Al deshabilitarla se cierran sus
  * sesiones; al habilitarla se avisa al usuario por email.
