@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import {
   Building2, FileText, FileBarChart, TrendingUp,
-  ArrowRight, Layers, Activity, Bot, CalendarCheck,
+  ArrowRight, Layers, Activity, Bot, CalendarCheck, BookOpen, Download, CalendarRange, Wallet,
 } from 'lucide-react';
+import { MANUAL_PDF_URL, MANUAL_PDF_FILENAME } from '../manual/manualContent';
 import { useAuthStore } from '../../store/authStore';
 import { useCompanyStore } from '../../store/companyStore';
 import { useAccess, formatDateCL } from '../../hooks/useAccess';
@@ -234,6 +235,46 @@ export const DashboardPage: React.FC = () => {
           ))}
         </div>
 
+        {/* ── AYUDA: manual interactivo y PDF ───────────────────────────────── */}
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <span className="font-data text-[10px] text-slate-400 tracking-[0.2em] uppercase">
+              / Ayuda
+            </span>
+            <div className="flex-1 h-px bg-slate-200" />
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div className="w-9 h-9 bg-amber-50 border border-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-4 h-4 text-amber-600" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900 text-sm">Manual de Usuario</h3>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Guía paso a paso de la plataforma, con buscador, índice, preguntas frecuentes y glosario.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
+              <Link
+                to="/manual"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              >
+                <BookOpen className="w-4 h-4" aria-hidden="true" />
+                Abrir manual
+              </Link>
+              <a
+                href={MANUAL_PDF_URL}
+                download={MANUAL_PDF_FILENAME}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-semibold hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              >
+                <Download className="w-4 h-4" aria-hidden="true" />
+                Descargar PDF
+              </a>
+            </div>
+          </div>
+        </div>
+
         {/* ── QUICK ACTIONS ─────────────────────────────────────────────────── */}
         <div>
           <div className="flex items-center gap-3 mb-4">
@@ -264,14 +305,14 @@ export const DashboardPage: React.FC = () => {
             <ActionCard
               title={`Forecast ${new Date().getFullYear()}`}
               description="Proyecta y edita el desglose mensual (enero a diciembre) a partir de los datos anuales"
-              icon={TrendingUp}
+              icon={CalendarRange}
               href={withCompany('/forecast-mensual')}
               tag="INPUT MENSUAL"
             />
             <ActionCard
               title={`Budget ${new Date().getFullYear() + 1}`}
               description="Presupuesta el desglose mensual del próximo ejercicio (P&G y balance proyectado)"
-              icon={TrendingUp}
+              icon={Wallet}
               href={withCompany('/budget')}
               tag="PRESUPUESTO"
             />

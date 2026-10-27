@@ -7,7 +7,11 @@ import { authService } from '../services/auth.service';
 import {
   LayoutDashboard, FileText, LogOut, Menu, X,
   Building2, FileBarChart, TrendingUp, Flame, ChevronRight, Bot, ArrowLeftRight, Lock, Users, Link2,
+  BookOpen, Download, PanelLeftClose, PanelLeftOpen, CalendarRange, Wallet, FileChartLine,
 } from 'lucide-react';
+import { MANUAL_PDF_URL, MANUAL_PDF_FILENAME } from '../pages/manual/manualContent';
+
+const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -22,6 +26,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
   // Vigencia/exención pueden cambiar (renovación del admin): refrescar al entrar
   useEffect(() => { refreshUser(); }, [refreshUser]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Escritorio: el menú se puede plegar a solo íconos (se recuerda en este navegador)
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'; } catch { return false; }
+  });
+  const toggleCollapsed = () => setCollapsed(prev => {
+    try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, prev ? '0' : '1'); } catch { /* sin almacenamiento */ }
+    return !prev;
+  });
 
   const isAdmin = user?.role === 'ADMIN';
 
@@ -95,15 +108,22 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     {
       label: 'Proyecciones Mensuales',
       items: [
-        { name: `Proyección Financiera ${currentYear}`,   href: '/forecast-mensual',      icon: TrendingUp,   scoped: true },
-        { name: `Presupuesto Financiero ${currentYear + 1}`, href: '/budget',             icon: TrendingUp,   scoped: true },
-        { name: 'Informes Proyectados',                   href: '/informes-comparativos', icon: FileBarChart, scoped: true },
+        { name: `Proyección Financiera ${currentYear}`,   href: '/forecast-mensual',      icon: CalendarRange,   scoped: true },
+        { name: `Presupuesto Financiero ${currentYear + 1}`, href: '/budget',             icon: Wallet,   scoped: true },
+        { name: 'Informes Proyectados',                   href: '/informes-comparativos', icon: FileChartLine, scoped: true },
       ],
     },
     {
       label: 'Inteligencia Artificial',
       items: [
         { name: 'Asistente IA', href: '/asistente', icon: Bot, scoped: true },
+      ],
+    },
+    {
+      label: 'Ayuda',
+      items: [
+        { name: 'Manual de Usuario',        href: '/manual',       icon: BookOpen },
+        { name: 'Descargar manual (PDF)',   href: MANUAL_PDF_URL,  icon: Download, download: MANUAL_PDF_FILENAME },
       ],
     },
   ];
@@ -138,8 +158,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       )}
 
       {/* ── Desktop sidebar ─────────────────────────────────────────────────── */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
+      <div className={`hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col overflow-hidden motion-safe:transition-[width] duration-200 ${collapsed ? 'lg:w-16' : 'lg:w-64'}`}>
         <Sidebar
+          collapsed={collapsed}
+          onToggleCollapse={toggleCollapsed}
           navGroups={navGroups}
           location={location}
           user={user}
@@ -153,7 +175,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       </div>
 
       {/* ── Main content ────────────────────────────────────────────────────── */}
-      <div className="lg:pl-64">
+      <div className={`motion-safe:transition-[padding] duration-200 ${collapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
         {/* Mobile top bar */}
         <div className="sticky top-0 z-40 lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-3">
           <div className="flex items-center justify-between">
@@ -199,7 +221,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 // scoped: la página trabaja sobre una empresa → el enlace lleva la empresa activa
-interface NavItem  { name: string; href: string; icon: React.ElementType; scoped?: boolean }
+// download: archivo estático que se descarga (no es una ruta de la app)
+interface NavItem  { name: string; href: string; icon: React.ElementType; scoped?: boolean; download?: string }
 interface NavGroup { label: string | null; items: NavItem[] }
 interface SidebarProps {
   navGroups: NavGroup[];
@@ -212,23 +235,134 @@ interface SidebarProps {
   activeCompanyName: string | null;
   canChangeCompany: boolean;
   onChangeCompany: () => void;
+  /** Solo escritorio: menú plegado a íconos y botón para plegar/desplegar */
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
   navGroups, location, user, isAdmin, onLogout, onClose,
   activeCompanyId, activeCompanyName, canChangeCompany, onChangeCompany,
+  collapsed = false, onToggleCollapse,
 }) => {
   const initials = (user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase();
   const displayName = user?.firstName
     ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`
     : user?.email;
 
+  const toggleButton = onToggleCollapse && (
+    <button
+      type="button"
+      onClick={onToggleCollapse}
+      aria-label={collapsed ? 'Desplegar menú' : 'Plegar menú'}
+      aria-expanded={!collapsed}
+      title={collapsed ? 'Desplegar menú' : 'Plegar menú'}
+      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 flex-shrink-0"
+    >
+      {collapsed
+        ? <PanelLeftOpen className="w-4 h-4" aria-hidden="true" />
+        : <PanelLeftClose className="w-4 h-4" aria-hidden="true" />}
+    </button>
+  );
+
+  // Plegado: solo íconos; el nombre de cada opción queda como tooltip
+  if (collapsed) {
+    return (
+      <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800">
+        <div className="flex items-center justify-center h-16 border-b border-slate-800">
+          {toggleButton}
+        </div>
+
+        <div className="flex justify-center py-3.5 border-b border-slate-800">
+          <div
+            title={`${displayName} · ${isAdmin ? 'Administrador' : 'Analista'}`}
+            className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-slate-900 font-bold text-xs"
+          >
+            {initials}
+          </div>
+        </div>
+
+        {activeCompanyId && (
+          <div className="flex justify-center py-3 border-b border-slate-800">
+            {canChangeCompany ? (
+              <button
+                type="button"
+                onClick={onChangeCompany}
+                aria-label={`Empresa activa: ${activeCompanyName ?? ''}. Cambiar empresa`}
+                title={`Empresa activa: ${activeCompanyName ?? ''} (cambiar)`}
+                className="w-9 h-9 flex items-center justify-center rounded-lg text-amber-400 hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              >
+                <Building2 className="w-4 h-4" aria-hidden="true" />
+              </button>
+            ) : (
+              <span title={`Empresa activa: ${activeCompanyName ?? ''}`} className="w-9 h-9 flex items-center justify-center text-amber-400">
+                <Building2 className="w-4 h-4" aria-hidden="true" />
+                <span className="sr-only">Empresa activa: {activeCompanyName}</span>
+              </span>
+            )}
+          </div>
+        )}
+
+        <nav aria-label="Navegación principal" className="flex-1 px-2 py-3 overflow-y-auto">
+          {navGroups.map((group, gi) => (
+            <div key={gi} className={gi > 0 ? 'mt-3 pt-3 border-t border-slate-800' : ''}>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const active = !item.download && (
+                    location.pathname === item.href ||
+                    (item.href !== '/dashboard' && location.pathname.startsWith(item.href + '/')));
+                  const className = [
+                    'group flex items-center justify-center w-full h-10 rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400',
+                    active ? 'bg-amber-500/15 text-amber-400' : 'text-slate-300 hover:text-amber-400 hover:bg-slate-800',
+                  ].join(' ');
+                  const content = (
+                    <>
+                      <item.icon aria-hidden="true" className="w-5 h-5" />
+                      <span className="sr-only">{item.name}</span>
+                    </>
+                  );
+                  return item.download ? (
+                    <a key={item.name} href={item.href} download={item.download} title={item.name} className={className}>
+                      {content}
+                    </a>
+                  ) : (
+                    <Link
+                      key={item.name}
+                      to={item.scoped && activeCompanyId ? `${item.href}?companyId=${activeCompanyId}` : item.href}
+                      title={item.name}
+                      aria-current={active ? 'page' : undefined}
+                      className={className}
+                    >
+                      {content}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className="px-2 py-3 border-t border-slate-800">
+          <button
+            type="button"
+            onClick={onLogout}
+            title="Cerrar Sesión"
+            className="flex items-center justify-center w-full h-10 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+          >
+            <LogOut className="w-5 h-5" aria-hidden="true" />
+            <span className="sr-only">Cerrar Sesión</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800">
 
       {/* Logo */}
       <div className="flex items-center justify-between h-16 px-5 border-b border-slate-800">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-7 h-7 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0">
             <Flame className="w-4 h-4 text-slate-900" />
           </div>
@@ -239,6 +373,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
         )}
+        {toggleButton}
       </div>
 
       {/* User */}
@@ -293,6 +428,20 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
             <div className="space-y-0.5">
               {group.items.map((item) => {
+                if (item.download) {
+                  return (
+                    <a
+                      key={item.name}
+                      href={item.href}
+                      download={item.download}
+                      onClick={onClose}
+                      className="group flex items-center gap-3 px-3 py-2 rounded-lg transition-colors duration-150 text-sm text-slate-400 hover:text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    >
+                      <item.icon aria-hidden="true" className="w-[18px] h-[18px] flex-shrink-0 text-slate-300 group-hover:text-amber-400 transition-colors" />
+                      <span>{item.name}</span>
+                    </a>
+                  );
+                }
                 const active =
                   location.pathname === item.href ||
                   (item.href !== '/dashboard' && location.pathname.startsWith(item.href + '/')) ||
@@ -311,7 +460,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     ].join(' ')}
                   >
                     <div className="flex items-center gap-3">
-                      <item.icon aria-hidden="true" className={`w-4 h-4 flex-shrink-0 ${active ? 'text-amber-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                      <item.icon aria-hidden="true" className={`w-[18px] h-[18px] flex-shrink-0 transition-colors ${active ? 'text-amber-400' : 'text-slate-300 group-hover:text-amber-400'}`} />
                       <span className={active ? 'font-medium' : ''}>{item.name}</span>
                     </div>
                     {active && <ChevronRight className="w-3 h-3 text-amber-500/60" aria-hidden="true" />}
@@ -328,9 +477,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         <button
           type="button"
           onClick={onLogout}
-          className="group flex items-center gap-3 w-full px-3 py-2 text-sm text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+          className="group flex items-center gap-3 w-full px-3 py-2 text-sm text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
         >
-          <LogOut className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+          <LogOut className="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
           <span>Cerrar Sesión</span>
         </button>
         <div className="px-3 pt-2 flex items-center justify-between">
