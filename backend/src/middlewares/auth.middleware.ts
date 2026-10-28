@@ -5,11 +5,12 @@ import { getAccessUser, isSubscriptionActive, formatDateCL } from '../services/a
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 // Escrituras permitidas con la suscripción vencida: solo acciones para VER o
-// DESCARGAR informes ya generados (no crean ni modifican datos financieros).
+// DESCARGAR informes ya generados y consultar el manual (no crean ni modifican datos financieros).
 const READ_ONLY_ALLOWED = [
   /\/reports\/[^/]+\/preview-token$/,
   /\/(reports|monthly-reports|comparison-reports)\/[^/]+\/(generate-code|validate-code)$/,
   /\/auth\/logout$/,
+  /\/manual-assistant\/?$/,
 ];
 
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {

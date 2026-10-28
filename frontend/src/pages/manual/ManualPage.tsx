@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BookOpen, Download, Search, X, ChevronRight, ArrowRight, Lightbulb, AlertTriangle,
-  Building2, FileText, FileBarChart, TrendingUp, Bot, LifeBuoy, ArrowUp, HelpCircle, BookA,
+  Building2, FileText, FileBarChart, TrendingUp, Bot, LifeBuoy, ArrowUp, HelpCircle, BookA, Sparkles,
 } from 'lucide-react';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { useCompanyStore } from '../../store/companyStore';
+import { ManualAssistant } from './ManualAssistant';
 import {
   buildManual, sectionId, MANUAL_PDF_URL, MANUAL_PDF_FILENAME,
   type ManualBlock, type ManualSection,
@@ -170,6 +171,11 @@ export const ManualPage: React.FC = () => {
   const q = normalize(query.trim());
   const [activeId, setActiveId] = useState<string>(sections[0].id);
   const [showTop, setShowTop] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantQuestion, setAssistantQuestion] = useState<string>();
+
+  const openAssistant = (question?: string) => { setAssistantQuestion(question); setAssistantOpen(true); };
+  const closeAssistant = () => { setAssistantOpen(false); setAssistantQuestion(undefined); };
 
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -308,14 +314,24 @@ export const ManualPage: React.FC = () => {
               Busque un tema o navegue por el índice. Cada sección tiene un acceso directo a la página que explica.
             </p>
           </div>
-          <a
-            href={MANUAL_PDF_URL}
-            download={MANUAL_PDF_FILENAME}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-          >
-            <Download className="w-4 h-4" aria-hidden="true" />
-            Descargar manual (PDF)
-          </a>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => openAssistant()}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-slate-900 text-sm font-semibold hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
+            >
+              <Sparkles className="w-4 h-4" aria-hidden="true" />
+              Preguntar al asistente
+            </button>
+            <a
+              href={MANUAL_PDF_URL}
+              download={MANUAL_PDF_FILENAME}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+            >
+              <Download className="w-4 h-4" aria-hidden="true" />
+              Descargar manual (PDF)
+            </a>
+          </div>
         </div>
 
         {/* ── Búsqueda ─────────────────────────────────────────────────────── */}
@@ -474,7 +490,15 @@ export const ManualPage: React.FC = () => {
               <div className="bg-white border border-dashed border-slate-300 rounded-xl py-12 text-center">
                 <Search className="w-6 h-6 text-slate-300 mx-auto mb-3" aria-hidden="true" />
                 <p className="text-sm text-slate-600">No encontramos «{query.trim()}» en el manual.</p>
-                <p className="text-xs text-slate-500 mt-1">Pruebe con otra palabra o consulte al administrador.</p>
+                <p className="text-xs text-slate-500 mt-1">Pruebe con otra palabra o pregúntele al asistente.</p>
+                <button
+                  type="button"
+                  onClick={() => openAssistant(query.trim())}
+                  className="mt-4 inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-amber-500 text-slate-900 text-sm font-semibold hover:bg-amber-400"
+                >
+                  <Sparkles className="w-4 h-4" aria-hidden="true" />
+                  Preguntar «{query.trim()}» al asistente
+                </button>
               </div>
             )}
           </div>
@@ -486,11 +510,40 @@ export const ManualPage: React.FC = () => {
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' })}
           aria-label="Volver al inicio del manual"
-          className="fixed bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-slate-900 text-white shadow-lg flex items-center justify-center hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+          className="fixed bottom-24 right-6 z-30 w-10 h-10 rounded-full bg-slate-900 text-white shadow-lg flex items-center justify-center hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
         >
           <ArrowUp className="w-4 h-4" aria-hidden="true" />
         </button>
       )}
+
+      {!assistantOpen && (
+        <button
+          type="button"
+          onClick={() => openAssistant()}
+          className="fixed bottom-6 right-6 z-30 inline-flex items-center gap-2 pl-4 pr-5 h-12 rounded-full bg-slate-900 text-white text-sm font-semibold shadow-lg hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          <Sparkles className="w-4 h-4 text-amber-400" aria-hidden="true" />
+          Preguntar al manual
+        </button>
+      )}
+
+      <ManualAssistant
+        open={assistantOpen}
+        onClose={closeAssistant}
+        initialQuestion={assistantQuestion}
+        renderText={text => (
+          <RichText
+            text={text}
+            q=""
+            onGoTo={id => {
+              // En pantallas chicas el panel tapa el manual: se cierra para mostrar la sección
+              if (!window.matchMedia('(min-width: 1024px)').matches) closeAssistant();
+              setQuery('');
+              requestAnimationFrame(() => goTo(id));
+            }}
+          />
+        )}
+      />
     </DashboardLayout>
   );
 };
