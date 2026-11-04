@@ -7,6 +7,9 @@ import { INDUSTRY_LIST } from '../../constants/industries';
 import { companyService } from '../../services/company.service';
 import { FileText, Upload, X } from 'lucide-react';
 
+// Mismo límite que multer en backend/src/routes/company.routes.ts
+const MAX_DEED_SIZE = 10 * 1024 * 1024;
+
 interface CompanyFormModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -134,7 +137,13 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
         try {
           await companyService.uploadDeedDocument(company.id, deedFile);
         } catch (err: any) {
-          setDeedError(err.response?.data?.message || 'Error al cargar el documento de escritura');
+          // 413 sin cuerpo JSON = lo rechazó el proxy (nginx) antes de llegar a la API
+          setDeedError(
+            err.response?.data?.message ||
+              (err.response?.status === 413
+                ? 'El archivo es demasiado grande para subirlo'
+                : 'Error al cargar el documento de escritura'),
+          );
           setDeedBusy(false);
           setIsLoading(false);
           return;
@@ -389,7 +398,17 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
                   type="file"
                   accept="application/pdf,text/plain"
                   className="hidden"
-                  onChange={(e) => setDeedFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (file && file.size > MAX_DEED_SIZE) {
+                      setDeedError('El archivo supera el tamaño máximo de 10 MB');
+                      setDeedFile(null);
+                      e.target.value = '';
+                      return;
+                    }
+                    setDeedError('');
+                    setDeedFile(file);
+                  }}
                 />
               </label>
             )}

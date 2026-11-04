@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import multer from 'multer';
 import { body } from 'express-validator';
 import { companyController } from '../controllers/company.controller';
@@ -128,7 +128,27 @@ router.put('/:id', updateCompanyValidation, companyController.updateCompany);
 router.delete('/:id', companyController.deleteCompany);
 router.get('/:id/summary', companyController.getCompanySummary);
 router.post('/:id/unlock', companyController.unlockCompany.bind(companyController));
-router.post('/:id/deed-document', upload.single('file'), companyController.uploadDeedDocument.bind(companyController));
+// Los errores de multer (p. ej. archivo > 10 MB) no llegan al controlador:
+// sin este wrapper caían al manejador global, que en producción responde sin
+// mensaje y el usuario solo veía "Error al cargar el documento de escritura".
+const uploadDeedFile: RequestHandler = (req, res, next) => {
+  upload.single('file')(req, res, (err: unknown) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError) {
+      const tooLarge = err.code === 'LIMIT_FILE_SIZE';
+      res.status(tooLarge ? 413 : 400).json({
+        success: false,
+        message: tooLarge
+          ? 'El archivo supera el tamaño máximo de 10 MB'
+          : 'No se pudo procesar el archivo enviado',
+      });
+      return;
+    }
+    next(err);
+  });
+};
+
+router.post('/:id/deed-document', uploadDeedFile, companyController.uploadDeedDocument.bind(companyController));
 router.delete('/:id/deed-document', companyController.deleteDeedDocument.bind(companyController));
 
 export default router;
