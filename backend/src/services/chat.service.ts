@@ -253,7 +253,7 @@ export async function chatWithCompany(
 
   const response = await client.messages.create({
     model: 'claude-opus-4-6',
-    max_tokens: 1024,
+    max_tokens: 8192,
     system: systemPrompt,
     messages,
   });

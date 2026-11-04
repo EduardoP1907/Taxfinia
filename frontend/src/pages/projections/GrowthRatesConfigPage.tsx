@@ -11,11 +11,9 @@ import {
   projectionsService,
   type ProjectionScenarioWithData,
   type FinancialProjection,
-  type HistoricalRates,
   type AnnualSuggestedRates,
 } from '../../services/projections.service';
 import { PercentInput } from '../../components/ui/PercentInput';
-import { formatRateReference } from '../../utils/percent';
 import { companyService } from '../../services/company.service';
 import { toast } from 'sonner';
 import { Settings, TrendingUp, ArrowRight, Plus, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -33,8 +31,7 @@ const DEFAULT_TAX_RATE = 0.2774;
 const toPct = (rate: number | string | null | undefined): number =>
   rate === null || rate === undefined || rate === '' ? 0 : Number(rate) * 100;
 
-// Tasas por defecto de la Hoja 4.0 (en %). El promedio de los últimos
-// 3 años se sigue mostrando al lado de cada campo como referencia.
+// Tasas por defecto de la Hoja 4.0 (en %).
 const DEFAULT_RATES: UniformRates = {
   revenueGrowthRate: 4.5,
   costOfSalesGrowthRate: 4,
@@ -73,8 +70,6 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
 
   // Tasas uniformes (se aplican a todos los años), en puntos porcentuales (5 = 5%)
   const [uniformRates, setUniformRates] = useState<UniformRates>(DEFAULT_RATES);
-  // Promedio histórico de los últimos 3 años de "Datos anuales" (referencia)
-  const [historical, setHistorical] = useState<HistoricalRates | null>(null);
 
   useEffect(() => {
     if (companyId) {
@@ -83,16 +78,8 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
   }, [companyId]);
 
   // Valores iniciales: las tasas ya guardadas en el escenario; si aún no se
-  // aplicaron, las tasas por defecto. El promedio histórico queda como referencia.
+  // aplicaron, las tasas por defecto.
   const initRates = async (sc: ProjectionScenarioWithData | null) => {
-    let hist: HistoricalRates | null = null;
-    try {
-      hist = await projectionsService.getHistoricalRates(companyId!, sc?.baseYear);
-    } catch (err) {
-      console.error('Error loading historical rates:', err);
-    }
-    setHistorical(hist);
-
     const firstProjected = sc?.projections?.find((p) => p.year > sc.baseYear);
     const hasSavedRates =
       firstProjected?.revenueGrowthRate !== null && firstProjected?.revenueGrowthRate !== undefined;
@@ -272,12 +259,7 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   Valores por defecto: Ventas 4,5%, Coste de ventas 4%, resto del P&amp;G 2%, Balance 5% y tasa
-                  impositiva 27,74%. Junto a cada campo se muestra como referencia el promedio de los últimos 3 años
-                  de Datos anuales
-                  {historical && historical.yearsUsed.length > 1
-                    ? ` (${historical.yearsUsed[0]}–${historical.yearsUsed[historical.yearsUsed.length - 1]})`
-                    : ''}
-                  . Todos son editables.
+                  impositiva 27,74%. Todos son editables.
                 </p>
               </div>
 
@@ -294,25 +276,13 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
                         {fields.map(({ key, label }) => (
                           <div key={key}>
                             <label className="block text-sm font-medium text-gray-700 mb-1">{label} (%)</label>
-                            <div className="flex items-center gap-3">
-                              <PercentInput
-                                className="flex-1"
-                                value={uniformRates[key]}
-                                onCommit={(v) =>
-                                  setUniformRates((prev) => ({ ...prev, [key]: v ?? 0 }))
-                                }
-                                aria-label={label}
-                              />
-                              <span
-                                className="w-32 shrink-0 text-xs text-gray-500 leading-tight"
-                                title="Referencia: promedio de los últimos 3 años de Datos anuales"
-                              >
-                                Prom. 3 años:{' '}
-                                <span className="font-mono text-gray-700">
-                                  {formatRateReference(historical?.annual[key])}
-                                </span>
-                              </span>
-                            </div>
+                            <PercentInput
+                              value={uniformRates[key]}
+                              onCommit={(v) =>
+                                setUniformRates((prev) => ({ ...prev, [key]: v ?? 0 }))
+                              }
+                              aria-label={label}
+                            />
                           </div>
                         ))}
                       </div>
