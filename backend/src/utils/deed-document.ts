@@ -4,6 +4,13 @@ const MAX_TEXT_LENGTH = 20000;
 
 export const ALLOWED_DEED_MIME_TYPES = ['application/pdf', 'text/plain'];
 
+// Fewer meaningful characters than this means there's nothing useful for the
+// AI: typically a scanned deed (page images, no text layer).
+const MIN_TEXT_CHARS = 50;
+
+/** Problem with the uploaded file itself — the API answers 400, not 500. */
+export class DeedDocumentError extends Error {}
+
 /**
  * Extracts plain text from an uploaded deed document so it can be fed into
  * the AI report prompt as company context. Supports PDF (parsed) and plain
@@ -25,11 +32,20 @@ export async function extractDeedDocumentText(buffer: Buffer, mimeType: string):
       text = result.text;
     } catch (err) {
       console.error('Error extracting deed PDF text:', err);
-      throw new Error('No se pudo leer el PDF. Verifique que el archivo no esté dañado ni protegido con contraseña.');
+      throw new DeedDocumentError('No se pudo leer el PDF. Verifique que el archivo no esté dañado ni protegido con contraseña.');
     }
   } else {
     text = buffer.toString('utf-8');
   }
 
-  return text.trim().slice(0, MAX_TEXT_LENGTH);
+  text = text.trim();
+  if (text.replace(/\s+/g, '').length < MIN_TEXT_CHARS) {
+    throw new DeedDocumentError(
+      mimeType === 'application/pdf'
+        ? 'El PDF parece escaneado: no contiene texto que se pueda leer. Suba una versión con texto seleccionable o un archivo .txt con el contenido de la escritura.'
+        : 'El archivo de texto está vacío o no tiene contenido suficiente.',
+    );
+  }
+
+  return text.slice(0, MAX_TEXT_LENGTH);
 }

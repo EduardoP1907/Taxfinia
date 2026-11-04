@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { companyService, unlockCompany, getAllCompaniesAdmin } from '../services/company.service';
 import { uploadDeedDocument, deleteDeedDocument } from '../services/deed-document.service';
+import { DeedDocumentError } from '../utils/deed-document';
 import { validationResult } from 'express-validator';
 import prisma from '../config/database';
 import { refreshWaccForScenario } from './projections.controller';
@@ -201,6 +202,10 @@ export class CompanyController {
 
       res.status(200).json({ success: true, message: 'Documento de escritura cargado exitosamente' });
     } catch (error: any) {
+      if (error instanceof DeedDocumentError) {
+        res.status(400).json({ success: false, message: error.message });
+        return;
+      }
       console.error('Error uploading deed document:', error);
       res.status(500).json({
         success: false,

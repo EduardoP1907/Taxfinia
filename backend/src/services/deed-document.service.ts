@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import prisma from '../config/database';
 import { isS3Enabled, uploadToS3, deleteFromS3 } from '../utils/s3';
-import { extractDeedDocumentText, ALLOWED_DEED_MIME_TYPES } from '../utils/deed-document';
+import { extractDeedDocumentText, ALLOWED_DEED_MIME_TYPES, DeedDocumentError } from '../utils/deed-document';
 
 const DEEDS_DIR = path.join(__dirname, '../../uploads/deeds');
 
@@ -22,7 +22,7 @@ export async function uploadDeedDocument(
   file: { buffer: Buffer; originalname: string; mimetype: string },
 ): Promise<void> {
   if (!ALLOWED_DEED_MIME_TYPES.includes(file.mimetype)) {
-    throw new Error('Formato no soportado. Solo se aceptan archivos PDF o de texto plano.');
+    throw new DeedDocumentError('Formato no soportado. Solo se aceptan archivos PDF o de texto plano.');
   }
 
   const company = await prisma.company.findFirst({

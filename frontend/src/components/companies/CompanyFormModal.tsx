@@ -8,7 +8,7 @@ import { companyService } from '../../services/company.service';
 import { FileText, Upload, X } from 'lucide-react';
 
 // Mismo límite que multer en backend/src/routes/company.routes.ts
-const MAX_DEED_SIZE = 10 * 1024 * 1024;
+const MAX_DEED_SIZE = 50 * 1024 * 1024;
 
 interface CompanyFormModalProps {
   isOpen: boolean;
@@ -392,7 +392,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
               <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-amber-400 hover:bg-amber-50/40 transition-colors">
                 <Upload className="w-4 h-4 text-gray-400 flex-shrink-0" />
                 <span className="text-sm text-gray-600 truncate">
-                  {deedFile ? deedFile.name : 'Seleccionar archivo (PDF o TXT)'}
+                  {deedFile ? deedFile.name : 'Seleccionar archivo (PDF o TXT, máx. 50 MB)'}
                 </span>
                 <input
                   type="file"
@@ -401,7 +401,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
                   onChange={(e) => {
                     const file = e.target.files?.[0] || null;
                     if (file && file.size > MAX_DEED_SIZE) {
-                      setDeedError('El archivo supera el tamaño máximo de 10 MB');
+                      setDeedError('El archivo supera el tamaño máximo de 50 MB');
                       setDeedFile(null);
                       e.target.value = '';
                       return;
