@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { askManual, type ManualChatMessage } from '../services/manual-assistant.service';
 
@@ -14,7 +14,8 @@ router.use(authMiddleware);
 router.use(rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 30,
-  keyGenerator: (req: Request) => req.user?.userId ?? req.ip ?? 'anon',
+  // ipKeyGenerator agrupa IPv6 por subred; sin él express-rate-limit registra ERR_ERL_KEY_GEN_IPV6
+  keyGenerator: (req: Request) => req.user?.userId ?? (req.ip ? ipKeyGenerator(req.ip) : 'anon'),
   message: { error: 'Has hecho muchas consultas seguidas al asistente. Espera unos minutos.' },
   standardHeaders: true,
   legacyHeaders: false,
