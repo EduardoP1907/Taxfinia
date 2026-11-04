@@ -9,23 +9,23 @@ export const ALLOWED_DEED_MIME_TYPES = ['application/pdf', 'text/plain'];
  * the AI report prompt as company context. Supports PDF (parsed) and plain
  * text (read as-is); any other mimetype is rejected before reaching here.
  *
- * `pdf-parse` (via pdfjs-dist) is imported lazily, on first use, instead of
- * at module load time: its legacy build references browser-only globals
- * (DOMMatrix, etc.) that older Node runtimes lack, and importing it eagerly
- * would crash the whole process at startup on such a runtime instead of
- * failing just this one request.
+ * PDFs are parsed with `unpdf` (pure-JS pdf.js build). We used to use
+ * `pdf-parse` v2, but its pdfjs-dist always loads the native `@napi-rs/canvas`
+ * module in Node: on the EC2 server that module crashed the process (Bus
+ * error) and, without it, uploads failed with "DOMMatrix is not defined".
+ * `unpdf` only touches canvas when rendering images, never for text.
  */
 export async function extractDeedDocumentText(buffer: Buffer, mimeType: string): Promise<string> {
   let text: string;
 
   if (mimeType === 'application/pdf') {
-    const { PDFParse } = await import('pdf-parse');
-    const parser = new PDFParse({ data: buffer });
+    const { extractText } = await import('unpdf');
     try {
-      const result = await parser.getText();
+      const result = await extractText(new Uint8Array(buffer), { mergePages: true });
       text = result.text;
-    } finally {
-      await parser.destroy();
+    } catch (err) {
+      console.error('Error extracting deed PDF text:', err);
+      throw new Error('No se pudo leer el PDF. Verifique que el archivo no esté dañado ni protegido con contraseña.');
     }
   } else {
     text = buffer.toString('utf-8');
