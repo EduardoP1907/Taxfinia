@@ -5,7 +5,8 @@ import { Button } from '../ui/Button';
 import type { Company, CompanySize, CreateCompanyData, UpdateCompanyData } from '../../types/company';
 import { INDUSTRY_LIST } from '../../constants/industries';
 import { companyService } from '../../services/company.service';
-import { FileText, Upload, X } from 'lucide-react';
+import { FileText, Upload, X, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 // Mismo límite que multer en backend/src/routes/company.routes.ts
 const MAX_DEED_SIZE = 50 * 1024 * 1024;
@@ -135,7 +136,14 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
       if (deedFile && company) {
         setDeedBusy(true);
         try {
-          await companyService.uploadDeedDocument(company.id, deedFile);
+          const status = await companyService.uploadDeedDocument(company.id, deedFile);
+          if (status === 'PROCESSING') {
+            toast.info('Escritura recibida', {
+              description:
+                'Es un documento escaneado: la estamos leyendo y estará lista para los informes en unos minutos.',
+              duration: 8000,
+            });
+          }
         } catch (err: any) {
           // 413 sin cuerpo JSON = lo rechazó el proxy (nginx) antes de llegar a la API
           setDeedError(
@@ -373,9 +381,29 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
 
             {deedName && !deedFile ? (
               <div className="flex items-center justify-between gap-3 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                  <span className="text-sm text-gray-700 truncate">{deedName}</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                    <span className="text-sm text-gray-700 truncate">{deedName}</span>
+                  </div>
+                  {company.deedDocumentStatus === 'PROCESSING' && (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-blue-600">
+                      <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
+                      Leyendo escritura escaneada… puede tardar unos minutos.
+                    </p>
+                  )}
+                  {company.deedDocumentStatus === 'FAILED' && (
+                    <p className="mt-1 flex items-start gap-1 text-xs text-red-600">
+                      <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                      {company.deedDocumentError || 'No se pudo leer el documento.'} Elimínelo y vuelva a subirlo.
+                    </p>
+                  )}
+                  {company.deedDocumentStatus === 'READY' && (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-emerald-600">
+                      <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
+                      Listo para usar en los informes.
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"

@@ -41,12 +41,14 @@ export const companyService = {
     return response.data.data;
   },
 
-  async uploadDeedDocument(id: string, file: File): Promise<void> {
+  /** PROCESSING = escritura escaneada: la lectura (OCR) sigue en segundo plano */
+  async uploadDeedDocument(id: string, file: File): Promise<'PROCESSING' | 'READY'> {
     const formData = new FormData();
     formData.append('file', file);
-    await api.post(`/companies/${id}/deed-document`, formData, {
+    const response = await api.post(`/companies/${id}/deed-document`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return response.data?.data?.status === 'PROCESSING' ? 'PROCESSING' : 'READY';
   },
 
   async deleteDeedDocument(id: string): Promise<void> {

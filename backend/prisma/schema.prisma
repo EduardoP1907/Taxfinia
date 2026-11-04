@@ -106,6 +106,9 @@ model Company {
   deedDocumentName String?              @map("deed_document_name")
   deedDocumentText String?              @map("deed_document_text")
   deedDocumentUploadedAt DateTime?      @map("deed_document_uploaded_at")
+  // PROCESSING (lectura OCR en segundo plano) | READY | FAILED. null = sin documento o subido antes de existir este campo
+  deedDocumentStatus String?            @map("deed_document_status")
+  deedDocumentError  String?            @map("deed_document_error")
   user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   fiscalYears      FiscalYear[]
   projections      ProjectionScenario[]

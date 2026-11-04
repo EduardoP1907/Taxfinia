@@ -194,13 +194,21 @@ export class CompanyController {
         return;
       }
 
-      await uploadDeedDocument(id, userId, {
+      const status = await uploadDeedDocument(id, userId, {
         buffer: req.file.buffer,
         originalname: req.file.originalname,
         mimetype: req.file.mimetype,
       });
 
-      res.status(200).json({ success: true, message: 'Documento de escritura cargado exitosamente' });
+      // PROCESSING = PDF escaneado: la lectura (OCR) sigue en segundo plano
+      res.status(status === 'PROCESSING' ? 202 : 200).json({
+        success: true,
+        data: { status },
+        message:
+          status === 'PROCESSING'
+            ? 'Documento recibido. Es una escritura escaneada: la estamos leyendo y estará lista en unos minutos.'
+            : 'Documento de escritura cargado exitosamente',
+      });
     } catch (error: any) {
       if (error instanceof DeedDocumentError) {
         res.status(400).json({ success: false, message: error.message });

@@ -17,6 +17,9 @@ export interface Company {
   isEnabled?: boolean;               // false = deshabilitada por el admin (no se puede abrir)
   deedDocumentName?: string;
   deedDocumentUploadedAt?: string;
+  // PROCESSING = escritura escaneada en lectura (OCR) en segundo plano
+  deedDocumentStatus?: 'PROCESSING' | 'READY' | 'FAILED' | null;
+  deedDocumentError?: string | null;
   createdAt: string;
   updatedAt: string;
 }
