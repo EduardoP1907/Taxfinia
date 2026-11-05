@@ -7,7 +7,7 @@ import { AuthLayout } from '../../layouts/AuthLayout';
 import { Modal } from '../../components/ui/Modal';
 
 const CONTRACTS = [
-  { href: '/contrato.pdf', title: 'Contrato de uso no comercial', description: 'Condiciones de uso de la plataforma PROMETHEIA' },
+  { href: '/contrato.pdf', title: 'Contrato de uso de la plataforma', description: 'Condiciones de uso de la plataforma PROMETHEIA' },
   { href: '/contrato-comercial-promocional.pdf', title: 'Contrato comercial promocional', description: 'Condiciones comerciales y promocionales de PROMETHEIA' },
 ];
 
