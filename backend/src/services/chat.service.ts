@@ -68,7 +68,7 @@ async function buildSystemPrompt(companyId: string): Promise<string> {
   const currency = company.currency || 'EUR';
   const years = company.fiscalYears.map(fy => fy.year).sort((a, b) => a - b);
 
-  let ctx = `Eres TAXFINIA AI, un analista financiero experto asignado exclusivamente a la empresa "${company.name}".
+  let ctx = `Eres PROMETHEIA AI, un analista financiero experto asignado exclusivamente a la empresa "${company.name}".
 Tienes acceso completo a todos sus datos financieros históricos, ratios calculados y proyecciones.
 Responde siempre en español, de forma clara, directa y profesional.
 Si el usuario pregunta sobre otra empresa, indica que solo tienes información sobre "${company.name}".
