@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -22,35 +22,48 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// On 401, clear local state and redirect to login
+interface ApiErrorData {
+  subscriptionExpired?: boolean;
+  companyDisabled?: boolean;
+  requiresCode?: boolean;
+  accountDisabled?: boolean;
+}
+
+// Efectos globales ante ciertas respuestas de error. Exportado para reutilizarlo
+// en peticiones que no pasan por axios (el chat en streaming usa fetch).
+export function handleApiErrorResponse(status: number | undefined, data: ApiErrorData | undefined): void {
+  // Suscripción vencida: refrescar el usuario para que la interfaz pase a
+  // modo solo lectura (import dinámico para evitar dependencia circular)
+  if (status === 403 && data?.subscriptionExpired) {
+    import('../store/authStore').then(m => m.useAuthStore.getState().refreshUser(true));
+  }
+  // Empresa deshabilitada por el admin: olvidarla como activa y volver a «Mis Empresas»
+  if (status === 403 && data?.companyDisabled) {
+    import('../store/companyStore').then(({ useCompanyStore }) => {
+      const userId = JSON.parse(localStorage.getItem('user') || 'null')?.id;
+      if (userId) useCompanyStore.getState().forgetCompany(userId);
+      useCompanyStore.getState().invalidateCompanies();
+      if (!window.location.pathname.startsWith('/empresas')) window.location.href = '/empresas';
+    });
+  }
+  // On 401, clear local state and redirect to login
+  if (status === 401 && !data?.requiresCode) {
+    const publicRoutes = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password'];
+    const isPublicRoute = publicRoutes.some(r => window.location.pathname.startsWith(r));
+    if (!isPublicRoute) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      // Cuenta deshabilitada por el admin: el login muestra el motivo
+      window.location.href = data?.accountDisabled ? '/login?cuenta=deshabilitada' : '/login';
+    }
+  }
+}
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Suscripción vencida: refrescar el usuario para que la interfaz pase a
-    // modo solo lectura (import dinámico para evitar dependencia circular)
-    if (error.response?.status === 403 && error.response?.data?.subscriptionExpired) {
-      import('../store/authStore').then(m => m.useAuthStore.getState().refreshUser(true));
-    }
-    // Empresa deshabilitada por el admin: olvidarla como activa y volver a «Mis Empresas»
-    if (error.response?.status === 403 && error.response?.data?.companyDisabled) {
-      import('../store/companyStore').then(({ useCompanyStore }) => {
-        const userId = JSON.parse(localStorage.getItem('user') || 'null')?.id;
-        if (userId) useCompanyStore.getState().forgetCompany(userId);
-        useCompanyStore.getState().invalidateCompanies();
-        if (!window.location.pathname.startsWith('/empresas')) window.location.href = '/empresas';
-      });
-    }
-    if (error.response?.status === 401 && !error.response?.data?.requiresCode) {
-      const publicRoutes = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password'];
-      const isPublicRoute = publicRoutes.some(r => window.location.pathname.startsWith(r));
-      if (!isPublicRoute) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-        // Cuenta deshabilitada por el admin: el login muestra el motivo
-        window.location.href = error.response?.data?.accountDisabled ? '/login?cuenta=deshabilitada' : '/login';
-      }
-    }
+    handleApiErrorResponse(error.response?.status, error.response?.data);
     return Promise.reject(error);
   }
 );

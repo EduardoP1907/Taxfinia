@@ -115,6 +115,8 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Respuesta del asistente que se está recibiendo en streaming
+  const [streaming, setStreaming] = useState('');
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -126,7 +128,7 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
     if (open && messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
-  }, [history, loading, open]);
+  }, [history, loading, open, streaming]);
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
@@ -143,12 +145,14 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
     setLoading(true);
 
     try {
-      const response = await chatService.sendMessage(companyId, msg, history);
+      const response = await chatService.sendMessage(companyId, msg, history, setStreaming);
       setHistory(prev => [...prev, { role: 'assistant', content: response }]);
-    } catch (err: any) {
-      setError(err?.response?.data?.error || 'Error al conectar con el asistente. Inténtalo de nuevo.');
+    } catch (err) {
+      const apiError = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(apiError || 'Error al conectar con el asistente. Inténtalo de nuevo.');
       setHistory(prev => prev.slice(0, -1));
     } finally {
+      setStreaming('');
       setLoading(false);
     }
   };
@@ -302,7 +306,18 @@ export const CompanyChat: React.FC<Props> = ({ companyId, companyName, isLocked 
               </div>
             ))}
 
-            {loading && (
+            {loading && streaming && (
+              <div className="flex gap-2.5 justify-start">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm">
+                  <Bot className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="flex-1 min-w-0 bg-white border border-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                  <MarkdownContent content={streaming} />
+                </div>
+              </div>
+            )}
+
+            {loading && !streaming && (
               <div className="flex gap-2.5 justify-start">
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center flex-shrink-0 shadow-sm">
                   <Bot className="w-4 h-4 text-amber-400" />

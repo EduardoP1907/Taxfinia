@@ -239,10 +239,15 @@ Sé concreto, cita números, identifica tendencias y da recomendaciones accionab
 }
 
 // ─── Chat handler ─────────────────────────────────────────────────────────────
+// La respuesta se transmite en streaming (onText recibe cada fragmento): una
+// respuesta completa de Opus puede tardar más de 30 s, y CloudFront corta las
+// peticiones al origen que no envían bytes en ese plazo (504).
 export async function chatWithCompany(
   companyId: string,
   message: string,
   history: ChatMessage[],
+  onText: (delta: string) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
   const systemPrompt = await buildSystemPrompt(companyId);
 
@@ -251,14 +256,22 @@ export async function chatWithCompany(
     { role: 'user', content: message },
   ];
 
-  const response = await client.messages.create({
-    model: 'claude-opus-4-6',
-    max_tokens: 8192,
-    system: systemPrompt,
-    messages,
-  });
+  const stream = client.messages.stream(
+    {
+      model: 'claude-opus-4-6',
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages,
+    },
+    { signal },
+  );
+  stream.on('text', onText);
 
-  const block = response.content[0];
-  if (block.type !== 'text') throw new Error('Unexpected response type');
-  return block.text;
+  const response = await stream.finalMessage();
+  const text = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map(b => b.text)
+    .join('');
+  if (!text) throw new Error('El asistente no devolvió ninguna respuesta');
+  return text;
 }
