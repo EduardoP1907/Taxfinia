@@ -41,6 +41,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
+// El chat envía el historial de la conversación: límite mayor que el de 100 KB
+// por defecto (debe ir antes del parser global, que omite cuerpos ya leídos)
+app.use('/api/chat', express.json({ limit: '1mb' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -105,8 +108,17 @@ app.use('/api/comparison-reports', comparisonReportRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Manejo de errores global
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error & { status?: number; type?: string }, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', err);
+  // Errores del parser del cuerpo (body-parser): responder con su código real
+  if (err.type === 'entity.too.large') {
+    res.status(413).json({ error: 'La petición es demasiado grande. Si estás usando el chat, limpia el historial e inténtalo de nuevo.' });
+    return;
+  }
+  if (err.type === 'entity.parse.failed') {
+    res.status(400).json({ error: 'El cuerpo de la petición no es un JSON válido' });
+    return;
+  }
   res.status(500).json({
     error: 'Error interno del servidor',
     message: config.nodeEnv === 'development' ? err.message : undefined,

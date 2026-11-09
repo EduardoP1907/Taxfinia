@@ -16,6 +16,16 @@ class ChatError extends Error {
   }
 }
 
+// Solo se envían los últimos mensajes: el historial completo puede superar el
+// límite de tamaño del servidor y encarece cada consulta (se reenvía en tokens).
+const MAX_HISTORY = 10;
+
+function recentHistory(history: ChatMessage[]): ChatMessage[] {
+  const recent = history.slice(-MAX_HISTORY);
+  while (recent.length && recent[0].role !== 'user') recent.shift();
+  return recent;
+}
+
 export const chatService = {
   /**
    * Envía la consulta y recibe la respuesta en streaming (Server-Sent Events).
@@ -37,7 +47,7 @@ export const chatService = {
         Accept: 'text/event-stream',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ message, history }),
+      body: JSON.stringify({ message, history: recentHistory(history) }),
     });
 
     if (!res.ok || !res.body) {

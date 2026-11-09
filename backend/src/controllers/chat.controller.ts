@@ -6,6 +6,21 @@ import { lockCompany } from '../services/company.service';
 // CloudFront (timeout de lectura del origen: 30 s) no corte la conexión.
 const HEARTBEAT_MS = 10_000;
 
+// Mensajes previos que se envían al modelo (el frontend ya recorta; esto es por seguridad)
+const MAX_HISTORY = 10;
+
+/** Valida el historial, se queda con los últimos mensajes y garantiza que empiece por 'user'. */
+function sanitizeHistory(history: unknown): ChatMessage[] {
+  if (!Array.isArray(history)) return [];
+  const valid = history.filter(
+    (m): m is ChatMessage =>
+      !!m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim() !== '',
+  );
+  const recent = valid.slice(-MAX_HISTORY);
+  while (recent.length && recent[0].role !== 'user') recent.shift();
+  return recent;
+}
+
 export class ChatController {
   /**
    * POST /api/chat/:companyId
@@ -18,7 +33,8 @@ export class ChatController {
    */
   async chat(req: Request, res: Response): Promise<void> {
     const { companyId } = req.params;
-    const { message, history = [] } = req.body as { message: string; history: ChatMessage[] };
+    const { message } = req.body as { message: string };
+    const history = sanitizeHistory(req.body?.history);
 
     if (!message?.trim()) {
       res.status(400).json({ error: 'El mensaje no puede estar vacío' });
