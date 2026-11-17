@@ -2,8 +2,9 @@
  * Projection 4.3 Page
  * Valoración por DCF (Discounted Cash Flow) - Hoja 4.3 del Excel
  *
- * El WACC se obtiene automáticamente al cargar la página mediante IA,
- * ajustado al sector y país de la empresa. No es editable por el usuario.
+ * La IA recomienda un WACC ajustado al sector y país de la empresa (se consulta
+ * automáticamente la primera vez). El usuario puede editar el WACC efectivo;
+ * la recomendación se muestra aparte y puede volver a aplicarse o reconsultarse.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -38,8 +39,10 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
   const [scenario, setScenario] = useState<ProjectionScenarioWithData | null>(null);
   const [_dcfResults, setDcfResults] = useState<DCFResults | null>(null);
 
-  // DCF display values — set by AI, read-only
+  // WACC efectivo (editable) y recomendación de la IA
   const [waccPct, setWaccPct] = useState<number | null>(null);
+  const [recommendedWaccPct, setRecommendedWaccPct] = useState<number | null>(null);
+  // Componentes del WACC estimados por IA — solo lectura
   const [terminalGrowthPct, setTerminalGrowthPct] = useState<number | null>(null);
   const [costOfDebtPct, setCostOfDebtPct] = useState<number | null>(null);
   const [taxRatePct, setTaxRatePct] = useState<number | null>(null);
@@ -78,7 +81,13 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
         const scenarioData = await projectionsService.getScenario(scenarioId);
         setScenario(scenarioData);
 
-          // Si el WACC ya está guardado, usarlo directamente sin llamar a la IA
+        // Recomendación guardada (escenarios antiguos: el WACC guardado venía de la IA)
+        const savedRecommendation = scenarioData.waccRecommended ?? scenarioData.wacc;
+        setRecommendedWaccPct(
+          savedRecommendation != null ? parseFloat((Number(savedRecommendation) * 100).toFixed(2)) : null,
+        );
+
+        // Si el WACC ya está guardado, usarlo directamente sin llamar a la IA
         if (scenarioData.wacc != null) {
           setWaccPct(parseFloat((Number(scenarioData.wacc) * 100).toFixed(2)));
         } else if (!waccFetchedRef.current) {
@@ -109,13 +118,28 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
     }
   };
 
-  const fetchWACCFromAI = async () => {
+  /**
+   * Consulta la recomendación de WACC a la IA.
+   * Sin `apply` (carga inicial, escenario sin WACC) el backend la aplica como WACC efectivo;
+   * con `apply = false` (botón "Consultar de nuevo") solo actualiza la recomendación
+   * y respeta el valor que el usuario haya editado.
+   */
+  const fetchWACCFromAI = async (apply?: boolean) => {
     if (!scenarioId) return;
     try {
       setEstimatingWACC(true);
       setWaccError(null);
-      const result = await projectionsService.estimateWACCWithAI(scenarioId);
-      setWaccPct(parseFloat((result.wacc * 100).toFixed(2)));
+      const result = await projectionsService.estimateWACCWithAI(scenarioId, apply);
+      const recommended = parseFloat((result.wacc * 100).toFixed(2));
+      setRecommendedWaccPct(recommended);
+      if (result.applied) {
+        setWaccPct(recommended);
+        setTerminalGrowthPct((prev) =>
+          prev ?? parseFloat((result.terminalGrowthRate * 100).toFixed(2)),
+        );
+      } else {
+        toast.success(`Recomendación de WACC actualizada: ${recommended.toFixed(2)}%`);
+      }
       setCostOfEquityPct(parseFloat((result.costOfEquity * 100).toFixed(2)));
       setCostOfDebtPct(parseFloat((result.costOfDebt * 100).toFixed(2)));
       setDebtPct(parseFloat((result.debtPercentage * 100).toFixed(1)));
@@ -265,7 +289,7 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
               <p className="text-sm text-blue-800 font-semibold mb-2">La Hoja 4.3 (DCF) incluye:</p>
               <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
-                <li>WACC calculado automáticamente con IA según sector y país</li>
+                <li>WACC recomendado por IA según sector y país (editable)</li>
                 <li>Descuento de Free Cash Flows proyectados</li>
                 <li>Cálculo del Valor Terminal (Gordon Growth Model)</li>
                 <li>Enterprise Value y Equity Value</li>
@@ -386,7 +410,7 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
                 <div className="mb-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
                   <p className="text-xs font-semibold text-purple-800 mb-1 flex items-center gap-1">
                     <Sparkles className="w-3 h-3" />
-                    WACC calculado con IA — coincide con el informe generado
+                    Justificación de la recomendación de la IA
                   </p>
                   <p className="text-xs text-purple-700 leading-relaxed">{waccExplanation}</p>
                 </div>
@@ -402,12 +426,60 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
                 </div>
               )}
 
-              <div className="flex items-center gap-6">
-                <div className="flex-1 max-w-xs">
-                  <ReadOnlyValue value={waccPct} large />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Calculado automáticamente por IA al cargar la página
-                  </p>
+              <div className="flex items-start gap-6">
+                <div className="flex-1 max-w-xs space-y-2">
+                  <PercentInput
+                    value={waccPct}
+                    onCommit={setWaccPct}
+                    allowEmpty
+                    disabled={estimatingWACC}
+                    placeholder="Ej: 9,5"
+                    aria-label="WACC"
+                  />
+
+                  {/* Recomendación de la IA (referencial, no vinculante) */}
+                  <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <p className="text-xs text-purple-800 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 flex-shrink-0" />
+                      <span>
+                        Recomendación IA:{' '}
+                        <strong>
+                          {estimatingWACC
+                            ? 'consultando…'
+                            : recommendedWaccPct != null ? `${recommendedWaccPct.toFixed(2)}%` : '—'}
+                        </strong>
+                      </span>
+                    </p>
+                    <p className="text-[10px] text-purple-600 mt-1">
+                      Valor sugerido según datos de mercado para el sector y país. Es solo una
+                      recomendación: puedes modificar el WACC según tu criterio.
+                    </p>
+                    <div className="flex flex-wrap gap-3 mt-2">
+                      {recommendedWaccPct != null && waccPct !== recommendedWaccPct && !estimatingWACC && (
+                        <button
+                          type="button"
+                          onClick={() => setWaccPct(recommendedWaccPct)}
+                          className="text-xs font-medium text-purple-700 hover:text-purple-900 underline"
+                        >
+                          Usar recomendación
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => fetchWACCFromAI(false)}
+                        disabled={estimatingWACC}
+                        className="text-xs font-medium text-purple-700 hover:text-purple-900 underline disabled:opacity-50 disabled:no-underline"
+                      >
+                        {recommendedWaccPct != null ? 'Consultar de nuevo con IA' : 'Consultar recomendación con IA'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {waccPct != null && recommendedWaccPct != null && waccPct !== recommendedWaccPct && !estimatingWACC && (
+                    <p className="text-xs text-amber-700">
+                      WACC modificado manualmente. Recuerda guardar los parámetros para que se use en informes y chat.
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1 text-xs text-gray-600">
                   <p className="font-medium mb-1">Fórmula WACC:</p>

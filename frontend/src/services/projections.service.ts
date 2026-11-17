@@ -90,7 +90,8 @@ export interface ProjectionScenarioWithData extends ProjectionScenario {
   costOfEquity?: number;
   costOfDebt?: number;
   taxRateForWacc?: number;
-  wacc?: number;
+  wacc?: number;                 // WACC efectivo (editable por el usuario)
+  waccRecommended?: number;      // Última recomendación de la IA
   terminalGrowthRate?: number;
   netDebt?: number;
   // DCF Results
@@ -349,9 +350,11 @@ export const projectionsService = {
 
   /**
    * Estimar WACC con IA basado en el sector y país de la empresa
-   * El backend consulta a Claude, guarda el WACC en el escenario y lo retorna
+   * El backend consulta a Claude y guarda la recomendación en el escenario.
+   * `apply` = true también sobrescribe el WACC efectivo; false solo guarda la recomendación.
+   * Sin `apply`, el backend aplica solo si el escenario aún no tiene WACC.
    */
-  async estimateWACCWithAI(scenarioId: string): Promise<{
+  async estimateWACCWithAI(scenarioId: string, apply?: boolean): Promise<{
     wacc: number;
     costOfEquity: number;
     costOfDebt: number;
@@ -360,8 +363,12 @@ export const projectionsService = {
     terminalGrowthRate: number;
     explanation: string;
     savedToScenario: boolean;
+    applied: boolean;
   }> {
-    const response = await api.post(`/projections/${scenarioId}/estimate-wacc`);
+    const response = await api.post(
+      `/projections/${scenarioId}/estimate-wacc`,
+      apply === undefined ? {} : { apply },
+    );
     return response.data;
   },
 };

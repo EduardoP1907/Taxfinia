@@ -322,7 +322,26 @@ export const getDCFResults = async (req: Request, res: Response) => {
  * Se puede llamar desde el HTTP handler o desde background tasks.
  * Devuelve el resultado completo de estimación.
  */
-export async function refreshWaccForScenario(scenarioId: string): Promise<ReturnType<typeof estimateWACC>> {
+/**
+ * El WACC es manual cuando el usuario lo editó y difiere de la última recomendación de la IA.
+ * Escenarios anteriores a `waccRecommended` tienen el WACC de la IA → no son manuales.
+ */
+function isWaccManual(scenario: { wacc: any; waccRecommended: any }): boolean {
+  if (scenario.wacc == null || scenario.waccRecommended == null) return false;
+  return Number(scenario.wacc) !== Number(scenario.waccRecommended);
+}
+
+/**
+ * Re-estima el WACC con IA y guarda la recomendación (`waccRecommended`).
+ * `apply`:
+ *   - true  → también sobrescribe el WACC efectivo y la tasa g
+ *   - false → solo guarda la recomendación
+ *   - 'auto' (default) → aplica solo si el usuario no editó el WACC manualmente
+ */
+export async function refreshWaccForScenario(
+  scenarioId: string,
+  apply: boolean | 'auto' = 'auto',
+): Promise<Awaited<ReturnType<typeof estimateWACC>> & { applied: boolean }> {
   const scenario = await prisma.projectionScenario.findUnique({
     where: { id: scenarioId },
     include: { company: true },
@@ -383,17 +402,25 @@ export async function refreshWaccForScenario(scenarioId: string): Promise<Return
 
   const estimate = await estimateWACC(industry, country, currency, businessActivity, financialContext, companySize);
 
+  const applied = apply === 'auto' ? !isWaccManual(scenario) : apply;
+
   await prisma.projectionScenario.update({
     where: { id: scenarioId },
     data: {
-      wacc: estimate.wacc,
-      terminalGrowthRate: estimate.terminalGrowthRate,
+      waccRecommended: estimate.wacc,
+      ...(applied && {
+        wacc: estimate.wacc,
+        terminalGrowthRate: estimate.terminalGrowthRate,
+      }),
     },
   });
 
-  console.log(`[WACC-AI] WACC estimado: ${(estimate.wacc * 100).toFixed(2)}% — guardado en escenario ${scenarioId}`);
+  console.log(
+    `[WACC-AI] WACC recomendado: ${(estimate.wacc * 100).toFixed(2)}% — escenario ${scenarioId} ` +
+    (applied ? '(aplicado)' : '(solo recomendación, WACC manual conservado)'),
+  );
 
-  return estimate;
+  return { ...estimate, applied };
 }
 
 export const estimateWACCWithAI = async (req: Request, res: Response) => {
@@ -417,9 +444,12 @@ export const estimateWACCWithAI = async (req: Request, res: Response) => {
       });
     }
 
-    const estimate = await refreshWaccForScenario(scenarioId);
+    // body.apply === true → sobrescribe el WACC efectivo; false → solo recomendación.
+    // Sin indicar: se aplica solo si el escenario aún no tiene WACC.
+    const apply = typeof req.body?.apply === 'boolean' ? req.body.apply : scenario.wacc == null;
+    const estimate = await refreshWaccForScenario(scenarioId, apply);
 
-    res.json({ ...estimate, savedToScenario: true });
+    res.json({ ...estimate, savedToScenario: estimate.applied });
   } catch (error: any) {
     console.error('[PROJECTIONS] Error estimating WACC with AI:', error);
     res.status(500).json({ error: error.message || 'Error al estimar WACC con IA' });

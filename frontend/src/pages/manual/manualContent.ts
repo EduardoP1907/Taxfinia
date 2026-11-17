@@ -430,7 +430,7 @@ export function buildManual(cy: number) {
           blocks: [{
             type: 'steps', items: [
               'Si es la primera vez, presione «Crear Proyección DCF». Requiere tener creada la proyección de la hoja 4.1.',
-              'La plataforma estima el WACC (costo del capital) con IA según el sector y el país de la empresa.',
+              'La plataforma recomienda un WACC (costo del capital) con IA según el sector y el país de la empresa. Es solo una recomendación: puede modificar el valor, volver a la recomendación con «Usar recomendación» o reconsultarla con «Consultar de nuevo con IA». Guarde los parámetros para que el WACC se use en informes y chat.',
               'Ingrese la tasa de crecimiento perpetuo (g). La define usted; suele estar entre la inflación esperada y el crecimiento de largo plazo de la economía.',
               'Elija cuántos años de flujos considerar: 5, 6 o 7 años.',
               'Guarde. Verá «Parámetros DCF guardados correctamente».',

@@ -303,6 +303,8 @@ model ProjectionScenario {
   terminalValue      Decimal?              @map("terminal_value") @db.Decimal(15, 2)
   valuePerShare      Decimal?              @map("value_per_share") @db.Decimal(15, 2)
   wacc               Decimal?              @db.Decimal(8, 4)
+  /// Última recomendación de WACC de la IA. `wacc` es el valor efectivo (editable por el usuario)
+  waccRecommended    Decimal?              @map("wacc_recommended") @db.Decimal(8, 4)
   projections        FinancialProjection[]
   company            Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
