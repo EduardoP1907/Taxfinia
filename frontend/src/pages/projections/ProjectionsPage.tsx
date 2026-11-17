@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { companyCurrency } from '../../constants/countries';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { projectionsService, type ProjectionScenarioWithData, type FinancialProjection } from '../../services/projections.service';
@@ -150,7 +151,7 @@ export const ProjectionsPage: React.FC<ProjectionsPageProps> = ({ tabsHeader }) 
     if (value === null || value === undefined) return '-';
     return new Intl.NumberFormat('es-ES', {
       style: 'currency',
-      currency: company?.currency || 'EUR',
+      currency: companyCurrency(company),
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);

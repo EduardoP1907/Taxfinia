@@ -3,10 +3,11 @@ import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { companyService } from '../../services/company.service';
 import api from '../../services/api';
 import type { Company } from '../../types/company';
+import { companyCurrency, currencySymbol } from '../../constants/countries';
 import { ArrowLeftRight, Building2, RefreshCw } from 'lucide-react';
 
 interface CompareResult {
-  company: { id: string; name: string; currency: string; industry: string | null };
+  company: { id: string; name: string; currency: string; country?: string; industry: string | null };
   year: number;
   hasData: boolean;
   income: { revenue: number | null; ebitda: number | null; netIncome: number | null } | null;
@@ -134,10 +135,10 @@ export const CompareCompaniesPage: React.FC = () => {
     return section[row.key] ?? null;
   };
 
-  const formatVal = (val: number | null, format: string): React.ReactNode => {
+  const formatVal = (val: number | null, format: string, currency: string): React.ReactNode => {
     if (val == null) return <span className="text-slate-400">n/d</span>;
     switch (format) {
-      case 'currency': return val.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €';
+      case 'currency': return val.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' ' + currencySymbol(currency);
       case 'percent':  return val.toFixed(1) + '%';
       case 'ratio':    return val.toFixed(2);
       case 'days':     return val.toFixed(0) + ' d';
@@ -299,7 +300,7 @@ export const CompareCompaniesPage: React.FC = () => {
                               <span className="text-slate-300 font-normal">—</span>
                             ) : (
                               <>
-                                {formatVal(val, row.format)}
+                                {formatVal(val, row.format, companyCurrency(r.company))}
                                 {isBest  && <span className="ml-1 text-emerald-400 text-xs">▲</span>}
                                 {isWorst && <span className="ml-1 text-red-400 text-xs">▼</span>}
                               </>

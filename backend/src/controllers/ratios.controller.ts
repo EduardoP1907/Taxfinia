@@ -164,7 +164,7 @@ export class RatiosController {
       const results = await Promise.all(companyIds.map(async (companyId) => {
         const company = await prisma.company.findFirst({
           where: { id: companyId, userId, deletedAt: null },
-          select: { id: true, name: true, currency: true, industry: true },
+          select: { id: true, name: true, currency: true, country: true, industry: true },
         });
         if (!company) return null;
 

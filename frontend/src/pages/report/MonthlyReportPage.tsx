@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { companyCurrency } from '../../constants/countries';
 import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Button } from '../../components/ui/Button';
@@ -403,13 +404,13 @@ export const MonthlyReportPage: React.FC = () => {
             />
             <IncomeSummary
               pnl={accumulatePnl(result.pnl, month - 1)}
-              currency={company?.currency ?? 'EUR'}
+              currency={companyCurrency(company)}
               month={month}
               year={year}
             />
             <BalanceSummary
               balance={result.balance[month - 1]}
-              currency={company?.currency ?? 'EUR'}
+              currency={companyCurrency(company)}
               month={month}
               year={year}
             />

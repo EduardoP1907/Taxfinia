@@ -1,4 +1,5 @@
 import prisma from '../config/database';
+import { resolveCurrency } from '../constants/countries';
 import { Company, Prisma } from '@prisma/client';
 import {
   AccessError, getAccessUser, isPrivileged, validateTaxId, assertTaxIdAvailable,
@@ -65,13 +66,14 @@ export class CompanyService {
         industry: data.industry,
         businessActivity: data.businessActivity,
         companySize: data.companySize,
-        country: data.country || 'ES',
+        country: data.country || 'CL',
         description: data.description,
         website: data.website,
         employees: data.employees,
         foundedYear: data.foundedYear,
         baseYear: data.baseYear,
-        currency: data.currency || 'EUR',
+        // La moneda siempre corresponde al país de la empresa
+        currency: resolveCurrency(data.country || 'CL', data.currency),
       },
     });
 
@@ -160,7 +162,9 @@ export class CompanyService {
         employees: data.employees,
         foundedYear: data.foundedYear,
         baseYear: data.baseYear,
-        currency: data.currency,
+        currency: data.country !== undefined || data.currency !== undefined
+          ? resolveCurrency(data.country ?? company.country, data.currency ?? company.currency)
+          : undefined,
         updatedAt: new Date(),
       },
     });

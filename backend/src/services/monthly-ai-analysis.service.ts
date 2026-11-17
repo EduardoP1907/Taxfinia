@@ -1,3 +1,4 @@
+import { countryName } from '../constants/countries';
 import Anthropic from '@anthropic-ai/sdk';
 import { formatAmount, pct, nd } from './ai-analysis.service';
 import type { MonthlyPnLRow, MonthlyBalanceRow } from './monthly-forecast.service';
@@ -112,7 +113,7 @@ function companyBlock(data: MonthlyFinancialDataForAI): string {
 - Identificación fiscal: ${data.company.taxId || 'No especificado'}
 - Giro/Actividad: ${data.company.businessActivity || 'No especificado'}
 - Sector/Industria: ${data.company.industry || 'No especificado'}
-- País: ${data.company.country || 'No especificado'}
+- País: ${countryName(data.company.country)}
 - Moneda: ${cur}
 - Año del forecast: ${data.year} (base de datos anuales: ${data.baseYear})
 - Meses cerrados (dato real): ${data.closedMonths} de 12 — el resto son proyecciones calculadas con tasas de crecimiento mensual.`;

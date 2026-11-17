@@ -235,9 +235,7 @@ function buildFinancialPrompt(data: FinancialDataForAI): string {
     throw new Error(`No hay datos financieros disponibles para el año ${latest}`);
   }
 
-  const currencyLabel = cur === 'CLP' ? 'Pesos Chilenos (CLP)' :
-    cur === 'USD' ? 'Dólares estadounidenses (USD)' :
-    cur === 'EUR' ? 'Euros (EUR)' : cur;
+  const currencyLabel = getCurrencyLabel(cur);
 
   const formatInstructions = cur === 'CLP'
     ? `FORMATO DE CIFRAS CLP:
@@ -258,7 +256,7 @@ DATOS DE LA EMPRESA:
 - RUT: ${data.company.taxId || 'No especificado'}
 - Giro/Actividad: ${data.company.businessActivity || 'No especificado'}
 - Sector/Industria: ${data.company.industry || 'No especificado'}
-- País: ${data.company.country || 'No especificado'}
+- País: ${data.company.country ? countryName(data.company.country) : 'No especificado'}
 - Moneda de análisis: ${currencyLabel}
 - Año base (análisis principal): ${latest}
 - Años disponibles: ${sortedYears.join(', ')} (${sortedYears.length} ejercicio${sortedYears.length > 1 ? 's' : ''})
@@ -394,6 +392,7 @@ const analysisTools: Anthropic.Tool[] = [
 // ─── WACC estimation ──────────────────────────────────────────────────────────
 
 import { lookupIndustryWACC, IndustryWACC } from '../constants/wacc-industries';
+import { countryName, normalizeCountryCode, currencyLabel as getCurrencyLabel } from '../constants/countries';
 
 export interface WACCEstimateResult {
   wacc: number;           // decimal (e.g. 0.085 = 8.5%)
@@ -448,6 +447,23 @@ export async function estimateWACC(
 
   // Obtener WACC de referencia desde la tabla de industrias
   const tableWACC: IndustryWACC | null = lookupIndustryWACC(industry);
+
+  // País de la empresa: la tabla de referencia es chilena, así que si la empresa
+  // opera en otro país el WACC debe ajustarse por riesgo-país, tasas e impuestos locales.
+  const countryCode = normalizeCountryCode(country);
+  const countryLabel = country ? `${countryName(countryCode)} (${countryCode})` : 'No especificado';
+  const isChile = countryCode === 'CL';
+  const countryInstruction = !country
+    ? 'País no especificado: asume Chile como mercado de referencia y dilo explícitamente en la explicación.'
+    : isChile
+      ? 'La empresa opera en Chile: la tabla de referencia aplica directamente, sin ajuste por riesgo-país.'
+      : `La empresa opera en ${countryName(countryCode)}, NO en Chile. Es OBLIGATORIO ajustar el WACC de referencia chileno a este país:
+- Tasa libre de riesgo: usa el rendimiento del bono soberano de largo plazo de ${countryName(countryCode)} en ${currency || 'su moneda'}; si no existe un mercado profundo, usa US Treasury 10Y + riesgo-país (spread soberano / EMBI o CDS).
+- Prima de riesgo de mercado: ERP madura + prima de riesgo-país de ${countryName(countryCode)} (referencia Damodaran por país).
+- Tasa impositiva: usa la tasa corporativa legal vigente de ${countryName(countryCode)} cuando la efectiva no sea razonable.
+- Coste de deuda: tasas de crédito empresarial de ${countryName(countryCode)} para el sector y tamaño.
+- Moneda: el WACC debe ser nominal en ${currency || 'la moneda de la empresa'}. Si esa moneda difiere de la local del país o del peso chileno, ajusta por diferencial de inflación esperado. En economías dolarizadas (USD) el riesgo-país sigue aplicando aunque no haya riesgo cambiario.
+- Crecimiento terminal (g): coherente con el crecimiento nominal de largo plazo de ${countryName(countryCode)} en ${currency || 'su moneda'}.`;
 
   // Mapear companySize al campo de la tabla
   const sizeKey: 'large' | 'medium' | 'small' | null =
@@ -530,21 +546,26 @@ USO DE LOS DATOS FINANCIEROS:
 DATOS DE LA EMPRESA:
 - Industria: ${industry || 'No especificado'}
 - Actividad: ${businessActivity || 'No especificado'}
-- País: ${country || 'No especificado'}
+- País: ${countryLabel}
 - Moneda: ${currency || 'No especificado'}
 ${sizeInstruction}
+
+AJUSTE POR PAÍS:
+${countryInstruction}
 
 ${tableSection}
 ${financialSection}
 
 PROCESO DE CÁLCULO:
 1. Parte del WACC de referencia de la tabla para el tamaño indicado (${sizeLabel ?? 'inferir desde ingresos reales'})
-2. Ajusta por diferencia de riesgo-país respecto a Chile (bono soberano + spread)
+2. Ajusta por diferencia de riesgo-país de ${countryLabel} respecto a Chile (bono soberano + spread), tasa impositiva local y moneda
 3. Reapalanca la beta con el D/E real de la empresa
 4. Recalcula Ke = Rf_país + β_reapalancada × ERP_país + prima_tamaño
 5. Calibra Kd con el coste efectivo observado o con tasas de mercado del país para el sector
 6. Aplica la estructura de capital real para ponderar
 7. WACC final = Ke × (E/V) + Kd × (1-T) × (D/V)
+
+En la explicación menciona explícitamente el país (${countryLabel}) y el ajuste de riesgo-país aplicado.
 
 Responde usando la herramienta estimate_wacc. Todos los valores en decimal.`;
 

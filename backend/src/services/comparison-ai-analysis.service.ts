@@ -7,6 +7,7 @@
  * for an analysis of deviations instead of a plain historical narrative.
  */
 
+import { countryName, currencyLabel as getCurrencyLabel } from '../constants/countries';
 import Anthropic from '@anthropic-ai/sdk';
 import { formatAmount, pct, nd, type FinancialDataForAI, type AIAnalysisResult } from './ai-analysis.service';
 import type { ComparisonReportType } from './comparison-financial-data.service';
@@ -125,9 +126,7 @@ function buildComparisonPrompt(
     throw new Error(`No hay datos suficientes para el período ${periodLabels[forecastYear] || forecastYear}`);
   }
 
-  const currencyLabel = cur === 'CLP' ? 'Pesos Chilenos (CLP)' :
-    cur === 'USD' ? 'Dólares estadounidenses (USD)' :
-    cur === 'EUR' ? 'Euros (EUR)' : cur;
+  const currencyLabel = getCurrencyLabel(cur);
 
   const formatInstructions = cur === 'CLP'
     ? `FORMATO DE CIFRAS CLP:
@@ -156,7 +155,7 @@ DATOS DE LA EMPRESA:
 - RUT/NIF: ${data.company.taxId || 'No especificado'}
 - Giro/Actividad: ${data.company.businessActivity || 'No especificado'}
 - Sector/Industria: ${data.company.industry || 'No especificado'}
-- País: ${data.company.country || 'No especificado'}
+- País: ${countryName(data.company.country)}
 - Moneda de análisis: ${currencyLabel}
 - Períodos incluidos: ${sortedYears.map(y => periodLabels[y] || String(y)).join(', ')}
 

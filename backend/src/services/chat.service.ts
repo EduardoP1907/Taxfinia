@@ -4,6 +4,7 @@
  * from Claude acting as a dedicated financial analyst for that company.
  */
 
+import { countryName } from '../constants/countries';
 import Anthropic from '@anthropic-ai/sdk';
 import { Decimal } from '@prisma/client/runtime/library';
 import prisma from '../config/database';
@@ -81,7 +82,7 @@ Nombre: ${company.name}
 NIF/RUT: ${company.taxId || 'No especificado'}
 Sector: ${company.industry || 'No especificado'}
 Actividad: ${company.businessActivity || 'No especificada'}
-País: ${company.country || 'No especificado'}
+País: ${countryName(company.country)}
 Moneda: ${currency}
 Ejercicios disponibles: ${years.join(', ')}
 `;

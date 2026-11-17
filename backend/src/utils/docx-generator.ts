@@ -1,3 +1,4 @@
+import { countryName } from '../constants/countries';
 import {
   Document,
   Packer,
@@ -310,7 +311,7 @@ export async function generateNarrativeDocx(data: DocxReportData, outputPath: st
               infoBox('Empresa', data.company.name),
               infoBox('NIF / RUT', data.company.taxId || 'No especificado'),
               infoBox('Sector / Industria', data.company.industry || 'No especificado'),
-              infoBox('País', data.company.country || 'No especificado'),
+              infoBox('País', countryName(data.company.country)),
               infoBox('Moneda', currency),
               infoBox('Período de Análisis', data.years.slice().sort((a, b) => a - b).map(y => data.periodLabels?.[y] ?? String(y)).join(' — ')),
               infoBox('Año Base', String(data.latestYear)),

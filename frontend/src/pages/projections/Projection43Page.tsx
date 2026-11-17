@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, Calculator, DollarSign, Save, Sparkles } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { PercentInput } from '../../components/ui/PercentInput';
+import { countryName, companyCurrency } from '../../constants/countries';
 
 interface Projection43PageProps {
   tabsHeader?: React.ReactNode;
@@ -205,7 +206,7 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
     if (value == null) return '-';
     return new Intl.NumberFormat('es-ES', {
       style: 'currency',
-      currency: company?.currency || 'EUR',
+      currency: companyCurrency(company),
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
@@ -400,7 +401,7 @@ export const Projection43Page: React.FC<Projection43PageProps> = ({ tabsHeader }
                     </p>
                     <p className="text-xs text-purple-600 mt-1">
                       Analizando tasa libre de riesgo, prima de mercado, beta sectorial y coste de deuda
-                      para <strong>{company?.industry || 'este sector'}</strong> en <strong>{company?.country || 'el país de la empresa'}</strong>.
+                      para <strong>{company?.industry || 'este sector'}</strong> en <strong>{company?.country ? countryName(company.country) : 'el país de la empresa'}</strong>.
                     </p>
                   </div>
                 </div>

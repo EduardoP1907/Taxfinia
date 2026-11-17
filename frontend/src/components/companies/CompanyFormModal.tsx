@@ -4,6 +4,7 @@ import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import type { Company, CompanySize, CreateCompanyData, UpdateCompanyData } from '../../types/company';
 import { INDUSTRY_LIST } from '../../constants/industries';
+import { COUNTRIES, CURRENCIES, allowedCurrencies, companyCurrency, normalizeCountryCode, resolveCurrency } from '../../constants/countries';
 import { companyService } from '../../services/company.service';
 import { FileText, Upload, X, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,12 +28,6 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
   title,
 }) => {
   const currentYear = new Date().getFullYear();
-
-  const countryCurrencyMap: Record<string, string> = {
-    CL: 'CLP', ES: 'EUR', US: 'USD', MX: 'MXN',
-    AR: 'ARS', CO: 'COP', PE: 'PEN', UK: 'GBP',
-    FR: 'EUR', DE: 'EUR',
-  };
 
   const [formData, setFormData] = useState({
     name: '',
@@ -65,13 +60,13 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
         industry: company.industry || '',
         businessActivity: (company as any).businessActivity || '',
         companySize: (company.companySize as CompanySize | undefined) || '',
-        country: company.country || 'CL',
+        country: normalizeCountryCode(company.country) || 'CL',
         description: company.description || '',
         website: company.website || '',
         employees: company.employees?.toString() || '',
         foundedYear: company.foundedYear?.toString() || '',
         baseYear: company.baseYear.toString(),
-        currency: company.currency || 'CLP',
+        currency: companyCurrency(company),
       });
     } else {
       // Reset form for new company
@@ -99,12 +94,8 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'country') {
-      const autoCurrency = countryCurrencyMap[value];
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-        ...(autoCurrency ? { currency: autoCurrency } : {}),
-      }));
+      // La moneda se ajusta automáticamente al país seleccionado
+      setFormData((prev) => ({ ...prev, country: value, currency: resolveCurrency(value) }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -264,16 +255,9 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
             >
-              <option value="ES">España</option>
-              <option value="US">Estados Unidos</option>
-              <option value="MX">México</option>
-              <option value="AR">Argentina</option>
-              <option value="CO">Colombia</option>
-              <option value="CL">Chile</option>
-              <option value="PE">Perú</option>
-              <option value="UK">Reino Unido</option>
-              <option value="FR">Francia</option>
-              <option value="DE">Alemania</option>
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>{c.name}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -349,17 +333,15 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
               value={formData.currency}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              disabled={allowedCurrencies(formData.country).length <= 1}
+              title="La moneda se ajusta automáticamente según el país"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700"
             >
-              <option value="EUR">EUR (€)</option>
-              <option value="USD">USD ($)</option>
-              <option value="MXN">MXN ($)</option>
-              <option value="ARS">ARS ($)</option>
-              <option value="COP">COP ($)</option>
-              <option value="CLP">CLP ($)</option>
-              <option value="PEN">PEN (S/)</option>
-              <option value="GBP">GBP (£)</option>
+              {CURRENCIES.filter((c) => allowedCurrencies(formData.country).includes(c.code)).map((c) => (
+                <option key={c.code} value={c.code}>{c.code} ({c.symbol}) — {c.name}</option>
+              ))}
             </select>
+            <p className="text-xs text-gray-500 mt-1">Se ajusta automáticamente según el país.</p>
           </div>
         </div>
 

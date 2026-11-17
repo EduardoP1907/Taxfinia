@@ -5,6 +5,7 @@
  * Word then handles the final PDF conversion via docx-to-pdf.ts.
  */
 
+import { countryName } from '../constants/countries';
 import {
   Document,
   Packer,
@@ -529,7 +530,7 @@ export async function generateTablesDocx(data: PDFReportData, outputPath: string
             `NIF / RUT:  ${data.company.taxId || 'No especificado'}`,
             `Giro:  ${data.company.businessActivity || 'No especificado'}`,
             `Sector:  ${data.company.industry || 'No especificado'}`,
-            `País:  ${data.company.country || 'No especificado'}`,
+            `País:  ${countryName(data.company.country)}`,
             `Moneda:  ${data.company.currency || 'No especificado'}`,
             `Ejercicios analizados:  ${yearLabels.join('  ·  ')}`,
             `Fecha de generación:  ${today}`,

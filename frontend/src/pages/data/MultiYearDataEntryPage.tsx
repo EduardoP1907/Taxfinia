@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { companyCurrency } from '../../constants/countries';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Card } from '../../components/ui/Card';
@@ -651,7 +652,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
                 yearDataList={yearDataList}
                 onUpdate={updateYearData}
                 onRemoveYear={handleRemoveYear}
-                currency={company?.currency || 'EUR'}
+                currency={companyCurrency(company)}
               />
             )}
             {activeTab === 'income' && (
@@ -659,7 +660,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
                 yearDataList={yearDataList}
                 onUpdate={updateYearData}
                 onRemoveYear={handleRemoveYear}
-                currency={company?.currency || 'EUR'}
+                currency={companyCurrency(company)}
               />
             )}
             {activeTab === 'additional' && (
@@ -667,7 +668,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
                 yearDataList={yearDataList}
                 onUpdate={updateYearData}
                 onRemoveYear={handleRemoveYear}
-                currency={company?.currency || 'EUR'}
+                currency={companyCurrency(company)}
               />
             )}
           </div>

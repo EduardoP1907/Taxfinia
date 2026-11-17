@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { CompanyFormModal } from '../../components/companies/CompanyFormModal';
 import { companyService } from '../../services/company.service';
 import type { Company, CreateCompanyData, UpdateCompanyData } from '../../types/company';
+import { currencySymbol as getCurrencySymbol, companyCurrency } from '../../constants/countries';
 import { useNavigate } from 'react-router-dom';
 import { useCompanyStore } from '../../store/companyStore';
 import { useAuthStore } from '../../store/authStore';
@@ -82,7 +83,7 @@ export const CompaniesPage: React.FC = () => {
     new Date(d).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
 
   const currencySymbol = (c = 'EUR') =>
-    ({ EUR: '€', USD: '$', MXN: '$', ARS: '$', COP: '$', CLP: '$', PEN: 'S/', GBP: '£' }[c] ?? c);
+    getCurrencySymbol(c);
 
   return (
     <DashboardLayout>
@@ -194,7 +195,7 @@ export const CompaniesPage: React.FC = () => {
                     </span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded text-xs text-slate-600">
                       <DollarSign className="w-3 h-3" />
-                      {currencySymbol(company.currency)}
+                      {currencySymbol(companyCurrency(company))}
                     </span>
                     {company.employees && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded text-xs text-slate-600">

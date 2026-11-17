@@ -36,6 +36,7 @@ import { RatiosSection } from '../../components/report/RatiosSection';
 import { ProtectedPdfViewer } from '../../components/report/ProtectedPdfViewer';
 import { CompanySelector } from '../../components/companies/CompanySelector';
 import { AnalyticsSection } from '../../components/report/AnalyticsSection';
+import { countryName, companyCurrency } from '../../constants/countries';
 
 type TabType = 'resultados' | 'balance' | 'ratios' | 'analitica';
 
@@ -554,11 +555,11 @@ export const ReportPage: React.FC = () => {
             </div>
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">País</p>
-              <p className="text-sm font-medium text-gray-900">{company.country || 'ES'}</p>
+              <p className="text-sm font-medium text-gray-900">{countryName(company.country)}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Moneda</p>
-              <p className="text-sm font-medium text-gray-900">{company.currency || 'EUR'}</p>
+              <p className="text-sm font-medium text-gray-900">{companyCurrency(company)}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Ejercicios Disponibles</p>
@@ -601,16 +602,16 @@ export const ReportPage: React.FC = () => {
           </div>
           <div className="p-6">
             {activeTab === 'resultados' && (
-              <IncomeStatementSection years={analysis.analysis} currency={company.currency} />
+              <IncomeStatementSection years={analysis.analysis} currency={companyCurrency(company)} />
             )}
             {activeTab === 'balance' && (
-              <BalanceSheetSection years={analysis.analysis} currency={company.currency} />
+              <BalanceSheetSection years={analysis.analysis} currency={companyCurrency(company)} />
             )}
             {activeTab === 'ratios' && (
               <RatiosSection years={analysis.analysis} />
             )}
             {activeTab === 'analitica' && (
-              <AnalyticsSection years={analysis.analysis} currency={company.currency} />
+              <AnalyticsSection years={analysis.analysis} currency={companyCurrency(company)} />
             )}
           </div>
         </div>

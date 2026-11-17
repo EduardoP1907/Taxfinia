@@ -96,23 +96,26 @@ export class CompanyController {
       // Leer valores actuales para detectar cambios relevantes para el WACC
       const before = await prisma.company.findFirst({
         where: { id, userId, deletedAt: null },
-        select: { industry: true, companySize: true },
+        select: { industry: true, companySize: true, country: true, currency: true },
       });
 
       const company = await companyService.updateCompany(id, userId, updateData);
 
-      // Re-estimar WACC si cambió industria o tamaño (sincrónico — antes de responder)
+      // Re-estimar WACC si cambió industria, tamaño, país o moneda (sincrónico — antes de responder)
       const industryChanged = before?.industry !== (updateData.industry ?? before?.industry);
       const sizeChanged = before?.companySize !== (updateData.companySize ?? before?.companySize);
 
-      if (industryChanged || sizeChanged) {
+      const countryChanged = before?.country !== (updateData.country ?? before?.country);
+      const currencyChanged = before?.currency !== (updateData.currency ?? before?.currency);
+
+      if (industryChanged || sizeChanged || countryChanged || currencyChanged) {
         const scenarios = await prisma.projectionScenario.findMany({
           where: { companyId: id },
           select: { id: true },
         });
 
         if (scenarios.length > 0) {
-          console.log(`[WACC-AUTO] Industria/tamaño cambiados en empresa ${id} — re-estimando WACC para ${scenarios.length} escenario(s)`);
+          console.log(`[WACC-AUTO] Industria/tamaño/país/moneda cambiados en empresa ${id} — re-estimando WACC para ${scenarios.length} escenario(s)`);
           const results = await Promise.allSettled(scenarios.map((s) => refreshWaccForScenario(s.id)));
           const failed = results.filter((r) => r.status === 'rejected');
           if (failed.length > 0) console.error('[WACC-AUTO] Errores en re-estimación:', failed);

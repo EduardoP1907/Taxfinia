@@ -4,6 +4,7 @@
  */
 
 import { Request, Response } from 'express';
+import { resolveCurrency } from '../constants/countries';
 import { ProjectionsService } from '../services/projections.service';
 import { bigIntToJSON } from '../utils/bigint';
 import { estimateWACC, WACCFinancialContext } from '../services/ai-analysis.service';
@@ -400,7 +401,7 @@ export async function refreshWaccForScenario(
 
   console.log(`[WACC-AI] Estimando WACC para sector="${industry}" país="${country}" tamaño="${companySize ?? 'no especificado'}" con datos financieros: ${financialContext ? 'sí' : 'no'}`);
 
-  const estimate = await estimateWACC(industry, country, currency, businessActivity, financialContext, companySize);
+  const estimate = await estimateWACC(industry, country, resolveCurrency(country, currency), businessActivity, financialContext, companySize);
 
   const applied = apply === 'auto' ? !isWaccManual(scenario) : apply;
 

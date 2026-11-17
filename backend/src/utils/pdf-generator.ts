@@ -1,3 +1,4 @@
+import { countryName } from '../constants/countries';
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
@@ -455,7 +456,7 @@ function addCoverPage(doc: PDFKit.PDFDocument, data: PDFReportData, totalPages: 
     `NIF/RUT: ${data.company.taxId || 'No especificado'}`,
     `Giro: ${data.company.businessActivity || 'No especificado'}`,
     `Sector: ${data.company.industry || 'No especificado'}`,
-    `País: ${data.company.country || 'N/D'}`,
+    `País: ${data.company.country ? countryName(data.company.country) : 'N/D'}`,
     `Ejercicios: ${data.years.slice().sort((a, b) => a - b).join(' · ')}`,
     `Moneda: ${data.company.currency || 'Local'}`,
   ];

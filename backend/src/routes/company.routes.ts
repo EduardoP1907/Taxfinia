@@ -1,6 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import multer from 'multer';
 import { body } from 'express-validator';
+import { COUNTRY_CODES, CURRENCY_CODES } from '../constants/countries';
 import { companyController } from '../controllers/company.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { requireEnabledCompany, companyResolvers } from '../middlewares/company-enabled.middleware';
@@ -37,8 +38,9 @@ const createCompanyValidation = [
   body('country')
     .optional()
     .trim()
-    .isLength({ min: 2, max: 2 })
-    .withMessage('El código de país debe ser de 2 caracteres'),
+    .toUpperCase()
+    .isIn(COUNTRY_CODES)
+    .withMessage('País no soportado'),
   body('description')
     .optional()
     .trim()
@@ -65,8 +67,9 @@ const createCompanyValidation = [
   body('currency')
     .optional()
     .trim()
-    .isLength({ min: 3, max: 3 })
-    .withMessage('La moneda debe ser un código de 3 letras (ej: EUR, USD)'),
+    .toUpperCase()
+    .isIn(CURRENCY_CODES)
+    .withMessage('Moneda no soportada'),
 ];
 
 const updateCompanyValidation = [
@@ -88,8 +91,9 @@ const updateCompanyValidation = [
   body('country')
     .optional()
     .trim()
-    .isLength({ min: 2, max: 2 })
-    .withMessage('El código de país debe ser de 2 caracteres'),
+    .toUpperCase()
+    .isIn(COUNTRY_CODES)
+    .withMessage('País no soportado'),
   body('description')
     .optional()
     .trim()
@@ -115,8 +119,9 @@ const updateCompanyValidation = [
   body('currency')
     .optional()
     .trim()
-    .isLength({ min: 3, max: 3 })
-    .withMessage('La moneda debe ser un código de 3 letras (ej: EUR, USD)'),
+    .toUpperCase()
+    .isIn(CURRENCY_CODES)
+    .withMessage('Moneda no soportada'),
 ];
 
 // Rutas

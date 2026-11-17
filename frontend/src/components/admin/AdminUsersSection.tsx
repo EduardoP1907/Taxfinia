@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, Users, CalendarCheck, ShieldCheck, Power, Trash2, AlertTriangle, ChevronDown, Building2, Minus, Plus } from 'lucide-react';
 import api from '../../services/api';
 import { formatDateCL } from '../../hooks/useAccess';
+import { countryName, companyCurrency } from '../../constants/countries';
 
 interface AdminUser {
   id: string;
@@ -426,7 +427,7 @@ const CompanyItem: React.FC<{ company: AdminUserCompany; busy: boolean; onToggle
           <dd className="text-slate-600 truncate">{c.industry}</dd>
         </>)}
         <dt className="text-slate-400">País / moneda</dt>
-        <dd className="text-slate-600">{c.country} · {c.currency}</dd>
+        <dd className="text-slate-600">{countryName(c.country)} · {companyCurrency(c)}</dd>
         <dt className="text-slate-400">Creada</dt>
         <dd className="text-slate-600">{formatDateCL(new Date(c.createdAt))}</dd>
         <dt className="text-slate-400">Ejercicios</dt>
