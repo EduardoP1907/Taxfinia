@@ -11,6 +11,7 @@ import type {
   AdditionalData,
   CreateAdditionalDataData,
 } from '../types/financial';
+import type { YearContext } from '../types/company';
 
 export const financialService = {
   // Fiscal Years
@@ -26,6 +27,18 @@ export const financialService = {
 
   async createFiscalYear(companyId: string, data: CreateFiscalYearData): Promise<FiscalYear> {
     const response = await api.post(`/financial/companies/${companyId}/fiscal-years`, data);
+    return response.data.data;
+  },
+
+  /** Confirma el ejercicio anual como cerrado: mueve el año de trabajo de la empresa. */
+  async closeFiscalYear(fiscalYearId: string): Promise<{ year: number; yearContext: YearContext }> {
+    const response = await api.post(`/financial/fiscal-years/${fiscalYearId}/close`);
+    return response.data.data;
+  },
+
+  /** Revierte un cierre hecho por error (no se puede si el ejercicio ya está consolidado). */
+  async reopenFiscalYear(fiscalYearId: string): Promise<{ year: number; yearContext: YearContext }> {
+    const response = await api.delete(`/financial/fiscal-years/${fiscalYearId}/close`);
     return response.data.data;
   },
 

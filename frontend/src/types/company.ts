@@ -1,5 +1,18 @@
 export type CompanySize = 'LARGE' | 'MEDIUM' | 'SMALL';
 
+/**
+ * Año de trabajo de la empresa, según su último ejercicio anual cerrado (L):
+ * informe anual = L, Forecast = L+1, Budget = L+2. Lo calcula el backend.
+ */
+export interface YearContext {
+  lastClosedYear: number | null;
+  reportYear: number | null;
+  forecastYear: number | null;
+  budgetYear: number | null;
+  latestClosableYear: number;   // año actual − 1 (último que ya puede cerrarse)
+  needsClosing: boolean;        // sin ejercicio cerrado o L < año actual − 2
+}
+
 export interface Company {
   id: string;
   name: string;
@@ -20,6 +33,7 @@ export interface Company {
   // PROCESSING = escritura escaneada en lectura (OCR) en segundo plano
   deedDocumentStatus?: 'PROCESSING' | 'READY' | 'FAILED' | null;
   deedDocumentError?: string | null;
+  yearContext?: YearContext;
   createdAt: string;
   updatedAt: string;
 }

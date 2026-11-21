@@ -5,7 +5,7 @@ import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { PercentInput } from '../../components/ui/PercentInput';
-import { Save, Building2, Plus, Trash2, Lock, Upload, Download, X, Info } from 'lucide-react';
+import { Save, Building2, Plus, Trash2, Lock, Upload, Download, X, Info, CalendarCheck } from 'lucide-react';
 import { useAccess } from '../../hooks/useAccess';
 import api from '../../services/api';
 import { companyService } from '../../services/company.service';
@@ -27,6 +27,7 @@ interface YearData {
   year: number;
   fiscalYearId: string;
   consolidatedAt: string | null;
+  closedAt: string | null;           // ejercicio confirmado como cerrado por el usuario
   lockReason: LockReason;
   balance: CreateBalanceSheetData;
   income: CreateIncomeStatementData;
@@ -202,6 +203,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
           year: fy.year,
           fiscalYearId: fy.id,
           consolidatedAt: (fy as { consolidatedAt?: string | null }).consolidatedAt ?? null,
+          closedAt: (fy as { closedAt?: string | null }).closedAt ?? null,
           lockReason: lockReasonFor(fy.year, (fy as { consolidatedAt?: string | null }).consolidatedAt),
           balance: balance || {},
           income: income || {},
@@ -287,6 +289,7 @@ export const MultiYearDataEntryPage: React.FC = () => {
         year: newYear,
         fiscalYearId: fiscalYear.id,
         consolidatedAt: null,
+        closedAt: null,
         lockReason: lockReasonFor(newYear, null),
         balance: {},
         income: {},
@@ -400,6 +403,103 @@ export const MultiYearDataEntryPage: React.FC = () => {
         return yd;
       });
     });
+  };
+
+  // ── Cierre de ejercicio ─────────────────────────────────────────────────────
+  // El último ejercicio cerrado (L) define el año del informe anual (L), del
+  // Forecast (L+1) y del Budget (L+2). Cerrar exige confirmación explícita.
+  const lastClosedYear = company?.yearContext?.lastClosedYear ?? null;
+  // Candidato: el ejercicio más reciente posterior a L, ya terminado y aún no cerrado
+  const closeCandidate = yearDataList
+    .filter(yd => !yd.closedAt && (lastClosedYear === null || yd.year > lastClosedYear)
+      && (privileged || yd.year <= yearWindow.max))
+    .sort((a, b) => b.year - a.year)[0] ?? null;
+  const lastClosedData = yearDataList.find(yd => yd.year === lastClosedYear && yd.closedAt) ?? null;
+  const canReopen = !!lastClosedData && (privileged || !lastClosedData.consolidatedAt);
+
+  const [closeTarget, setCloseTarget] = useState<YearData | null>(null);
+  const [closeConfirmed, setCloseConfirmed] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [reopenTarget, setReopenTarget] = useState<YearData | null>(null);
+  const invalidateCompanies = useCompanyStore((state) => state.invalidateCompanies);
+  const initActiveCompany = useCompanyStore((state) => state.initActiveCompany);
+  const userId = useAccess().user?.id;
+
+  // Mismas validaciones que el servidor, para avisar antes de confirmar
+  const closeIssues = (yd: YearData): string[] => {
+    const issues: string[] = [];
+    const b = yd.balance;
+    const assets = ['tangibleAssets', 'intangibleAssets', 'financialInvestmentsLp', 'otherNoncurrentAssets',
+      'inventory', 'accountsReceivable', 'otherReceivables', 'taxReceivables', 'cashEquivalents']
+      .reduce((s, k) => s + Number((b as Record<string, unknown>)[k] || 0), 0);
+    const liabEq = ['shareCapital', 'reserves', 'retainedEarnings', 'provisionsLp', 'bankDebtLp', 'otherLiabilitiesLp',
+      'provisionsSp', 'bankDebtSp', 'accountsPayable', 'taxLiabilities', 'otherLiabilitiesSp']
+      .reduce((s, k) => s + Number((b as Record<string, unknown>)[k] || 0), 0) - Number(b.treasuryStock || 0);
+    if (assets <= 0) issues.push('El Balance de Situación no tiene activos.');
+    else if (Math.abs(assets - liabEq) > 1) issues.push('El balance no cuadra (Total Activo ≠ Patrimonio Neto + Pasivo).');
+    if (Number(yd.income.revenue || 0) <= 0) issues.push('La Cuenta de Pérdidas y Ganancias no tiene ventas.');
+    return issues;
+  };
+
+  const refreshYearContext = (yearContext: Company['yearContext']) => {
+    setCompany(prev => (prev ? { ...prev, yearContext } : prev));
+    // El menú lateral muestra los años de la empresa activa: recargar la lista
+    invalidateCompanies();
+    if (userId) initActiveCompany(userId);
+  };
+
+  const confirmCloseYear = async () => {
+    if (!closeTarget) return;
+    try {
+      setClosing(true);
+      setNotice(null);
+      // Primero se guardan los cambios pendientes, para cerrar exactamente lo que se ve
+      await saveEditableYears();
+      const res = await financialService.closeFiscalYear(closeTarget.fiscalYearId);
+      setYearDataList(prev => prev.map(yd => (yd.year === res.year ? { ...yd, closedAt: new Date().toISOString() } : yd)));
+      refreshYearContext(res.yearContext);
+      setNotice({
+        type: 'success',
+        text: `Ejercicio ${res.year} cerrado. Informe Anual ${res.year}, Forecast ${res.year + 1} y Budget ${res.year + 2} ya están disponibles.`,
+      });
+      setCloseTarget(null);
+    } catch (error) {
+      const msg = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setNotice({ type: 'error', text: msg || 'No se pudo cerrar el ejercicio. Inténtalo de nuevo.' });
+      setCloseTarget(null);
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  const confirmReopenYear = async () => {
+    if (!reopenTarget) return;
+    try {
+      setClosing(true);
+      setNotice(null);
+      const res = await financialService.reopenFiscalYear(reopenTarget.fiscalYearId);
+      setYearDataList(prev => prev.map(yd => (yd.year === res.year ? { ...yd, closedAt: null } : yd)));
+      refreshYearContext(res.yearContext);
+      setNotice({ type: 'success', text: `Ejercicio ${res.year} reabierto.` });
+    } catch (error) {
+      const msg = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setNotice({ type: 'error', text: msg || 'No se pudo reabrir el ejercicio. Inténtalo de nuevo.' });
+    } finally {
+      setClosing(false);
+      setReopenTarget(null);
+    }
+  };
+
+  // Guarda solo los ejercicios editables (los de solo lectura los rechaza el servidor)
+  const saveEditableYears = async () => {
+    await Promise.all(yearDataList.filter(yd => !yd.lockReason).map(async (yearData) => {
+      await Promise.all([
+        financialService.createOrUpdateBalanceSheet(yearData.fiscalYearId, yearData.balance),
+        financialService.createOrUpdateIncomeStatement(yearData.fiscalYearId, yearData.income),
+        financialService.createOrUpdateCashFlow(yearData.fiscalYearId, yearData.cashflow),
+        financialService.createOrUpdateAdditionalData(yearData.fiscalYearId, yearData.additional),
+      ]);
+    }));
   };
 
   const handleSaveAll = async () => {
@@ -551,6 +651,37 @@ export const MultiYearDataEntryPage: React.FC = () => {
                 anteriores a {yearWindow.min}. Cada año podrás agregar el ejercicio recién cerrado
                 (hoy: hasta {yearWindow.max}).
               </p>
+            </div>
+          )}
+
+          {/* Cierre de ejercicio: define el año del informe anual, Forecast y Budget */}
+          {!readOnly && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-slate-700">
+              <div className="flex items-start gap-3">
+                <CalendarCheck className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                <p>
+                  <strong>
+                    {lastClosedYear !== null ? `Último ejercicio cerrado: ${lastClosedYear}.` : 'Aún no hay ejercicios cerrados.'}
+                  </strong>{' '}
+                  {lastClosedYear !== null
+                    ? `Informe Anual ${lastClosedYear} · Forecast ${lastClosedYear + 1} · Budget ${lastClosedYear + 2}.`
+                    : 'El informe anual, el Forecast y el Budget se habilitan al cerrar un ejercicio.'}
+                  {closeCandidate && ` Cuando termines de cargar ${closeCandidate.year}, ciérralo para avanzar al siguiente año.`}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {canReopen && lastClosedData && (
+                  <Button variant="outline" size="sm" disabled={saving || closing} onClick={() => setReopenTarget(lastClosedData)}>
+                    Reabrir {lastClosedData.year}
+                  </Button>
+                )}
+                {closeCandidate && (
+                  <Button size="sm" disabled={saving || closing} onClick={() => { setCloseConfirmed(false); setCloseTarget(closeCandidate); }}>
+                    <CalendarCheck className="w-4 h-4 mr-2" aria-hidden="true" />
+                    Cerrar ejercicio {closeCandidate.year}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
@@ -732,6 +863,94 @@ export const MultiYearDataEntryPage: React.FC = () => {
                 >
                   Agregar
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: confirmar cierre de ejercicio */}
+      {closeTarget && (() => {
+        const issues = closeIssues(closeTarget);
+        const y = closeTarget.year;
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="close-year-title">
+            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+              <div className="p-6">
+                <div className="flex items-center justify-center w-12 h-12 mx-auto bg-amber-50 rounded-full mb-4">
+                  <CalendarCheck className="w-6 h-6 text-amber-600" aria-hidden="true" />
+                </div>
+                <h3 id="close-year-title" className="text-lg font-semibold text-gray-900 text-center mb-3">
+                  Cerrar ejercicio {y}
+                </h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Al cerrar {y} la empresa pasa a trabajar sobre este ejercicio:
+                </p>
+                <ul className="text-sm text-gray-700 list-disc ml-5 space-y-1 mb-4">
+                  <li>Informe Financiero Anual <strong>{y}</strong></li>
+                  <li>Proyección Financiera (Forecast) <strong>{y + 1}</strong></li>
+                  <li>Presupuesto (Budget) <strong>{y + 2}</strong></li>
+                  <li>Las proyecciones a 10 años te ofrecerán actualizarse a base <strong>{y}</strong></li>
+                </ul>
+                <p className="text-xs text-gray-500 mb-4">
+                  Antes de cerrar se guardarán los cambios pendientes. Si te equivocas, podrás reabrirlo mientras no
+                  generes un informe ni uses el asistente IA con él.
+                </p>
+                {issues.length > 0 ? (
+                  <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <p className="font-semibold mb-1">No se puede cerrar todavía:</p>
+                    <ul className="list-disc ml-5">{issues.map(i => <li key={i}>{i}</li>)}</ul>
+                  </div>
+                ) : (
+                  <label className="flex items-start gap-2 mb-4 text-sm text-gray-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 accent-amber-600"
+                      checked={closeConfirmed}
+                      onChange={(e) => setCloseConfirmed(e.target.checked)}
+                    />
+                    <span>Confirmo que los datos del ejercicio {y} están completos y son definitivos.</span>
+                  </label>
+                )}
+                <div className="flex gap-3">
+                  <Button variant="outline" className="flex-1" onClick={() => setCloseTarget(null)} disabled={closing}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={confirmCloseYear}
+                    disabled={issues.length > 0 || !closeConfirmed || closing}
+                    isLoading={closing}
+                  >
+                    Cerrar ejercicio {y}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal: reabrir ejercicio cerrado por error */}
+      {reopenTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="reopen-year-title">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <h3 id="reopen-year-title" className="text-lg font-semibold text-gray-900 text-center mb-3">
+                Reabrir ejercicio {reopenTarget.year}
+              </h3>
+              <p className="text-sm text-gray-600 mb-6 text-center">
+                La empresa volverá a trabajar sobre el ejercicio cerrado anterior
+                {yearDataList.some(yd => yd.closedAt && yd.year < reopenTarget.year) ? '' : ' (no queda ninguno cerrado)'}:
+                el informe anual, el Forecast y el Budget retroceden un año.
+              </p>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => setReopenTarget(null)} disabled={closing}>
+                  Cancelar
+                </Button>
+                <Button className="flex-1" onClick={confirmReopenYear} disabled={closing} isLoading={closing}>
+                  Reabrir {reopenTarget.year}
+                </Button>
               </div>
             </div>
           </div>
@@ -1041,6 +1260,9 @@ const BalanceSheetTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onRem
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 uppercase">
                   {yearData.year}
+                  {yearData.closedAt && (
+                    <CalendarCheck className="w-3 h-3 text-emerald-600" aria-label="Ejercicio cerrado" role="img" />
+                  )}
                   {yearData.lockReason && (
                     <Lock
                       className="w-3 h-3 text-slate-400"
@@ -1238,6 +1460,9 @@ const IncomeStatementTable: React.FC<TableProps> = ({ yearDataList, onUpdate, on
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 uppercase">
                   {yearData.year}
+                  {yearData.closedAt && (
+                    <CalendarCheck className="w-3 h-3 text-emerald-600" aria-label="Ejercicio cerrado" role="img" />
+                  )}
                   {yearData.lockReason && (
                     <Lock
                       className="w-3 h-3 text-slate-400"
@@ -1333,6 +1558,9 @@ const AdditionalDataTable: React.FC<TableProps> = ({ yearDataList, onUpdate, onR
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 uppercase">
                   {yearData.year}
+                  {yearData.closedAt && (
+                    <CalendarCheck className="w-3 h-3 text-emerald-600" aria-label="Ejercicio cerrado" role="img" />
+                  )}
                   {yearData.lockReason && (
                     <Lock
                       className="w-3 h-3 text-slate-400"

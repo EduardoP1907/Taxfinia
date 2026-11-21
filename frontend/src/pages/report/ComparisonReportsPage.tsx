@@ -15,6 +15,8 @@ import { companyService } from '../../services/company.service';
 import type { Company } from '../../types/company';
 import { ComparisonAIReportPanel } from '../../components/report/ComparisonAIReportPanel';
 import { BarChart3 } from 'lucide-react';
+import { companyYears } from '../../utils/yearContext';
+import { NeedsClosingNotice } from '../../components/companies/NeedsClosingNotice';
 
 export const ComparisonReportsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -49,8 +51,27 @@ export const ComparisonReportsPage: React.FC = () => {
   }
 
   const companyName = selectedCompany?.name ?? companyId;
-  const forecastYear = new Date().getFullYear();
-  const budgetYear = forecastYear + 1;
+  // Forecast = último ejercicio cerrado + 1, Budget = + 2
+  const years = companyYears(selectedCompany);
+  const { forecastYear, budgetYear } = years;
+
+  if (loadingCompanies) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center py-16">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-600" role="status" aria-label="Cargando" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (years.needsClosing) {
+    return (
+      <DashboardLayout>
+        <NeedsClosingNotice companyId={companyId} years={years} />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

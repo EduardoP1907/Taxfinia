@@ -183,6 +183,8 @@ export const projectionsService = {
     baseYear?: number;
     projectionYears?: number;
     name?: string;
+    /** Copia tasas de crecimiento y WACC de otro escenario de la empresa (siguen editables). */
+    copyFromScenarioId?: string;
   }) {
     const response = await api.post('/projections', data);
     return response.data;

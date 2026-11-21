@@ -30,6 +30,9 @@ import { useAuthStore } from '../../store/authStore';
 const POLL_INTERVAL_MS = 4000;
 import { useAccess } from '../../hooks/useAccess';
 import { YearSelector } from '../../components/data/YearSelector';
+import { companyYears } from '../../utils/yearContext';
+import { NeedsClosingNotice } from '../../components/companies/NeedsClosingNotice';
+import type { YearContext } from '../../types/company';
 import { IncomeStatementSection } from '../../components/report/IncomeStatementSection';
 import { BalanceSheetSection } from '../../components/report/BalanceSheetSection';
 import { RatiosSection } from '../../components/report/RatiosSection';
@@ -385,9 +388,14 @@ export const ReportPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [availableCompanies, setAvailableCompanies] = useState<any[]>([]);
   const [company, setCompany] = useState<any>(null);
-  const [selectedYear, setSelectedYear] = useState<number>(parseInt(yearParam || '') || new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number>(parseInt(yearParam || '') || new Date().getFullYear() - 1);
   const [analysis, setAnalysis] = useState<CompanyAnalysis | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>(tabParam || 'resultados');
+  // El informe anual sigue al último ejercicio cerrado (L): por defecto se abre L y
+  // no se ofrecen ejercicios posteriores (aún sin cerrar)
+  const { privileged } = useAccess();
+  const [yearContext, setYearContext] = useState<YearContext | null>(null);
+  const lastClosedYear = yearContext?.lastClosedYear ?? null;
 
 
   useEffect(() => {
@@ -419,6 +427,13 @@ export const ReportPage: React.FC = () => {
     if (!companyId) return;
     try {
       setLoading(true);
+      const companyInfo = await companyService.getCompany(companyId).catch(() => null);
+      const yc = companyInfo?.yearContext ?? null;
+      setYearContext(yc);
+      const L = yc?.lastClosedYear ?? null;
+      if (L !== null && (!yearParam || (!privileged && parseInt(yearParam) > L))) {
+        setSelectedYear(L);
+      }
       const data = await ratiosService.getCompanyAnalysis(companyId);
       const hasRatios = data.analysis.some(year => year.ratios !== null);
       if (!hasRatios && data.analysis.length > 0) {
@@ -480,7 +495,7 @@ export const ReportPage: React.FC = () => {
         title="Informe Económico-Financiero"
         description="Selecciona la empresa para ver su informe"
         icon={<FileText className="w-7 h-7 text-slate-900" />}
-        onSelect={(c) => navigate(`/informe?companyId=${c.id}&year=${c.baseYear || new Date().getFullYear()}`)}
+        onSelect={(c) => navigate(`/informe?companyId=${c.id}`)}
       />
     );
   }
@@ -498,6 +513,14 @@ export const ReportPage: React.FC = () => {
             </div>
           </Card>
         </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!privileged && yearContext && lastClosedYear === null) {
+    return (
+      <DashboardLayout>
+        <NeedsClosingNotice companyId={companyId} years={companyYears({ yearContext })} />
       </DashboardLayout>
     );
   }
@@ -545,7 +568,7 @@ export const ReportPage: React.FC = () => {
               <p className="text-gray-600">{company.name} {company.taxId && `• ${company.taxId}`}</p>
             </div>
             <div className="flex items-center gap-3">
-              <YearSelector companyId={companyId} currentYear={selectedYear} onYearChange={handleYearChange} />
+              <YearSelector companyId={companyId} currentYear={selectedYear} onYearChange={handleYearChange} maxYear={privileged ? null : lastClosedYear} />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200">

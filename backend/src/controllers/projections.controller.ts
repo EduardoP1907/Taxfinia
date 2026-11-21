@@ -19,7 +19,7 @@ const projectionsService = new ProjectionsService();
  */
 export const createProjectionScenario = async (req: Request, res: Response) => {
   try {
-    const { companyId, baseYear, projectionYears, name } = req.body;
+    const { companyId, baseYear, projectionYears, name, copyFromScenarioId } = req.body;
 
     if (!companyId) {
       return res.status(400).json({
@@ -31,7 +31,8 @@ export const createProjectionScenario = async (req: Request, res: Response) => {
       companyId,
       baseYear ? parseInt(baseYear) : undefined,
       projectionYears ? parseInt(projectionYears) : 10,
-      name
+      name,
+      typeof copyFromScenarioId === 'string' ? copyFromScenarioId : undefined
     );
 
     res.status(201).json(bigIntToJSON(result));

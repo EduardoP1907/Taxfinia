@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useCompanyStore } from '../../store/companyStore';
 import { useAccess, formatDateCL } from '../../hooks/useAccess';
 import { companyService } from '../../services/company.service';
+import { companyYears } from '../../utils/yearContext';
 
 // Reloj aislado: solo este componente se vuelve a dibujar (antes era toda la página cada segundo)
 const Clock: React.FC = () => {
@@ -122,6 +123,9 @@ export const DashboardPage: React.FC = () => {
 
   // Los accesos llevan la empresa activa para no pedir la selección otra vez
   const withCompany = (href: string) => (activeCompanyId ? `${href}?companyId=${activeCompanyId}` : href);
+  // Años según el último ejercicio cerrado de la empresa activa (sin empresa: sin año)
+  const activeCompany = useCompanyStore(s => s.companies?.find(c => c.id === s.activeCompanyId) ?? null);
+  const years = activeCompany?.yearContext?.lastClosedYear != null ? companyYears(activeCompany) : null;
 
   const quickActions: ActionCardProps[] = [
     {
@@ -303,14 +307,14 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <ActionCard
-              title={`Forecast ${new Date().getFullYear()}`}
+              title={years ? `Forecast ${years.forecastYear}` : 'Forecast'}
               description="Proyecta y edita el desglose mensual (enero a diciembre) a partir de los datos anuales"
               icon={CalendarRange}
               href={withCompany('/forecast-mensual')}
               tag="INPUT MENSUAL"
             />
             <ActionCard
-              title={`Budget ${new Date().getFullYear() + 1}`}
+              title={years ? `Budget ${years.budgetYear}` : 'Budget'}
               description="Presupuesta el desglose mensual del próximo ejercicio (P&G y balance proyectado)"
               icon={Wallet}
               href={withCompany('/budget')}

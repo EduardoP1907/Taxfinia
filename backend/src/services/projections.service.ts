@@ -22,7 +22,8 @@ export class ProjectionsService {
     companyId: string,
     baseYear?: number,
     projectionYears: number = 10,
-    name?: string
+    name?: string,
+    copyFromScenarioId?: string
   ) {
     // Verificar que la empresa existe
     const company = await prisma.company.findUnique({
@@ -57,9 +58,12 @@ export class ProjectionsService {
         throw new Error(`No se encontraron datos para el año ${actualBaseYear}`);
       }
     } else {
-      baseFiscalYear = company.fiscalYears.find(
-        fy => fy.incomeStatement !== null && fy.balanceSheet !== null
+      // Base = último ejercicio anual CERRADO por el usuario (L); si aún no cierra
+      // ninguno, el último anual con ambos estados (comportamiento anterior).
+      const annualWithData = company.fiscalYears.filter(
+        fy => fy.quarter === 0 && fy.month === 0 && fy.incomeStatement !== null && fy.balanceSheet !== null
       );
+      baseFiscalYear = annualWithData.find(fy => fy.closedAt !== null) ?? annualWithData[0];
       if (!baseFiscalYear) {
         throw new Error('No se encontró ningún año con datos financieros completos');
       }
@@ -103,7 +107,87 @@ export class ProjectionsService {
       });
     }
 
+    // "Actualizar proyección a base L": se traspasan las tasas y el WACC del escenario anterior
+    if (copyFromScenarioId) {
+      await this.copySettingsFromScenario(copyFromScenarioId, scenario.id, companyId);
+    }
+
     return this.getProjectionScenario(scenario.id);
+  }
+
+  /**
+   * Copia a un escenario nuevo las tasas de crecimiento (4.0/4.1) y los parámetros
+   * de WACC/DCF (4.3) de otro escenario de la misma empresa. Las tasas se trasladan
+   * por posición respecto del año base (1er año proyectado → 1er año proyectado);
+   * si el nuevo tiene más años, repite la última tasa. Todo sigue siendo editable:
+   * solo se pre-cargan los valores. No se copian la deuda neta ni los resultados,
+   * que dependen del balance del nuevo año base y se recalculan.
+   */
+  private async copySettingsFromScenario(sourceId: string, targetId: string, companyId: string) {
+    const source = await prisma.projectionScenario.findFirst({
+      where: { id: sourceId, companyId },
+      include: { projections: { orderBy: { year: 'asc' } } },
+    });
+    if (!source) throw new Error('No se encontró la proyección anterior de esta empresa');
+
+    // 1) WACC y parámetros DCF
+    await prisma.projectionScenario.update({
+      where: { id: targetId },
+      data: {
+        wacc: source.wacc,
+        waccRecommended: source.waccRecommended,
+        riskFreeRate: source.riskFreeRate,
+        beta: source.beta,
+        marketRiskPremium: source.marketRiskPremium,
+        costOfEquity: source.costOfEquity,
+        costOfDebt: source.costOfDebt,
+        taxRateForWacc: source.taxRateForWacc,
+        terminalGrowthRate: source.terminalGrowthRate,
+      },
+    });
+
+    // 2) Tasas de crecimiento (solo si el escenario anterior ya tenía tasas aplicadas)
+    const sourceRates = source.projections
+      .filter(p => p.year > source.baseYear)
+      .filter(p => p.revenueGrowthRate !== null);
+    if (sourceRates.length === 0) return;
+
+    const target = await prisma.projectionScenario.findUnique({
+      where: { id: targetId },
+      include: { projections: { orderBy: { year: 'asc' } } },
+    });
+    if (!target) return;
+
+    const rate = (v: Decimal | null) => (v === null ? undefined : toNumber(v));
+    const ratesByYear = target.projections
+      .filter(p => p.year > target.baseYear)
+      .map((p, i) => {
+        const src = sourceRates[Math.min(i, sourceRates.length - 1)];
+        return {
+          year: p.year,
+          revenueGrowthRate: rate(src.revenueGrowthRate),
+          costOfSalesGrowthRate: rate(src.costOfSalesGrowthRate),
+          otherOperatingExpensesGrowthRate: rate(src.otherOperatingExpensesGrowthRate),
+          depreciationGrowthRate: rate(src.depreciationGrowthRate),
+          exceptionalNetGrowthRate: rate(src.exceptionalNetGrowthRate),
+          financialIncomeGrowthRate: rate(src.financialIncomeGrowthRate),
+          financialExpensesGrowthRate: rate(src.financialExpensesGrowthRate),
+          totalAssetsGrowthRate: rate(src.totalAssetsGrowthRate),
+          equityGrowthRate: rate(src.equityGrowthRate),
+          totalLiabilitiesGrowthRate: rate(src.totalLiabilitiesGrowthRate),
+          incomeTaxRate: rate(src.incomeTaxRate),
+        };
+      });
+
+    await this.applyGrowthRatesToScenario(targetId, ratesByYear);
+
+    // Con tasas y WACC ya cargados, dejar calculada la valoración DCF (4.3).
+    // Si faltan parámetros, el usuario la calcula desde la hoja como siempre.
+    if (source.wacc !== null && source.terminalGrowthRate !== null) {
+      await this.calculateDCFValuation(targetId).catch(err =>
+        console.warn('[PROJECTIONS] DCF no calculado al copiar escenario:', err?.message),
+      );
+    }
   }
 
   /**

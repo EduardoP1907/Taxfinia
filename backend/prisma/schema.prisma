@@ -129,7 +129,10 @@ model FiscalYear {
   month            Int               @default(0) @map("month")
   // Año anual incluido en un informe IA o consultado por el asistente: queda solo lectura
   consolidatedAt   DateTime?         @map("consolidated_at")
-  startDate        DateTime?         @map("start_date")
+  // Año anual que el usuario confirmó como cerrado. El último cerrado (L) define
+  // el año del informe anual (L), del Forecast (L+1), del Budget (L+2) y la base de 4.1/4.3
+  closedAt         DateTime?         @map("closed_at")
+  startDate       DateTime?         @map("start_date")
   endDate          DateTime?         @map("end_date")
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")

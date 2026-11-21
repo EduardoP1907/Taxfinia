@@ -6,6 +6,8 @@ interface YearSelectorProps {
   companyId: string;
   currentYear: number;
   onYearChange: (year: number) => void;
+  /** Último ejercicio seleccionable (p. ej. el último cerrado); sin límite si se omite. */
+  maxYear?: number | null;
 }
 
 /**
@@ -17,15 +19,18 @@ export const YearSelector: React.FC<YearSelectorProps> = ({
   companyId,
   currentYear,
   onYearChange,
+  maxYear,
 }) => {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     financialService.getAnnualFiscalYears(companyId)
-      .then(fys => setAvailableYears([...new Set(fys.map(fy => fy.year))].sort((a, b) => b - a)))
+      .then(fys => setAvailableYears(
+        [...new Set(fys.map(fy => fy.year))].filter(y => maxYear == null || y <= maxYear).sort((a, b) => b - a),
+      ))
       .catch(err => console.error('Error loading fiscal years:', err));
-  }, [companyId]);
+  }, [companyId, maxYear]);
 
   useEffect(() => {
     if (!open) return;

@@ -10,6 +10,7 @@ import { Projection41Page } from './Projection41Page';
 import { ProjectionsPage } from './ProjectionsPage';
 import { Projection43Page } from './Projection43Page';
 import { GrowthRatesConfigPage } from './GrowthRatesConfigPage';
+import { ProjectionBaseYearBanner } from '../../components/projections/ProjectionBaseYearBanner';
 import { CompanySelector } from '../../components/companies/CompanySelector';
 import { companyService } from '../../services/company.service';
 import type { Company } from '../../types/company';
@@ -86,6 +87,8 @@ export const CombinedProjectionsPage: React.FC = () => {
 
   // Componente de tabs que se mostrará en todas las vistas
   const TabsHeader = () => (
+    <>
+    <ProjectionBaseYearBanner />
     <div className="mb-6 border-b border-gray-200 bg-white rounded-t-lg">
       <nav className="-mb-px flex space-x-1 px-4 overflow-x-auto">
         {TABS.map((tab) => (
@@ -110,32 +113,37 @@ export const CombinedProjectionsPage: React.FC = () => {
         ))}
       </nav>
     </div>
+    </>
   );
+
+  // Al cambiar de escenario (p. ej. "Actualizar proyección a base L") la hoja se
+  // vuelve a montar para cargar el nuevo
+  const scenarioKey = searchParams.get('scenarioId') ?? 'none';
 
   // Renderizar la vista activa
   if (activeTab === '4.1') {
     return (
       <div className="projection-41-page-wrapper">
-        <Projection41Page tabsHeader={<TabsHeader />} />
+        <Projection41Page key={scenarioKey} tabsHeader={<TabsHeader />} />
       </div>
     );
   } else if (activeTab === '4.3') {
     return (
       <div className="projection-43-page-wrapper">
-        <Projection43Page tabsHeader={<TabsHeader />} />
+        <Projection43Page key={scenarioKey} tabsHeader={<TabsHeader />} />
       </div>
     );
   } else if (activeTab === '4.2') {
     return (
       <div className="projections-42-page-wrapper">
-        <ProjectionsPage tabsHeader={<TabsHeader />} />
+        <ProjectionsPage key={scenarioKey} tabsHeader={<TabsHeader />} />
       </div>
     );
   } else {
     // 4.0 - Configurar Tasas de Crecimiento (vista por defecto)
     return (
       <div className="projection-40-page-wrapper">
-        <GrowthRatesConfigPage tabsHeader={<TabsHeader />} />
+        <GrowthRatesConfigPage key={scenarioKey} tabsHeader={<TabsHeader />} />
       </div>
     );
   }

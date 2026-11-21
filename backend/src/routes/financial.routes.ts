@@ -20,6 +20,11 @@ router.param('fiscalYearId', requireEnabledCompany(companyResolvers.fiscalYear))
 router.get('/companies/:companyId/fiscal-years', financialController.getFiscalYears);
 router.post('/companies/:companyId/fiscal-years', companyLockMiddleware, financialController.createFiscalYear);
 
+// Cierre confirmado del ejercicio anual: mueve el año de trabajo de la empresa
+// (informe = L, Forecast = L+1, Budget = L+2). DELETE revierte un cierre por error.
+router.post('/fiscal-years/:fiscalYearId/close', financialController.closeFiscalYear);
+router.delete('/fiscal-years/:fiscalYearId/close', financialController.reopenFiscalYear);
+
 // ============= BALANCE SHEET =============
 router.get('/fiscal-years/:fiscalYearId/balance-sheet', financialController.getBalanceSheet);
 router.post('/fiscal-years/:fiscalYearId/balance-sheet', companyLockMiddleware, financialController.upsertBalanceSheet);

@@ -7,6 +7,12 @@ import {
 } from '../services/monthly-report.service';
 import { sendAdminReportCodeEmail } from '../utils/email';
 import { isS3Enabled } from '../utils/s3';
+import { getYearContext } from '../services/fiscal-close.service';
+
+/** Año del Forecast de la empresa (último ejercicio cerrado + 1) si el cliente no envía uno. */
+async function defaultForecastYear(companyId: string): Promise<number> {
+  return (await getYearContext(companyId)).forecastYear ?? new Date().getFullYear();
+}
 
 type Variant = 'prometheia' | 'ejecutivo';
 
@@ -46,7 +52,7 @@ export class MonthlyReportController {
     try {
       const { companyId } = req.params;
       const userId = (req as any).user?.userId;
-      const year = req.body.year ? parseInt(req.body.year) : new Date().getFullYear();
+      const year = req.body.year ? parseInt(req.body.year) : await defaultForecastYear(companyId);
 
       if (!userId) { res.status(401).json({ error: 'No autorizado' }); return; }
       if (!companyId) { res.status(400).json({ error: 'ID de empresa requerido' }); return; }
@@ -89,7 +95,7 @@ export class MonthlyReportController {
     try {
       const { companyId } = req.params;
       const userId = (req as any).user?.userId;
-      const year = req.body.year ? parseInt(req.body.year) : new Date().getFullYear();
+      const year = req.body.year ? parseInt(req.body.year) : await defaultForecastYear(companyId);
 
       if (!userId) { res.status(401).json({ error: 'No autorizado' }); return; }
       if (!companyId) { res.status(400).json({ error: 'ID de empresa requerido' }); return; }

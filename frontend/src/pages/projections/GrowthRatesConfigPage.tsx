@@ -122,7 +122,7 @@ export const GrowthRatesConfigPage: React.FC<GrowthRatesConfigPageProps> = ({ ta
       const newScenario = await projectionsService.createScenario({
         companyId: companyId!,
         projectionYears: 10,
-        name: `Proyección ${new Date().getFullYear()} - ${company?.name}`,
+        name: `Proyección base ${company?.yearContext?.lastClosedYear ?? new Date().getFullYear() - 1} - ${company?.name}`,
       });
       toast.success('Escenario de proyección creado');
       setScenario(newScenario);

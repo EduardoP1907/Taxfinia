@@ -135,12 +135,24 @@ export async function consolidateAnnualYears(companyId: string): Promise<number>
   });
   if (!company || isPrivileged(company.user)) return 0;
 
+  // Solo hasta el último ejercicio cerrado: un año posterior aún sin cerrar (p. ej.
+  // 2026 a medio cargar al generar el informe 2025) sigue editable.
+  const lastClosed = await prisma.fiscalYear.findFirst({
+    where: {
+      companyId, quarter: 0, month: 0, closedAt: { not: null },
+      balanceSheet: { isNot: null }, incomeStatement: { isNot: null },
+    },
+    orderBy: { year: 'desc' },
+    select: { year: true },
+  });
+
   const result = await prisma.fiscalYear.updateMany({
     where: {
       companyId,
       quarter: 0,
       month: 0,
       consolidatedAt: null,
+      ...(lastClosed ? { year: { lte: lastClosed.year } } : {}),
       OR: [{ balanceSheet: { isNot: null } }, { incomeStatement: { isNot: null } }],
     },
     data: { consolidatedAt: new Date() },

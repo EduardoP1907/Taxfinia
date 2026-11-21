@@ -14,6 +14,8 @@ import { generateExecutiveSummaryDocx } from '../utils/docx-executive-summary';
 import { convertDocxToPdf } from '../utils/docx-to-pdf';
 import { Decimal } from '@prisma/client/runtime/library';
 import { lockCompany } from './company.service';
+import { getLastClosedYear } from './fiscal-close.service';
+import { getAccessUser, isPrivileged } from './access.service';
 import { isS3Enabled, uploadToS3 } from '../utils/s3';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -252,11 +254,25 @@ export async function startReport(
   userId: string,
   year?: number,
 ): Promise<{ reportId: string; alreadyRunning: boolean }> {
+  // El informe anual sigue al último ejercicio cerrado (L): sin año pedido se usa L,
+  // y un ejercicio posterior a L (aún sin cerrar) no se puede informar.
+  const lastClosed = await getLastClosedYear(companyId);
+  const user = await getAccessUser(userId);
+  if (!user || !isPrivileged(user)) {
+    if (lastClosed === null) {
+      throw new Error('Primero cierra tu último ejercicio en "Datos Financieros" para generar el informe anual.');
+    }
+    if (year && year > lastClosed) {
+      throw new Error(`El ejercicio ${year} aún no está cerrado. Ciérralo en "Datos Financieros" para generar su informe.`);
+    }
+  }
+  const requestedYear = year ?? lastClosed ?? undefined;
+
   // Validates that there is financial data (throws otherwise)
-  const financialData = await buildFinancialData(companyId, year);
+  const financialData = await buildFinancialData(companyId, requestedYear);
   // Use requested year only if data exists for it; otherwise fall back to latest available
-  const reportYear = (year && financialData.years.includes(year))
-    ? year
+  const reportYear = (requestedYear && financialData.years.includes(requestedYear))
+    ? requestedYear
     : financialData.latestYear;
 
   const running = await prisma.report.findFirst({

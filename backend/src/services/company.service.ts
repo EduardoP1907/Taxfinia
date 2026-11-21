@@ -5,6 +5,7 @@ import {
   AccessError, getAccessUser, isPrivileged, validateTaxId, assertTaxIdAvailable,
   companyHasConsolidatedData, consolidateAnnualYears, unconsolidateAnnualYears,
 } from './access.service';
+import { buildYearContext, getLastClosedYears, getYearContext } from './fiscal-close.service';
 
 interface CreateCompanyData {
   name: string;
@@ -91,10 +92,12 @@ export class CompanyService {
       },
     });
 
-    return companies;
+    // Año de trabajo de cada empresa (informe/Forecast/Budget), según su último ejercicio cerrado
+    const lastClosed = await getLastClosedYears(companies.map(c => c.id));
+    return companies.map(c => ({ ...c, yearContext: buildYearContext(lastClosed.get(c.id) ?? null) }));
   }
 
-  async getCompanyById(companyId: string, userId: string): Promise<Company | null> {
+  async getCompanyById(companyId: string, userId: string) {
     const company = await prisma.company.findFirst({
       where: {
         id: companyId,
@@ -110,7 +113,8 @@ export class CompanyService {
       },
     });
 
-    return company;
+    if (!company) return null;
+    return { ...company, yearContext: await getYearContext(company.id) };
   }
 
   async updateCompany(

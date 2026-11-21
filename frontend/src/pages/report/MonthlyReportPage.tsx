@@ -22,6 +22,8 @@ import {
 import { CompanySelector } from '../../components/companies/CompanySelector';
 import { MonthlyAIReportPanel } from '../../components/report/MonthlyAIReportPanel';
 import type { Company } from '../../types/company';
+import { companyYears } from '../../utils/yearContext';
+import { NeedsClosingNotice } from '../../components/companies/NeedsClosingNotice';
 import {
   CalendarDays, AlertCircle, RefreshCw, BarChart3, FileText, Scale,
 } from 'lucide-react';
@@ -68,11 +70,11 @@ function accumulatePnl(rows: MonthlyPnLRow[], uptoIdx: number): AccumulatedPnL {
 // ─── MonthPicker ──────────────────────────────────────────────────────────────
 interface MonthPickerProps {
   companyName: string;
+  year: number;
   onSelect: (month: number) => void;
   onBack: () => void;
 }
-const MonthPicker: React.FC<MonthPickerProps> = ({ companyName, onSelect, onBack }) => {
-  const year = new Date().getFullYear();
+const MonthPicker: React.FC<MonthPickerProps> = ({ companyName, year, onSelect, onBack }) => {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
@@ -295,7 +297,9 @@ export const MonthlyReportPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const year = new Date().getFullYear();
+  // Año del Forecast de la empresa: último ejercicio cerrado + 1
+  const years = companyYears(company);
+  const year = years.forecastYear;
 
   useEffect(() => {
     companyService.getCompanies()
@@ -310,14 +314,14 @@ export const MonthlyReportPage: React.FC = () => {
   }, [companyId]);
 
   useEffect(() => {
-    if (!companyId || !mParam) return;
+    if (!companyId || !mParam || !company || years.needsClosing) return;
     setLoading(true);
     setError(null);
     monthlyForecastService.calculate(companyId, year)
       .then(setResult)
       .catch((e) => setError(e?.response?.data?.error || e.message || `No se pudo calcular el Forecast ${year}`))
       .finally(() => setLoading(false));
-  }, [companyId, mParam, year]);
+  }, [companyId, mParam, year, company, years.needsClosing]);
 
   // ── Step 1: no company ───────────────────────────────────────────────────
   if (!companyId) {
@@ -333,12 +337,21 @@ export const MonthlyReportPage: React.FC = () => {
     );
   }
 
+  if (company && years.needsClosing) {
+    return (
+      <DashboardLayout>
+        <NeedsClosingNotice companyId={companyId} years={years} />
+      </DashboardLayout>
+    );
+  }
+
   // ── Step 2: no month selected ────────────────────────────────────────────
   if (!mParam) {
     if (!company) return null;
     return (
       <MonthPicker
         companyName={company.name}
+        year={year}
         onSelect={(m) => setSearchParams({ companyId, month: String(m) })}
         onBack={() => setSearchParams({})}
       />

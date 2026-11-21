@@ -12,6 +12,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import * as ratios from '../utils/ratios';
 import type { BalanceSheetData, IncomeStatementData } from '../utils/ratios';
 import { buildFinancialData } from './report.service';
+import { getYearContext } from './fiscal-close.service';
 import { monthlyForecastService, type MonthlyForecastResult } from './monthly-forecast.service';
 import type { FinancialDataForAI } from './ai-analysis.service';
 
@@ -75,8 +76,19 @@ export async function checkEligibility(
   const company = await prisma.company.findFirst({ where: { id: companyId, userId, deletedAt: null } });
   if (!company) throw new Error('Empresa no encontrada');
 
-  const forecastYear = new Date().getFullYear();
+  // Años según el último ejercicio cerrado de la empresa (L): Forecast L+1, Budget L+2
+  const yc = await getYearContext(companyId);
+  const forecastYear = yc.forecastYear ?? new Date().getFullYear();
   const budgetYear = forecastYear + 1;
+  if (yc.needsClosing) {
+    return {
+      eligible: false,
+      reason: yc.lastClosedYear === null
+        ? 'Primero cierra tu último ejercicio anual en "Datos Financieros" para generar este informe.'
+        : `Tu último ejercicio cerrado es ${yc.lastClosedYear}. Carga y cierra el ejercicio ${yc.latestClosableYear} en "Datos Financieros" para generar este informe.`,
+      annualYears: [], forecastYear, budgetYear,
+    };
+  }
 
   const required = REAL_YEARS_BY_TYPE[type];
   const annualYears = await getRealYearsBefore(companyId, forecastYear, required);

@@ -4,6 +4,8 @@ import { DashboardLayout } from '../../layouts/DashboardLayout';
 import { CompanySelector } from '../../components/companies/CompanySelector';
 import { companyService } from '../../services/company.service';
 import type { Company } from '../../types/company';
+import { companyYears } from '../../utils/yearContext';
+import { NeedsClosingNotice } from '../../components/companies/NeedsClosingNotice';
 import {
   monthlyForecastService, mergeConfig, MONTHS, calcPnLClient, calcBalanceClient, PNL_OVERRIDE_KEYS,
   type MonthlyForecastConfig, type MonthlyForecastResult, type MonthlyPnLRow,
@@ -326,7 +328,6 @@ const BalanceOverrideInput: React.FC<{
 export const MonthlyForecastPage: React.FC = () => {
   return (
     <MonthlyForecastShell
-      year={new Date().getFullYear()}
       titlePrefix="Forecast"
       companySelectorDescription="Selecciona la empresa para ver o crear su proyección mensual"
     />
@@ -334,13 +335,14 @@ export const MonthlyForecastPage: React.FC = () => {
 };
 
 // ─── Shell: company selection via URL, shared by Forecast and Budget ─────────
+// El año sale del último ejercicio cerrado de la empresa (L): Forecast = L+1,
+// Budget = L+2. Ya no depende del calendario.
 
 export const MonthlyForecastShell: React.FC<{
-  year: number;
   titlePrefix: string;
   companySelectorDescription: string;
   mode?: 'forecast' | 'budget';
-}> = ({ year, titlePrefix, companySelectorDescription, mode = 'forecast' }) => {
+}> = ({ titlePrefix, companySelectorDescription, mode = 'forecast' }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
@@ -365,10 +367,31 @@ export const MonthlyForecastShell: React.FC<{
           p.set('companyId', company.id);
           setSearchParams(p);
         }}
-        title={`${titlePrefix} ${year}`}
+        title={titlePrefix}
         description={companySelectorDescription}
         icon={<CalendarDays className="w-7 h-7 text-slate-900" />}
       />
+    );
+  }
+
+  if (loadingCompanies) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center py-16">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-600" role="status" aria-label="Cargando" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const years = companyYears(selectedCompany);
+  const year = mode === 'budget' ? years.budgetYear : years.forecastYear;
+
+  if (years.needsClosing) {
+    return (
+      <DashboardLayout>
+        <NeedsClosingNotice companyId={companyId} years={years} />
+      </DashboardLayout>
     );
   }
 

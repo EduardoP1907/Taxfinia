@@ -2,8 +2,37 @@ import { Request, Response } from 'express';
 import { financialService } from '../services/financial.service';
 import { convertBigIntToString } from '../utils/bigint';
 import { parseImportFile, generateTemplateBuffer } from '../utils/excel-import';
+import { closeFiscalYear, reopenFiscalYear } from '../services/fiscal-close.service';
+import { AccessError } from '../services/access.service';
 
 export const financialController = {
+  // ============= CIERRE DE EJERCICIO =============
+  async closeFiscalYear(req: Request, res: Response) {
+    try {
+      const result = await closeFiscalYear(req.params.fiscalYearId, req.user!.userId);
+      res.json({ success: true, data: result, message: `Ejercicio ${result.year} cerrado correctamente.` });
+    } catch (error: any) {
+      if (!(error instanceof AccessError)) console.error('Error closing fiscal year:', error);
+      res.status(error instanceof AccessError ? error.status : 500).json({
+        success: false,
+        error: error instanceof AccessError ? error.message : 'No se pudo cerrar el ejercicio. Inténtalo de nuevo.',
+      });
+    }
+  },
+
+  async reopenFiscalYear(req: Request, res: Response) {
+    try {
+      const result = await reopenFiscalYear(req.params.fiscalYearId, req.user!.userId);
+      res.json({ success: true, data: result, message: `Ejercicio ${result.year} reabierto.` });
+    } catch (error: any) {
+      if (!(error instanceof AccessError)) console.error('Error reopening fiscal year:', error);
+      res.status(error instanceof AccessError ? error.status : 500).json({
+        success: false,
+        error: error instanceof AccessError ? error.message : 'No se pudo reabrir el ejercicio. Inténtalo de nuevo.',
+      });
+    }
+  },
+
   // ============= FISCAL YEARS =============
 
   async getFiscalYears(req: Request, res: Response) {

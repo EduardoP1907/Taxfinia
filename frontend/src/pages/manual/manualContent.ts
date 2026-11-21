@@ -343,6 +343,7 @@ export function buildManual(cy: number) {
               ],
             },
             { type: 'p', text: 'El ejercicio recién cerrado se habilita el 1 de enero. Los años que quedan fuera de la ventana se conservan en solo lectura.' },
+            { type: 'p', text: 'El cambio de año no es automático: cuando termine de cargar el ejercicio, pulse «Cerrar ejercicio» en Datos Financieros y confirme. Desde ese momento el Informe Financiero Anual pasa a ese ejercicio, la Proyección Financiera al año siguiente y el Presupuesto Financiero al subsiguiente, y las proyecciones a 10 años le ofrecen actualizarse a esa base. Mientras no lo cierre, la empresa sigue trabajando con el último ejercicio cerrado. Un cierre hecho por error se puede reabrir mientras el ejercicio no se haya usado en un informe ni con el asistente IA.' },
           ],
         },
         {
@@ -686,6 +687,7 @@ export function buildManual(cy: number) {
   ];
 
   const faq: FaqItem[] = [
+    { q: 'Ya es enero, ¿por qué la Proyección Financiera sigue en el año anterior?', a: 'Porque el año de trabajo avanza solo cuando usted carga y cierra el ejercicio anterior en Datos Financieros («Cerrar ejercicio»). Así puede seguir trabajando mientras termina su cierre contable.' },
     { q: '¿Por qué no puedo cargar el año en curso?', a: 'Porque no está cerrado. Se trabaja en la Proyección Financiera [[10]] y se carga como dato anual desde el 1 de enero siguiente.' },
     { q: 'El balance me sale descuadrado, ¿qué reviso?', a: 'Que el resultado del ejercicio esté incluido en el patrimonio neto, que la depreciación acumulada esté restada del activo fijo y que no haya partidas duplicadas entre corto y largo plazo.' },
     { q: '¿Los datos se guardan solos?', a: 'No. En Datos Financieros presione «Guardar Todo»; en las Proyecciones Mensuales, «Guardar y recalcular».' },

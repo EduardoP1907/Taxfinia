@@ -10,6 +10,7 @@ import {
   BookOpen, Download, PanelLeftClose, PanelLeftOpen, CalendarRange, Wallet, FileChartLine,
 } from 'lucide-react';
 import { MANUAL_PDF_URL, MANUAL_PDF_FILENAME } from '../pages/manual/manualContent';
+import { companyYears } from '../utils/yearContext';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
 
@@ -69,9 +70,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     navigate('/login');
   };
 
-  // Los años del menú se calculan cada vez: el informe anual es del último
-  // ejercicio cerrado, la proyección del año en curso y el presupuesto del siguiente.
-  const currentYear = new Date().getFullYear();
+  // Los años del menú salen del último ejercicio cerrado de la empresa activa (L):
+  // informe anual = L, proyección = L+1, presupuesto = L+2. Sin empresa activa
+  // (o sin ejercicio cerrado) el menú no muestra año.
+  const activeCompany = companies?.find(c => c.id === activeCompanyId) ?? null;
+  const menuYears = activeCompany?.yearContext?.lastClosedYear != null ? companyYears(activeCompany) : null;
+  const withYear = (label: string, year?: number) => (menuYears && year ? `${label} ${year}` : label);
 
   // El admin tiene su propio menú: no ve las secciones de usuario
   const adminNavGroups: NavGroup[] = [
@@ -102,14 +106,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       items: [
         { name: 'Datos Financieros',                       href: '/datos',        icon: FileText,     scoped: true },
         { name: 'Proyecciones a 10 Años',                  href: '/proyecciones', icon: TrendingUp,   scoped: true },
-        { name: `Informe Financiero Anual ${currentYear - 1}`, href: '/informe',  icon: FileBarChart, scoped: true },
+        { name: withYear('Informe Financiero Anual', menuYears?.reportYear), href: '/informe', icon: FileBarChart, scoped: true },
       ],
     },
     {
       label: 'Proyecciones Mensuales',
       items: [
-        { name: `Proyección Financiera ${currentYear}`,   href: '/forecast-mensual',      icon: CalendarRange,   scoped: true },
-        { name: `Presupuesto Financiero ${currentYear + 1}`, href: '/budget',             icon: Wallet,   scoped: true },
+        { name: withYear('Proyección Financiera', menuYears?.forecastYear),  href: '/forecast-mensual', icon: CalendarRange, scoped: true },
+        { name: withYear('Presupuesto Financiero', menuYears?.budgetYear),   href: '/budget',           icon: Wallet,        scoped: true },
         { name: 'Informes Proyectados',                   href: '/informes-comparativos', icon: FileChartLine, scoped: true },
       ],
     },
